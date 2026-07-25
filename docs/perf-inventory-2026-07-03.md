@@ -69,7 +69,7 @@ Playwright の実測プロファイルで `/home` -> `/collection` -> `/cats` �
 | うちのこ / 文箱 viewer | `displaySrc -> originalSrc -> thumbnailSrc -> src` | `src/components/home/OmoideMemoryViewer.tsx:86-93` |
 | うちのこ / 年ごとの思い出 row | `thumbnailSrc -> displaySrc -> src` | `src/components/cats/CatsPage.tsx:3058-3062` |
 | うちのこ / 足あと | 写真 entry は lens photo `src`、思い出 entry は `thumbnailSrc -> displaySrc -> src` | `src/lib/cats/footprints.ts:30-43`, `src/lib/cats/footprints.ts:62-71` |
-| うちのこ / 基本 hero | `avatarDataUrl -> activeCoverPhoto.src -> coat avatar`。activeCoverPhoto はとっておき優先、なければ安定したねがお fallback | `src/components/cats/CatsPage.tsx:238-274` |
+| うちのこ / プロフィールの代表写真 | `coverPhotoDataUrl -> activeCoverPhoto`。プロフィール内では小さなthumbnailとして表示し、写真タブの内容を押し下げない | `src/components/cats/CatsPage.tsx` |
 | 汎用 `PhotoTile` | 渡された `src` を `StoredPhotoImage` に渡す | `src/components/ui/PhotoTile.tsx:78-88` |
 
 ### A-4. signed URL API呼出回数、キャッシュ、有効期限

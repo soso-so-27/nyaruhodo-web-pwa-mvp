@@ -57,6 +57,27 @@ test.describe("account deletion UI", () => {
     await expect(page.getByTestId("account-delete-payment-block")).toHaveCount(0);
   });
 
+  test("links photo settings guidance to the individual photos in うちのこ", async ({
+    page,
+  }) => {
+    await mockBillingStatus(page, {});
+
+    await page.goto("/account-deletion");
+
+    await expect(
+      page.getByText(
+        "「うちのこ」で写真をひらくと、ねこだよりへの送信設定を変更できます。",
+        { exact: false },
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "うちのこへ" }),
+    ).toHaveAttribute("href", "/cats");
+    await expect(
+      page.getByRole("link", { name: "送る写真を確認" }),
+    ).toHaveCount(0);
+  });
+
   test("shows payment management block for a signed-in user with an active subscription", async ({
     page,
   }) => {

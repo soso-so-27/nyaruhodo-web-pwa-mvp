@@ -2511,9 +2511,7 @@ test.describe("collection album flow", () => {
 });
 
 async function openOwnPhotoSettings(page: Page) {
-  await page
-    .getByRole("button", { name: "ねこだよりに送る写真の設定" })
-    .click();
+  await page.goto("/collection?manage=sent");
   await expect(
     page.getByRole("heading", {
       name: "ねこだよりに送る写真の設定",

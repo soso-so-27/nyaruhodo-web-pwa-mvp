@@ -199,6 +199,9 @@ test.describe("20時便の4枚選択", () => {
       choiceDialog.getByTestId("evening-four-choice-saved"),
     ).toBeVisible();
     await expect(
+      choiceDialog.getByTestId("evening-four-choice-day-bridge"),
+    ).toContainText("きょうは、ここまで。また、あした。");
+    await expect(
       choiceDialog.getByTestId("evening-four-choice-own-record"),
     ).toHaveText("きょう撮った写真を「うちのこ」で見る›");
     await choiceDialog.getByTestId("evening-four-choice-finish").click();
@@ -264,7 +267,7 @@ test.describe("20時便の4枚選択", () => {
     );
     const deliveryBridge = page.getByTestId("cats-photo-delivery-bridge");
     await expect(deliveryBridge).toContainText(
-      "きょうの選択テスト猫から、ねこだよりが届きました",
+      "この写真を残した日に届いたねこだより",
     );
     await expect(
       deliveryBridge.getByRole("link", { name: "ねこだよりを見る" }),
@@ -322,7 +325,7 @@ test.describe("20時便の4枚選択", () => {
       OWN_PHOTO_ID,
     );
     await expect(nextDayBridge).toContainText(
-      "7月22日の選択テスト猫から、ねこだよりが届きました",
+      "この写真を残した日に届いたねこだより",
     );
     await expect(page.getByTestId("cats-photo-today-link")).toHaveCount(0);
   });
@@ -434,8 +437,11 @@ test.describe("20時便の4枚選択", () => {
       "empty-after",
     );
     await expect(page.getByTestId("home-letter-tray")).toContainText(
-      "保存すると、次のよる8時ごろにねこだよりがとどきます",
+      "保存すると、あしたのよる8時ごろにねこだよりがとどきます",
     );
+    await expect(
+      page.getByText("きょうは、ここまで。また、あした。"),
+    ).toBeVisible();
     await expect(page.getByText("きょうは とどかない")).toHaveCount(0);
   });
 

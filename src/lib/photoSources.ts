@@ -30,7 +30,7 @@ export const PHOTO_DISPLAY_CONTRACT = {
     fit: "cover",
     source: "display",
     storageVariant: "hero",
-    usage: "cat profile cover",
+    usage: "cat representative photo source and crop",
   },
   detail: {
     fit: "contain",

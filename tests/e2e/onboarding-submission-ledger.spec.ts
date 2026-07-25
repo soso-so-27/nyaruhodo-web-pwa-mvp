@@ -10,6 +10,7 @@ import {
   createOnboardingJourneySubmissionId,
   createOnboardingOwnPhotoId,
 } from "../../src/lib/onboarding/journeyContract";
+import { buildOnboardingJourneyDeliveryId } from "../../src/lib/server/onboardingDeliveryBundle";
 
 const catPhotoDataUrl = `data:image/jpeg;base64,${fs
   .readFileSync(path.resolve(process.cwd(), "tests/fixtures/cat-photo-letter.jpg"))
@@ -43,6 +44,38 @@ test.describe("onboarding submission ledger", () => {
     await expect(response.json()).resolves.toMatchObject({
       ok: false,
       error: "invalid_submission",
+    });
+  });
+
+  test("rejects an explicit invalid onboarding choice operation instead of inferring keep", async ({
+    request,
+  }) => {
+    const journeyId = `onbj_${crypto.randomUUID()}`;
+    const dateKey = getJstDateKey();
+    const submissionId = createOnboardingJourneySubmissionId(
+      journeyId,
+      dateKey,
+    );
+    const bundleId = buildOnboardingJourneyDeliveryId({
+      journeyId,
+      deliveryDateKey: dateKey,
+    });
+    const response = await request.post("/api/onboarding/choice", {
+      data: {
+        bundleId,
+        deliveryDateKey: dateKey,
+        journeyId,
+        operation: "skipp",
+        resumeToken: createOnboardingResumeToken(),
+        selectedPhotoId: `${bundleId}-choice-1`,
+        submissionId,
+      },
+    });
+
+    expect(response.status()).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: "invalid_choice_request",
     });
   });
 
@@ -796,6 +829,192 @@ test.describe("onboarding submission ledger", () => {
         ]),
         returnedCandidateCount: 3,
       });
+    } finally {
+      await adminSupabase
+        .from("onboarding_submissions")
+        .delete()
+        .eq("submission_id", submissionId);
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .contains("metadata", { onboarding_submission_id: submissionId });
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", [...candidateIds, ownPhotoId]);
+    }
+  });
+
+  test("keeps an onboarding skip canonical across retries and a later keep", async ({
+    request,
+  }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(!adminSupabase, "Local Supabase service role is required.");
+    if (!adminSupabase) return;
+
+    const stamp = `${Date.now()}-${crypto.randomUUID()}`;
+    const anonymousId = `onboarding-skip-${stamp}`;
+    const journeyId = `onbj_${crypto.randomUUID()}`;
+    const dateKey = getJstDateKey();
+    const submissionId = createOnboardingJourneySubmissionId(
+      journeyId,
+      dateKey,
+    );
+    const ownPhotoId = createOnboardingOwnPhotoId(submissionId);
+    const resumeToken = createOnboardingResumeToken();
+    const candidateIds = Array.from(
+      { length: 4 },
+      (_, index) => `onboarding-skip-stock-${stamp}-${index + 1}`,
+    );
+    const blockedPhotoIds = (
+      await readCurrentAdminStockIdentityIds(adminSupabase)
+    ).slice(0, 96);
+    const exchangeData = {
+      ownPhoto: {
+        id: ownPhotoId,
+        catId: `onboarding-skip-cat-${stamp}`,
+        ownerCatId: `onboarding-skip-cat-${stamp}`,
+        src: catPhotoDataUrl,
+        createdAt: Date.now(),
+        shared: true,
+      },
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+      category: "sleeping",
+      seed: submissionId,
+      deliveryDateKey: dateKey,
+      recipientCatId: `onboarding-skip-cat-${stamp}`,
+      anonymousId,
+      blockedPhotoIds,
+      preferredSourcePhotoId: candidateIds[0],
+      requestedCandidateCount: 4,
+      capability: "onboarding_choice_v1",
+      mode: "onboarding",
+      onboardingSubmission: {
+        dateKey,
+        journeyId,
+        resumeToken,
+        source: "instagram_bio",
+        submissionId,
+      },
+    };
+
+    try {
+      const { error: candidateError } = await adminSupabase
+        .from("cat_moments")
+        .insert(
+          candidateIds.map((candidateId, index) => ({
+            anonymous_id: `onboarding-skip-source-${stamp}-${index + 1}`,
+            local_moment_id: candidateId,
+            local_cat_id: `onboarding-skip-source-cat-${stamp}-${index + 1}`,
+            owner_cat_id: `onboarding-skip-source-cat-${stamp}-${index + 1}`,
+            photo_url: createSolidTestJpegDataUrl(index),
+            state: "sleeping",
+            visibility: "shared",
+            delivery_status: "available",
+            moderation_status: "approved",
+            moderated_at: new Date().toISOString(),
+            moderated_by: "e2e",
+            metadata: {
+              source: "admin-stock",
+              pool_kind: "admin_stock",
+              source_cat_key: `onboarding-skip-real-cat-${stamp}-${index + 1}`,
+            },
+            captured_at: new Date(Date.now() - 60_000 - index).toISOString(),
+            created_at: new Date(Date.now() - 60_000 - index).toISOString(),
+          })),
+        );
+      expect(candidateError).toBeNull();
+
+      const exchange = await request.post("/api/sleeping-delivery/exchange", {
+        headers: { "x-forwarded-for": `192.0.2.${Date.now() % 200}` },
+        data: exchangeData,
+      });
+      expect(exchange.status()).toBe(200);
+      const exchangeBody = (await exchange.json()) as {
+        bundleId?: string;
+        experienceVersion?: string;
+        photos?: Array<{ id: string; sourcePhotoId?: string }>;
+      };
+      expect(exchangeBody.experienceVersion).toBe("onboarding_choice_v1");
+      expect(exchangeBody.photos).toHaveLength(4);
+      expect(
+        exchangeBody.photos?.map((photo) => photo.sourcePhotoId).sort(),
+      ).toEqual([...candidateIds].sort());
+      expect(exchangeBody.bundleId).toBeTruthy();
+
+      const skipData = {
+        bundleId: exchangeBody.bundleId,
+        deliveryDateKey: dateKey,
+        journeyId,
+        operation: "skip",
+        resumeToken,
+        selectedPhotoId: null,
+        submissionId,
+      };
+      const firstSkip = await request.post("/api/onboarding/choice", {
+        data: skipData,
+      });
+      expect(firstSkip.status()).toBe(200);
+      await expect(firstSkip.json()).resolves.toMatchObject({
+        ok: true,
+        state: "skipped",
+        selectedPhotoId: null,
+        idempotent: false,
+      });
+
+      const skipRetry = await request.post("/api/onboarding/choice", {
+        data: skipData,
+      });
+      expect(skipRetry.status()).toBe(200);
+      await expect(skipRetry.json()).resolves.toMatchObject({
+        ok: true,
+        state: "skipped",
+        selectedPhotoId: null,
+        idempotent: true,
+      });
+
+      const laterKeep = await request.post("/api/onboarding/choice", {
+        data: {
+          ...skipData,
+          operation: "keep",
+          selectedPhotoId: exchangeBody.photos?.[0]?.id,
+        },
+      });
+      expect(laterKeep.status()).toBe(409);
+      await expect(laterKeep.json()).resolves.toMatchObject({
+        ok: false,
+        error: "choice_already_resolved",
+        canonical: {
+          state: "skipped",
+          selectedPhotoId: null,
+        },
+      });
+
+      const { data: ledger, error: ledgerError } = await adminSupabase
+        .from("onboarding_submissions")
+        .select(
+          "delivery_choice_outcome, delivery_id, source_photo_id, stage",
+        )
+        .eq("submission_id", submissionId)
+        .single();
+      expect(ledgerError).toBeNull();
+      expect(ledger).toMatchObject({
+        delivery_choice_outcome: "skipped",
+        delivery_id: null,
+        source_photo_id: null,
+        stage: "delivered",
+      });
+
+      const { data: deliveryRows, error: deliveryError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("local_delivery_id, status")
+        .contains("metadata", { onboarding_submission_id: submissionId });
+      expect(deliveryError).toBeNull();
+      expect(deliveryRows).toHaveLength(4);
+      expect(
+        deliveryRows?.filter((row) => row.status === "kept"),
+      ).toHaveLength(0);
     } finally {
       await adminSupabase
         .from("onboarding_submissions")

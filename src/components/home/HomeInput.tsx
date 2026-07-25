@@ -13,7 +13,9 @@ import {
   getHomeInstallPlatform,
   HOME_INSTALL_ONBOARDING_COMPLETED_EVENT,
   isHomeInstallHintSnoozed,
+  isHomeInstallHintReadyForVisit,
   isStandaloneDisplay,
+  recordHomeInstallHomeVisit,
   snoozeHomeInstallHint,
   type HomeInstallPlatform,
 } from "../../lib/homeInstall";
@@ -412,6 +414,7 @@ export function HomeInput({
   );
   const openingEveningDeliveryRequestRef = useRef<string | null>(null);
   const hasTrackedHomeInstallHintRef = useRef(false);
+  const hasRecordedHomeInstallVisitRef = useRef(false);
 
   useEffect(() => {
     compactDuplicatePhotoSourcesInLocalStorage();
@@ -490,7 +493,20 @@ export function HomeInput({
   }, []);
 
   useEffect(() => {
+    function recordCurrentHomeVisitIfReady() {
+      if (
+        hasRecordedHomeInstallVisitRef.current ||
+        window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) !== "true"
+      ) {
+        return;
+      }
+
+      recordHomeInstallHomeVisit();
+      hasRecordedHomeInstallVisitRef.current = true;
+    }
+
     function refreshHomeInstallHint() {
+      recordCurrentHomeVisitIfReady();
       if (
         isStandaloneDisplay() ||
         isEmbeddedInAppBrowser() ||
@@ -507,6 +523,7 @@ export function HomeInput({
         Boolean(platform) &&
           window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) ===
             "true" &&
+          isHomeInstallHintReadyForVisit() &&
           !isHomeInstallHintSnoozed(),
       );
     }
@@ -1867,6 +1884,7 @@ export function HomeInput({
     if (
       isStandaloneDisplay() ||
       isEmbeddedInAppBrowser() ||
+      !isHomeInstallHintReadyForVisit() ||
       isHomeInstallHintSnoozed()
     ) {
       return;
@@ -2377,7 +2395,7 @@ export function HomeInput({
     }
 
     setEveningRefreshTick((value) => value + 1);
-    showToast("今回は保存しませんでした");
+    showToast("きょうは、ここまで。また、あした。");
     return {
       kind: "skipped" as const,
       conflict: canonical.conflict,
@@ -2741,6 +2759,10 @@ export function HomeInput({
   });
   const canUsePendingPhotoAsDeliveryTarget =
     eveningHomeState.kind === "before" || eveningHomeState.kind === "waiting";
+  const pendingPhotoDeliveryCopy =
+    eveningHomeState.dateKey === getJstDateKey(homeNow)
+      ? "保存すると、よる8時ごろにねこだよりがとどきます。"
+      : "保存すると、あしたのよる8時ごろにねこだよりがとどきます。";
   const isHomeReady = isHomeClockReady && hasHydratedHomeState;
 
   return (
@@ -2880,7 +2902,7 @@ export function HomeInput({
           catProfiles={catProfiles}
           selectedCatId={pendingExchangeCatId ?? activeCatId}
           isExchangeTargetAvailable={canUsePendingPhotoAsDeliveryTarget}
-          deliveryCopy="保存すると、よる8時ごろにねこだよりがとどきます。"
+          deliveryCopy={pendingPhotoDeliveryCopy}
           onCatSelect={handlePendingExchangeCatSelect}
           onModeChange={(mode) => {
             trackProductEvent(
@@ -4431,6 +4453,14 @@ export function EveningDeliveryFourChoice({
               </div>
               <p style={styles.eveningFourSavedCopy}>
                 この写真を「ねこだより」に残しました
+              </p>
+              <p
+                data-testid="evening-four-choice-day-bridge"
+                style={styles.eveningFourDayBridge}
+              >
+                きょうは、ここまで。
+                <br />
+                また、あした。
               </p>
               {state.targetPhoto && targetOwnCatId ? (
                 <a
@@ -9186,6 +9216,16 @@ const styles = {
     fontSize: "13px",
     fontWeight: 500,
     lineHeight: 1.6,
+    textAlign: "center",
+  },
+  eveningFourDayBridge: {
+    margin: "2px 0 0",
+    color: "var(--ink-faint)",
+    fontFamily: "var(--font-display)",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+    letterSpacing: "var(--tracking-body)",
     textAlign: "center",
   },
   eveningFourOwnRecordLink: {

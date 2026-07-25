@@ -20,14 +20,15 @@ type ChoiceRequest = {
   bundleId?: unknown;
   deliveryDateKey?: unknown;
   journeyId?: unknown;
+  operation?: unknown;
   resumeToken?: unknown;
   selectedPhotoId?: unknown;
   submissionId?: unknown;
 };
 
 type ChoiceResolutionRow = {
-  outcome: "kept";
-  selected_local_delivery_id: string;
+  outcome: "kept" | "skipped";
+  selected_local_delivery_id: string | null;
   resolved_at: string;
   applied: boolean;
 };
@@ -44,6 +45,14 @@ export async function POST(request: Request) {
   const resumeToken = sanitizeId(parsed.input.resumeToken);
   const selectedPhotoId = sanitizeId(parsed.input.selectedPhotoId);
   const submissionId = sanitizeId(parsed.input.submissionId);
+  const operation = Object.prototype.hasOwnProperty.call(
+    parsed.input,
+    "operation",
+  )
+    ? sanitizeOperation(parsed.input.operation)
+    : selectedPhotoId
+      ? "keep"
+      : null;
 
   if (
     !bundleId ||
@@ -57,7 +66,9 @@ export async function POST(request: Request) {
       createOnboardingJourneySubmissionId(journeyId, deliveryDateKey) ||
     bundleId !==
       buildOnboardingJourneyDeliveryId({ journeyId, deliveryDateKey }) ||
-    !isBundleChoiceId(selectedPhotoId, bundleId)
+    !operation ||
+    (operation === "keep" && !isBundleChoiceId(selectedPhotoId, bundleId)) ||
+    (operation === "skip" && selectedPhotoId !== null)
   ) {
     return choiceError("invalid_choice_request", 400);
   }
@@ -109,7 +120,11 @@ export async function POST(request: Request) {
     resolvedAt: resolution.resolved_at,
   };
 
-  if (resolution.selected_local_delivery_id !== selectedPhotoId) {
+  const requestedPhotoId = operation === "keep" ? selectedPhotoId : null;
+  if (
+    resolution.outcome !== (operation === "keep" ? "kept" : "skipped") ||
+    resolution.selected_local_delivery_id !== requestedPhotoId
+  ) {
     return NextResponse.json(
       {
         ok: false,
@@ -169,6 +184,10 @@ function sanitizeDateKey(value: unknown) {
     : null;
 }
 
+function sanitizeOperation(value: unknown) {
+  return value === "keep" || value === "skip" ? value : null;
+}
+
 function isBundleChoiceId(photoId: string | null, bundleId: string) {
   return Boolean(
     photoId &&
@@ -180,8 +199,13 @@ function isBundleChoiceId(photoId: string | null, bundleId: string) {
 
 function isChoiceResolutionRow(value: ChoiceResolutionRow) {
   return (
-    value.outcome === "kept" &&
-    typeof value.selected_local_delivery_id === "string" &&
+    (value.outcome === "kept" || value.outcome === "skipped") &&
+    (value.selected_local_delivery_id === null ||
+      typeof value.selected_local_delivery_id === "string") &&
+    (value.outcome !== "kept" ||
+      typeof value.selected_local_delivery_id === "string") &&
+    (value.outcome !== "skipped" ||
+      value.selected_local_delivery_id === null) &&
     typeof value.resolved_at === "string" &&
     typeof value.applied === "boolean"
   );

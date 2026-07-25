@@ -39,6 +39,7 @@ export type LatestHypothesisView = {
 export type CatProfile = {
   id: string;
   name: string;
+  nameState?: "unset" | "confirmed";
   nameConfirmedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -527,16 +528,19 @@ export function buildDailyHintHypothesis(
 }
 
 export function createLocalCatProfile(
-  name = DEFAULT_CAT_NAME,
+  name?: string,
   timestamps?: { createdAt?: string; updatedAt?: string },
 ): CatProfile {
   const now = new Date().toISOString();
+  const confirmedName = name?.trim() ?? "";
 
   return {
     id: `local-cat-${Date.now().toString(36)}-${Math.random()
       .toString(36)
       .slice(2, 8)}`,
-    name,
+    name: confirmedName || DEFAULT_CAT_NAME,
+    nameState: confirmedName ? "confirmed" : "unset",
+    nameConfirmedAt: confirmedName ? now : undefined,
     createdAt: timestamps?.createdAt ?? now,
     updatedAt: timestamps?.updatedAt ?? timestamps?.createdAt ?? now,
   };
@@ -691,29 +695,22 @@ export function isCatProfileNameUnset(profile: CatProfile | null | undefined) {
     return true;
   }
 
+  if (profile?.nameState === "unset") {
+    return true;
+  }
+
+  if (profile?.nameState === "confirmed") {
+    return false;
+  }
+
   if (name !== DEFAULT_CAT_NAME) {
     return false;
   }
 
-  if (!profile) {
-    return true;
-  }
-
-  return !hasUserProfileDetails(profile);
-}
-
-function hasUserProfileDetails(profile: CatProfile) {
-  return Boolean(
-    profile.nameConfirmedAt ||
-      profile.updatedAt !== profile.createdAt ||
-      profile.coverPhotoDataUrl ||
-      profile.homePhotoDataUrl ||
-      profile.basicInfo?.familySinceDate ||
-      profile.basicInfo?.birthDate ||
-      profile.basicInfo?.gender ||
-      profile.basicInfo?.breed?.trim() ||
-      profile.appearance?.coat,
-  );
+  // Profiles saved before nameState was introduced used "ミケ" as their
+  // visible name. Keep that legacy name unless the profile explicitly says
+  // it is still unnamed.
+  return false;
 }
 
 export function addCatProfile(profiles: CatProfile[], name: string) {
@@ -723,7 +720,11 @@ export function addCatProfile(profiles: CatProfile[], name: string) {
     return null;
   }
 
-  const profile = createLocalCatProfile(trimmedName);
+  const profile = {
+    ...createLocalCatProfile(trimmedName),
+    nameState: "confirmed" as const,
+    nameConfirmedAt: new Date().toISOString(),
+  };
   const nextProfiles = [...profiles, profile];
 
   saveCatProfiles(nextProfiles);
@@ -753,6 +754,8 @@ export function updateCatProfileName(
       ? {
           ...profile,
           name: trimmedName,
+          nameState: "confirmed" as const,
+          nameConfirmedAt: profile.nameConfirmedAt ?? now,
           updatedAt: now,
         }
       : profile,
@@ -797,7 +800,11 @@ export function updateCatProfileCoat(
 }
 
 export function getCatName(profile: CatProfile | null) {
-  return profile?.name || DEFAULT_CAT_NAME;
+  if (isCatProfileNameUnset(profile)) {
+    return "この子";
+  }
+
+  return profile?.name?.trim() || "この子";
 }
 
 export function readCurrentCatHintSuppressions() {
@@ -926,12 +933,20 @@ function normalizeStoredCatProfile(profile: LegacyCatProfile): CatProfile {
     ? migrateTypeKey(String(profile.typeKey))
     : undefined;
   const typeInfo = typeKey ? getCatTypeInfo(typeKey) : undefined;
+  const storedName = profile.name?.trim() ?? "";
+  const nameState =
+    profile.nameState === "unset" || profile.nameState === "confirmed"
+      ? profile.nameState
+      : profile.nameConfirmedAt || storedName
+        ? "confirmed"
+        : "unset";
   const coverPhotoDataUrl = profile.coverPhotoDataUrl ?? profile.avatarDataUrl;
   const coverCrop = normalizeCatCoverCrop(profile.coverCrop ?? profile.avatarCrop);
 
   return {
     id: profile.id as string,
-    name: profile.name ?? DEFAULT_CAT_NAME,
+    name: storedName || DEFAULT_CAT_NAME,
+    nameState,
     nameConfirmedAt: profile.nameConfirmedAt,
     createdAt: profile.createdAt ?? new Date().toISOString(),
     updatedAt:

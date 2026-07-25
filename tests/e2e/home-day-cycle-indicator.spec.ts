@@ -263,6 +263,11 @@ test.describe("home desk state cycle", () => {
             cover_crop: { scale: 0.55, offsetX: 12, offsetY: -8 },
             home_photo_storage_path: null,
             home_photo_position: null,
+            metadata: {
+              source: "localStorage-v1",
+              cat_name_state: "confirmed",
+              cat_name_confirmed_at: new Date(now).toISOString(),
+            },
             local_created_at: new Date(now).toISOString(),
             local_updated_at: new Date(now).toISOString(),
             created_at: new Date(now).toISOString(),
@@ -309,6 +314,8 @@ test.describe("home desk state cycle", () => {
           profiles: JSON.parse(
             window.localStorage.getItem("cat_profiles") ?? "[]",
           ) as Array<{
+            nameState?: string;
+            nameConfirmedAt?: string;
             coverPhotoDataUrl?: string;
             coverCrop?: { scale?: number; offsetX?: number; offsetY?: number };
           }>,
@@ -322,6 +329,8 @@ test.describe("home desk state cycle", () => {
         activeCatId: localCatId,
         profiles: [
           {
+            nameState: "confirmed",
+            nameConfirmedAt: new Date(now).toISOString(),
             coverPhotoDataUrl: `storage:${restoredCoverPath}`,
             coverCrop: { scale: 0.55, offsetX: 12, offsetY: -8 },
           },
@@ -668,7 +677,7 @@ test.describe("home desk state cycle", () => {
       "1b",
     );
     await expect(page.getByTestId("home-letter-tray")).toContainText(
-      "保存すると、次のよる8時ごろにねこだよりがとどきます",
+      "保存すると、あしたのよる8時ごろにねこだよりがとどきます",
     );
     await expect(page.getByText("きょうは とどかない")).toHaveCount(0);
   });

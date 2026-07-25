@@ -46,6 +46,8 @@ import {
 type LocalCatProfile = {
   id: string;
   name?: string;
+  nameState?: "unset" | "confirmed";
+  nameConfirmedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   homePhotoDataUrl?: string;
@@ -142,6 +144,7 @@ type RemoteCatRow = {
   cover_crop: Record<string, unknown> | null;
   home_photo_storage_path: string | null;
   home_photo_position: string | null;
+  metadata: Record<string, unknown> | null;
   local_created_at: string | null;
   local_updated_at: string | null;
   created_at: string;
@@ -781,6 +784,7 @@ export type AccountSleepingPhotoDeleteResult = {
 
 export async function deleteAccountSleepingPhoto(
   photoId: string,
+  remoteMomentId?: string,
 ): Promise<AccountSleepingPhotoDeleteResult> {
   if (typeof window === "undefined") {
     return { status: "local_only" };
@@ -821,6 +825,20 @@ export async function deleteAccountSleepingPhoto(
 
   if (error) {
     throw new Error(`Sleeping photo delete failed: ${error.message}`);
+  }
+
+  if (remoteMomentId && remoteMomentId !== photoId) {
+    const { error: remoteDeleteError } = await supabase
+      .from("cat_moments")
+      .delete()
+      .eq("user_id", data.user.id)
+      .eq("id", remoteMomentId);
+
+    if (remoteDeleteError) {
+      throw new Error(
+        `Sleeping photo remote delete failed: ${remoteDeleteError.message}`,
+      );
+    }
   }
 
   return { status: "deleted" };
@@ -1106,13 +1124,42 @@ function normalizeProfiles(
     )
     .map((profile) => {
       const { avatarDataUrl, avatarCrop, ...rest } = profile;
+      const storedName = rest.name?.trim() ?? "";
+      const nameState =
+        rest.nameState === "unset" || rest.nameState === "confirmed"
+          ? rest.nameState
+          : rest.nameConfirmedAt || storedName
+            ? "confirmed"
+            : "unset";
 
       return {
         ...rest,
+        nameState,
         coverPhotoDataUrl: profile.coverPhotoDataUrl ?? avatarDataUrl,
         coverCrop: normalizeCatCoverCrop(profile.coverCrop ?? avatarCrop),
       };
     });
+}
+
+function readRemoteCatNameState(
+  metadata: Record<string, unknown> | null | undefined,
+): "unset" | "confirmed" {
+  if (metadata?.cat_name_state === "unset") {
+    return "unset";
+  }
+
+  // Remote rows created before this marker existed already exposed their
+  // stored name. Treat them as confirmed so an existing "ミケ" does not turn
+  // into the unnamed placeholder after account restore.
+  return "confirmed";
+}
+
+function readRemoteCatNameConfirmedAt(
+  metadata: Record<string, unknown> | null | undefined,
+) {
+  return typeof metadata?.cat_name_confirmed_at === "string"
+    ? metadata.cat_name_confirmed_at
+    : undefined;
 }
 
 function hasMeaningfulLocalData(snapshot: LocalSnapshot) {
@@ -1283,7 +1330,13 @@ async function syncCatProfile(
     understanding: toJsonObject(profile.understanding),
     home_photo_position: profile.homePhotoPosition ?? null,
     cover_crop: profile.coverCrop ? toJsonObject(profile.coverCrop) : null,
-    metadata: SYNC_METADATA,
+    metadata: {
+      ...SYNC_METADATA,
+      cat_name_state: profile.nameState ?? "confirmed",
+      ...(profile.nameConfirmedAt
+        ? { cat_name_confirmed_at: profile.nameConfirmedAt }
+        : {}),
+    },
     local_created_at: toIsoStringOrNull(profile.createdAt),
     local_updated_at: toIsoStringOrNull(profile.updatedAt),
   };
@@ -1925,12 +1978,18 @@ async function restoreRemoteSnapshot(
 
   for (const cat of remoteCats) {
     const localCatId = cat.local_cat_id ?? `remote-cat-${cat.id}`;
+    const restoredNameState = readRemoteCatNameState(cat.metadata);
     remoteIdToLocalId.set(cat.id, localCatId);
     remoteLocalCatIds.push(localCatId);
 
     const restoredProfile = {
       id: localCatId,
       name: cat.name,
+      nameState: restoredNameState,
+      nameConfirmedAt:
+        restoredNameState === "confirmed"
+          ? readRemoteCatNameConfirmedAt(cat.metadata)
+          : undefined,
       createdAt: cat.local_created_at ?? cat.created_at,
       updatedAt: cat.local_updated_at ?? cat.updated_at,
       homePhotoDataUrl: cat.home_photo_storage_path

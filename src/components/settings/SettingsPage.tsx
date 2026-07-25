@@ -693,17 +693,17 @@ export function SettingsPage() {
                   </div>
                   <div style={styles.divider} />
                   <p style={styles.storageNote}>
-                    写真と記録は、この端末に保存されています。Googleでログインすると、アカウントにも保存でき、別の端末でも見られます。
+                    写真などのデータは、この端末に保存されています。Googleでログインすると、アカウントにも保存でき、別の端末でも見られます。
                   </p>
-                  <div style={styles.divider} />
-                  <details style={styles.disclosure}>
-                    <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
-                    <p style={styles.storageNote}>
-                      写真をとったときと同じアプリ、またはブラウザからひらいてください。
-                    </p>
-                  </details>
                 </>
             )}
+            <div style={styles.divider} />
+            <details style={styles.disclosure}>
+              <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
+              <p style={styles.storageNote}>
+                写真をとったときと同じアプリ、またはブラウザからひらいてください。
+              </p>
+            </details>
           </AppCard>
         </section>
 
@@ -718,7 +718,7 @@ export function SettingsPage() {
             ) : (
               <div style={styles.inlineRecovery} role="status">
                 <p style={styles.storageNote}>
-                  アカウントの保存状態を確認できませんでした。写真と記録は、この端末に残っています。
+                  アカウントの保存状態を確認できませんでした。写真などのデータは、この端末に残っています。
                 </p>
                 <AppButton
                   type="button"
@@ -771,24 +771,18 @@ export function SettingsPage() {
             {syncNeedsAuthRecovery ? (
               <AuthRecoveryNotice returnTo="/settings" />
             ) : null}
-            <details style={styles.disclosure}>
-              <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
-              <p style={styles.storageNote}>
-                写真をとったときと同じアプリ、またはブラウザからひらいてください。
-              </p>
-            </details>
           </AppCard>
         </section>
         ) : null}
 
-        <section style={{ ...styles.section, order: 4 }}>
+        <section style={{ ...styles.section, order: 5 }}>
           <p style={styles.sectionLabel}>思い出便</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowTextStack}>
                 <span style={styles.rowLabel}>思い出便を 受け取る</span>
                 <span style={styles.rowDescription}>
-                  前に とったねがおが、ときどきホームにとどきます。オフにするととどきません。
+                  前に撮った写真が、ときどき「うちのこ」の「記録」に届きます。オフの間は届かず、表示されません。
                 </span>
               </span>
               <button
@@ -819,7 +813,7 @@ export function SettingsPage() {
         </section>
 
         {isLoggedIn && referralSummary?.referralEnabled ? (
-          <section style={{ ...styles.section, order: 5 }}>
+          <section style={{ ...styles.section, order: 6 }}>
             <p style={styles.sectionLabel}>紹介</p>
             <AppCard variant="outlined" padding="sm" style={styles.card}>
               <div style={styles.betaNote}>
@@ -872,7 +866,7 @@ export function SettingsPage() {
           </section>
         ) : null}
 
-        <section style={{ ...styles.section, order: 6 }}>
+        <section style={{ ...styles.section, order: 7 }}>
           <p style={styles.sectionLabel}>参加と応援</p>
           <AppCard variant="outlined" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
             {betaCapabilities.feedbackEnabled ? (
@@ -1064,7 +1058,7 @@ export function SettingsPage() {
 
         {activeSettingsTab === "general" ? (
           <>
-        <section style={{ ...styles.section, order: 7 }}>
+        <section style={{ ...styles.section, order: 8 }}>
           <p style={styles.sectionLabel}>ヘルプと規約</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <a href="/about" style={styles.linkRow}>
@@ -1104,7 +1098,7 @@ export function SettingsPage() {
           </AppCard>
         </section>
 
-        <section style={{ ...styles.section, order: 8 }}>
+        <section style={{ ...styles.section, order: 9 }}>
           <p style={styles.sectionLabel}>アプリについて</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
@@ -1129,7 +1123,7 @@ export function SettingsPage() {
           </AppCard>
         </section>
 
-        <section style={{ ...styles.section, order: 9 }}>
+        <section style={{ ...styles.section, order: 10 }}>
           <p style={styles.sectionLabel}>アカウントとデータ</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <a href="/account-deletion" style={styles.linkRow}>

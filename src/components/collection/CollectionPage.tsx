@@ -64,7 +64,6 @@ import {
   updateKeptExchangePhotoDataUrl,
   updateKeptExchangePhotoDimensions,
   updateOwnSleepingPhotoDimensions,
-  updateOwnSleepingPhotoDelivery,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
@@ -77,7 +76,7 @@ import {
   getJstHour,
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
-import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
+import { persistOwnPhotoSharing } from "../../lib/home/ownPhotoSharing";
 import { sendPhotoReport } from "../../lib/home/photoReports";
 import { readOnboardingProgress } from "../../lib/onboarding/progress";
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../../lib/storage";
@@ -431,6 +430,9 @@ export function CollectionPage() {
     useState<MainichiViewerState | null>(null);
   const [isOwnPhotoManagementOpen, setIsOwnPhotoManagementOpen] =
     useState(false);
+  const [ownPhotoManagementOrigin, setOwnPhotoManagementOrigin] = useState<
+    "collection" | "settings"
+  >("collection");
   const [shouldPlayMainichiNavEntry, setShouldPlayMainichiNavEntry] =
     useState(false);
   const [clientNow, setClientNow] = useState(() => Date.now());
@@ -458,6 +460,11 @@ export function CollectionPage() {
     setCatProfiles(profiles);
     setActiveCatId(activeProfile.id);
     saveActiveCatId(activeProfile.id);
+    const searchParams = new URLSearchParams(window.location.search);
+    setIsOwnPhotoManagementOpen(searchParams.get("manage") === "sent");
+    setOwnPhotoManagementOrigin(
+      searchParams.get("from") === "settings" ? "settings" : "collection",
+    );
     setHasLoaded(true);
   }, []);
 
@@ -981,86 +988,59 @@ export function CollectionPage() {
     pendingOwnPhotoActionsRef.current.add(photoId);
 
     try {
-      const currentPhoto = readOwnSleepingPhotosForAlbum().find(
-        (candidate) => candidate.id === photoId,
-      );
+      const result = await persistOwnPhotoSharing(photoId, nextShared);
 
-      if (!currentPhoto) {
+      if (result.error === "photo_not_found") {
         showToast(
           "写真の保存状態を確認できませんでした。画面をひらき直して、もう一度お試しください。",
         );
         return null;
       }
 
-      if (nextShared) {
-        const updatedPhoto = updateOwnSleepingPhotoDelivery(photoId, true);
+      if (result.error === "local_share_update_failed") {
+        showToast(
+          "ねこだよりに変更できませんでした。写真は自分だけのままです。画面をひらき直して、もう一度お試しください。",
+        );
+        return null;
+      }
 
-        if (!updatedPhoto) {
-          showToast(
-            "ねこだよりに変更できませんでした。写真は自分だけのままです。画面をひらき直して、もう一度お試しください。",
-          );
-          return null;
-        }
+      if (result.error === "share_backup_failed_restored") {
+        showToast(
+          "ねこだよりに変更できませんでした。写真は自分だけのままです。通信を確認して、もう一度お試しください。",
+        );
+        return null;
+      }
 
-        const backupResult = await backupOwnSleepingPhotoMoment(updatedPhoto);
-
-        if (!backupResult.ok) {
-          const previousShared =
-            currentPhoto.shared ?? currentPhoto.visibility === "shared";
-          const previousPhoto = {
-            ...currentPhoto,
-            shared: previousShared,
-            visibility: previousShared ? ("shared" as const) : ("private" as const),
-          };
-          const compensationResult = await backupOwnSleepingPhotoMoment(previousPhoto);
-          const restoredPhoto = compensationResult.ok
-            ? updateOwnSleepingPhotoDelivery(photoId, previousShared)
-            : null;
-          showToast(
-            restoredPhoto
-              ? "ねこだよりに変更できませんでした。写真は自分だけのままです。通信を確認して、もう一度お試しください。"
-              : "変更結果を確認できませんでした。安全のため、ねこだよりの候補として表示しています。通信を確認して「自分だけにする」を押してください。",
-          );
-          return restoredPhoto
-            ? null
-            : {
-                photo: updatedPhoto,
-                confirmed: false,
-              };
-        }
-
+      if (result.error === "share_backup_failed_uncertain" && result.photo) {
+        showToast(
+          "変更結果を確認できませんでした。安全のため、ねこだよりの候補として表示しています。通信を確認して「自分だけにする」を押してください。",
+        );
         return {
-          photo: updatedPhoto,
-          confirmed: true,
+          photo: result.photo,
+          confirmed: false,
         };
       }
 
-      const backupResult = await backupOwnSleepingPhotoMoment({
-        ...currentPhoto,
-        shared: false,
-        visibility: "private",
-      });
-
-      if (!backupResult.ok) {
+      if (result.error === "private_backup_failed") {
         showToast(
           "自分だけに変更できませんでした。写真はねこだよりの候補のままです。通信を確認して、もう一度お試しください。",
         );
         return null;
       }
 
-      const updatedPhoto = updateOwnSleepingPhotoDelivery(photoId, false);
-
-      if (!updatedPhoto) {
+      if (result.error === "local_private_update_failed") {
         showToast(
           "写真は自分だけに変更しましたが、この端末の表示を更新できませんでした。画面をひらき直してください。",
         );
         return null;
       }
 
-      return {
-        photo: updatedPhoto,
-        confirmed: true,
-      };
+      return result.photo
+        ? {
+            photo: result.photo,
+            confirmed: result.confirmed,
+          }
+        : null;
     } finally {
       pendingOwnPhotoActionsRef.current.delete(photoId);
     }
@@ -1621,6 +1601,28 @@ export function CollectionPage() {
     setCurrentPhotoIndex(index);
   }
 
+  function closeOwnPhotoManagement(
+    destination: "collection" | "origin" = "collection",
+  ) {
+    if (destination === "origin" && ownPhotoManagementOrigin === "settings") {
+      window.location.assign("/settings");
+      return;
+    }
+
+    setIsOwnPhotoManagementOpen(false);
+    const url = new URL(window.location.href);
+
+    if (url.searchParams.has("manage") || url.searchParams.has("from")) {
+      url.searchParams.delete("manage");
+      url.searchParams.delete("from");
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  }
+
   if (!hasLoaded) {
     return (
       <main style={styles.page}>
@@ -1673,9 +1675,11 @@ export function CollectionPage() {
               <button
                 type="button"
                 style={styles.nekodayoriBackButton}
-                onClick={() => setIsOwnPhotoManagementOpen(false)}
+                onClick={() => closeOwnPhotoManagement("origin")}
               >
-                ねこだよりへ戻る
+                {ownPhotoManagementOrigin === "settings"
+                  ? "設定へ戻る"
+                  : "ねこだよりへ戻る"}
               </button>
               <h1 style={styles.nekodayoriManageTitle}>
                 ねこだよりに送る写真の設定
@@ -1700,16 +1704,12 @@ export function CollectionPage() {
             dayGroups={albumDayGroups}
             catProfiles={catProfiles}
             playNavEntryMotion={shouldPlayMainichiNavEntry}
-            showOwnPhotoManagement={Boolean(
-              activeCatProfile && sleepingBoxPhotos.length > 0,
-            )}
             onNavEntryMotionPlayed={() => setShouldPlayMainichiNavEntry(false)}
             onOpenCurrentSaved={(dateKey, photo) =>
               openBoxDetail("other", dateKey, photo)
             }
             onOpenMainichiDay={openMainichiDay}
             onOpenMainichiPhoto={openMainichiBoardPhoto}
-            onOpenOwnPhotoManagement={() => setIsOwnPhotoManagementOpen(true)}
           />
         )}
       </div>
@@ -1794,7 +1794,7 @@ export function CollectionPage() {
       {toastText ? <div style={styles.toast}>{toastText}</div> : null}
       <BottomNavigation
         active="collection"
-        onActiveItemClick={() => setIsOwnPhotoManagementOpen(false)}
+        onActiveItemClick={() => closeOwnPhotoManagement("collection")}
       />
     </main>
   );
@@ -1815,18 +1815,15 @@ function NekodayoriOverview({
   dayGroups,
   catProfiles,
   playNavEntryMotion,
-  showOwnPhotoManagement,
   onNavEntryMotionPlayed,
   onOpenCurrentSaved,
   onOpenMainichiDay,
   onOpenMainichiPhoto,
-  onOpenOwnPhotoManagement,
 }: {
   currentState: NekodayoriCurrentState;
   dayGroups: AlbumDayGroup[];
   catProfiles: CatProfile[];
   playNavEntryMotion: boolean;
-  showOwnPhotoManagement: boolean;
   onNavEntryMotionPlayed: () => void;
   onOpenCurrentSaved: (dateKey: string, photo: BoxPreviewPhoto) => void;
   onOpenMainichiDay: (
@@ -1838,7 +1835,6 @@ function NekodayoriOverview({
     month: MainichiBoardMonth,
     source?: MainichiMorphSource | null,
   ) => void;
-  onOpenOwnPhotoManagement: () => void;
 }) {
   const hasHistory = dayGroups.some((group) =>
     group.sections.some(
@@ -1881,16 +1877,6 @@ function NekodayoriOverview({
             onOpenMainichiPhoto={onOpenMainichiPhoto}
           />
         </section>
-      ) : null}
-
-      {showOwnPhotoManagement ? (
-        <button
-          type="button"
-          style={styles.nekodayoriManageLink}
-          onClick={onOpenOwnPhotoManagement}
-        >
-          ねこだよりに送る写真の設定
-        </button>
       ) : null}
     </section>
   );
@@ -1983,10 +1969,10 @@ function NekodayoriCurrentCard({
           data-testid="nekodayori-pending-count"
           style={styles.nekodayoriCurrentCopy}
         >
-          ひらいて、残したい猫を選べます。
+          「きょう」で、残したい猫を選べます。
         </p>
         <AppButton href="/home" variant="primary" fullWidth>
-          ねこだよりを見る
+          「きょう」で選ぶ
         </AppButton>
       </section>
     );

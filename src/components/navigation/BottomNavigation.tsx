@@ -5,6 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
+import {
+  getJstAutoOpenTime,
+  getJstDeliveryTime,
+  readEveningDeliveryStore,
+} from "../../lib/home/eveningDelivery";
 import { hasUnopenedArrivedOmoideMemory } from "../../lib/home/omoideDelivery";
 import {
   fallBackCatIllustrationImage,
@@ -32,6 +37,8 @@ type ViewTransitionDocument = Document & {
 };
 
 const COLLECTION_NAV_ENTRY_STORAGE_KEY = "neteruneko_collection_nav_entry";
+const HOME_NAV_ARRIVAL_SEEN_DATE_STORAGE_KEY =
+  "neteruneko_home_nav_arrival_seen_date";
 
 export function BottomNavigation({
   active,
@@ -43,6 +50,7 @@ export function BottomNavigation({
   const pathname = usePathname();
   const [pendingKey, setPendingKey] = useState<NavItem["key"] | null>(null);
   const [hasUnopenedOmoide, setHasUnopenedOmoide] = useState(false);
+  const [hasUnseenHomeArrival, setHasUnseenHomeArrival] = useState(false);
   const activeKey = active === "today" ? "home" : active;
   const items: readonly NavItem[] = [
     {
@@ -105,6 +113,43 @@ export function BottomNavigation({
       window.clearInterval(intervalId);
     };
   }, []);
+
+  useEffect(() => {
+    function refreshUnseenHomeArrival() {
+      const arrivalDateKey = getLatestHomeArrivalDateKey();
+      if (!arrivalDateKey) {
+        setHasUnseenHomeArrival(false);
+        return;
+      }
+
+      if (activeKey === "home") {
+        markHomeArrivalSeen(arrivalDateKey);
+        setHasUnseenHomeArrival(false);
+        return;
+      }
+
+      setHasUnseenHomeArrival(isHomeArrivalUnseen(arrivalDateKey));
+    }
+
+    refreshUnseenHomeArrival();
+    window.addEventListener(
+      "neteruneko_evening_delivery_updated",
+      refreshUnseenHomeArrival,
+    );
+    window.addEventListener("storage", refreshUnseenHomeArrival);
+    window.addEventListener("focus", refreshUnseenHomeArrival);
+    const intervalId = window.setInterval(refreshUnseenHomeArrival, 30_000);
+
+    return () => {
+      window.removeEventListener(
+        "neteruneko_evening_delivery_updated",
+        refreshUnseenHomeArrival,
+      );
+      window.removeEventListener("storage", refreshUnseenHomeArrival);
+      window.removeEventListener("focus", refreshUnseenHomeArrival);
+      window.clearInterval(intervalId);
+    };
+  }, [activeKey]);
 
   function handleNavClick(
     event: MouseEvent<HTMLAnchorElement>,
@@ -183,6 +228,12 @@ export function BottomNavigation({
                   style={styles.unopenedSealDot}
                 />
               ) : null}
+              {item.key === "home" && hasUnseenHomeArrival ? (
+                <span
+                  data-testid="today-nav-unopened-delivery-dot"
+                  style={styles.unopenedSealDot}
+                />
+              ) : null}
             </span>
             <span style={isActive ? styles.activeNavLabel : styles.navLabel}>
               {displayLabel}
@@ -192,6 +243,56 @@ export function BottomNavigation({
       })}
     </nav>
   );
+}
+
+function getLatestHomeArrivalDateKey(now = Date.now()) {
+  return (
+    Object.values(readEveningDeliveryStore())
+      .filter((day) => {
+        if (day.openedAt || day.skippedAt) {
+          return false;
+        }
+
+        const hasArrivedPhoto = Boolean(
+          day.deliveredPhoto || day.deliveredPhotos?.length,
+        );
+        const hasScheduledTarget = Boolean(day.targetOwnPhotoId);
+        return (
+          (hasArrivedPhoto || hasScheduledTarget) &&
+          now >= getJstDeliveryTime(day.dateKey) &&
+          now < getJstAutoOpenTime(day.dateKey)
+        );
+      })
+      .map((day) => day.dateKey)
+      .sort((first, second) => second.localeCompare(first))[0] ?? null
+  );
+}
+
+function isHomeArrivalUnseen(arrivalDateKey: string) {
+  try {
+    const seenDateKey = window.localStorage.getItem(
+      HOME_NAV_ARRIVAL_SEEN_DATE_STORAGE_KEY,
+    );
+    return !seenDateKey || arrivalDateKey > seenDateKey;
+  } catch {
+    return false;
+  }
+}
+
+function markHomeArrivalSeen(arrivalDateKey: string) {
+  try {
+    const seenDateKey = window.localStorage.getItem(
+      HOME_NAV_ARRIVAL_SEEN_DATE_STORAGE_KEY,
+    );
+    if (!seenDateKey || arrivalDateKey > seenDateKey) {
+      window.localStorage.setItem(
+        HOME_NAV_ARRIVAL_SEEN_DATE_STORAGE_KEY,
+        arrivalDateKey,
+      );
+    }
+  } catch {
+    // The navigation remains usable when localStorage is unavailable.
+  }
 }
 
 function TodayPairIcon({

@@ -100,12 +100,9 @@ export default function AccountCreatePage({
   const isStartingGoogle = pendingAction === "google";
   const isPreparingHandoff = pendingAction === "handoff";
   const isEmbeddedBrowser = embeddedBrowserLabel.length > 0;
-  const onboardingAlbumTitle = hasOnboardingCatName
-    ? `${onboardingCatName.trim()}のアルバムをつくる`
-    : "うちのこのアルバムをつくる";
-  const onboardingAlbumBody = hasOnboardingCatName
-    ? `${onboardingCatName.trim()}のねがおと、とどいたねこだよりを\nあとから見返せるようにします。`
-    : "今日のねがおと、とどいたねこだよりを\nあとから見返せるようにします。";
+  const onboardingAccountTitle = "写真と記録をアカウントに保存";
+  const onboardingAccountBody =
+    "この端末に残した写真と記録をアカウントに保存すると、別の端末でも見られます。";
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -476,12 +473,12 @@ export default function AccountCreatePage({
               <p style={styles.eyebrow}>アカウント</p>
               <h1 style={styles.title}>
                 {isFromOnboarding
-                  ? onboardingAlbumTitle
+                  ? onboardingAccountTitle
                   : "Googleアカウントにログインしています"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? onboardingAlbumBody
+                  ? onboardingAccountBody
                   : "写真と記録をアカウントに保存できます。別の端末でも見られます。"}
               </p>
               {connectedEmail ? (
@@ -510,11 +507,11 @@ export default function AccountCreatePage({
                         method: "already_connected",
                       });
                       trackOnboardingAlbumCreatedVariant("already_connected");
-                      router.push("/cats?onboarding=1");
+                      router.push("/home");
                     }}
                     fullWidth
                   >
-                    アルバムへ進む
+                    ホームへ進む
                   </AppButton>
                 ) : (
                   <AppButton
@@ -537,12 +534,12 @@ export default function AccountCreatePage({
               </p>
               <h1 style={styles.title}>
                 {isFromOnboarding
-                  ? onboardingAlbumTitle
+                  ? onboardingAccountTitle
                   : "写真と記録を、あとから見返せるように"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? onboardingAlbumBody
+                  ? onboardingAccountBody
                   : "Googleでログインすると、写真と記録をアカウントに保存できます。別の端末でも見られます。"}
               </p>
               {!isFromOnboarding ? (

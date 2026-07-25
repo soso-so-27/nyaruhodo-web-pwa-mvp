@@ -276,7 +276,7 @@ const styles = {
   backdrop: {
     position: "fixed",
     inset: 0,
-    zIndex: 60,
+    zIndex: 200,
     backdropFilter: "blur(2px)",
     WebkitBackdropFilter: "blur(2px)",
     willChange: "opacity",
@@ -290,7 +290,7 @@ const styles = {
   },
   sheet: {
     position: "fixed",
-    zIndex: 61,
+    zIndex: 201,
     display: "flex",
     flexDirection: "column",
     color: "var(--ink)",

@@ -9,7 +9,7 @@ contexts instead of inventing a local `src` / `object-fit` rule.
 |---|---|---|---|---|
 | `list` | square tiles and small thumbnails | `cover` | `thumbnailSrc -> displaySrc -> originalSrc -> src` | `thumbnail` transform |
 | `board` | nekodayori board cards | `cover` | `displaySrc -> originalSrc -> thumbnailSrc -> src` | `thumbnail` transform |
-| `cover` | cat profile cover | `cover` | `displaySrc -> originalSrc -> thumbnailSrc -> src` | plain `display` |
+| `cover` | representative-photo source and crop editing | `cover` | `displaySrc -> originalSrc -> thumbnailSrc -> src` | `hero` while editing |
 | `detail` | detail/fullscreen viewer | `contain` | `displaySrc -> originalSrc -> thumbnailSrc -> src` | plain `display` |
 
 ## Board context
@@ -23,12 +23,13 @@ saved 512px thumbnail asset.
 
 ## Cover context
 
-Profile cover has one extra rule:
+The page-wide cat profile cover was retired on 2026-07-25. The profile now shows
+a compact representative-photo setting, signed with the `thumbnail` transform.
+The internal `cover` context remains for source selection and crop editing:
 
 - if a user crop exists, the crop always wins
-- if a custom cover photo exists without a crop, fall back to `cover` with
-  `object-position: 50% 30%`
-- automatic cover photos use the same `cover` fallback
+- if a custom representative photo exists without a crop, use centered `cover`
+- automatic representative photos use the same `cover` fallback
 
 ## Detail context
 

@@ -224,9 +224,7 @@ test.describe("production nekodayori natural board", () => {
 });
 
 async function openSentPhotoSettings(page: Page) {
-  await page
-    .getByRole("button", { name: "ねこだよりに送る写真の設定" })
-    .click();
+  await page.goto("/collection?manage=sent");
 }
 
 async function seedBoard(page: Page, sentCount: number, deliveredCount: number) {

@@ -86,6 +86,7 @@ test.describe("settings page organization", () => {
       .filter({ has: summary })
       .locator("p");
     await expect(summary).toBeVisible();
+    await expect(summary).toHaveCount(1);
     await expect(hiddenNote).toBeHidden();
 
     await summary.click();
@@ -110,7 +111,7 @@ test.describe("settings page organization", () => {
     await expect(page.getByRole("link", { name: "データの削除・退会" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Googleでログイン" })).toBeVisible();
     await expect(
-      page.getByText("写真と記録は、この端末に保存されています。", {
+      page.getByText("写真などのデータは、この端末に保存されています。", {
         exact: false,
       }),
     ).toBeVisible();
@@ -124,6 +125,9 @@ test.describe("settings page organization", () => {
     await expect(page.getByText("困ったとき", { exact: true })).toBeVisible();
     await expect(page.getByText("古い画面が残るとき")).toBeHidden();
     await expect(page.getByText("アプリのバージョン", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /ねこだよりに送る写真/ }),
+    ).toHaveCount(0);
 
     const accountLabel = page.getByText("アカウント", { exact: true });
     const accountDataLabel = page.getByText("アカウントとデータ", {
@@ -135,6 +139,7 @@ test.describe("settings page organization", () => {
         await accountDataLabel.elementHandle(),
       ),
     ).toBe(true);
+
   });
 
   test("hides the referral code while keeping share actions", async ({ page }) => {
@@ -201,6 +206,11 @@ test.describe("settings page organization", () => {
     const switchControl = page.getByRole("switch", {
       name: /思い出便を 受け取る/,
     });
+    await expect(
+      page.getByText(
+        "前に撮った写真が、ときどき「うちのこ」の「記録」に届きます。オフの間は届かず、表示されません。",
+      ),
+    ).toBeVisible();
     await expect(switchControl).toHaveAttribute("aria-checked", "false");
     const switchBox = await switchControl.boundingBox();
     expect(switchBox?.height).toBeGreaterThanOrEqual(44);

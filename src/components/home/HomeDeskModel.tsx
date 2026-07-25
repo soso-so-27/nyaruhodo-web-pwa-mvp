@@ -357,9 +357,12 @@ export function HomeDeskModel({
     (homeDay.phase !== "opened" && !shouldSuppressEmptyBeforeNotice);
   const shouldShowNotificationTray = shouldShowBaseNotice;
   const shouldShowHomeFrameTakeButton =
-    deskState === "1" && homeDay.phase === "empty-before";
-  const homeCaptureHint =
-    "写真は「うちのこ」に残ります。「ねこだよりにする」と、よる8時ごろ届きます。";
+    homeDay.phase === "empty-before" || homeDay.phase === "empty-after";
+  const homeDeliveryTiming =
+    eveningState.dateKey === getJstDateKey(now)
+      ? "よる8時ごろ"
+      : "あしたのよる8時ごろ";
+  const homeCaptureHint = `写真は「うちのこ」に残ります。「ねこだよりにする」と、${homeDeliveryTiming}、4匹から1匹をえらべます。`;
   const shouldShowHomeFrameRetakeLink =
     deskState === "2" && homeDay.phase === "sent-before";
   const shouldHidePresence = true;
@@ -623,10 +626,10 @@ export function HomeDeskModel({
                       data-testid="home-retake-action"
                       style={deskStyles.homeAddPhotoButton}
                       onClick={onTakePhoto}
-                      aria-label="ねがおを とる"
+                      aria-label="きょうのねがおを残す"
                     >
                       <AppIcon name="camera" size={15} />
-                      <span>ねがおを とる</span>
+                      <span>きょうのねがおを残す</span>
                     </button>
                     <span style={deskStyles.homeCaptureHint}>
                       <AppIcon
@@ -665,14 +668,14 @@ export function HomeDeskModel({
                       className="home-empty-cta-action"
                       style={deskStyles.homeEmptyAction}
                       onClick={onTakePhoto}
-                      aria-label={`${catName}の ねがおを とる`}
+                      aria-label={`${catName}のきょうのねがおを残す`}
                     >
                       <AppIcon
                         name="camera"
                         size={16}
                         style={deskStyles.homeEmptyActionIcon}
                       />
-                      <span>ねがおを とる</span>
+                      <span>きょうのねがおを残す</span>
                     </button>
                     <span style={deskStyles.homeCaptureHint}>
                       <AppIcon
@@ -905,6 +908,7 @@ export function HomeDeskModel({
                 >
                   <HomeLetterTrayText
                     phase={homeDay.phase}
+                    deliveryTiming={homeDeliveryTiming}
                     deliveryCheckState={deliveryCheckState}
                     onRetry={onRetryEveningDeliveryCheck}
                     systemOpenedDeliveryNotice={systemOpenedDeliveryNotice}
@@ -1919,11 +1923,13 @@ function getHomeDayPresentation({
 
 function HomeLetterTrayText({
   phase,
+  deliveryTiming,
   deliveryCheckState = "idle",
   onRetry,
   systemOpenedDeliveryNotice = false,
 }: {
   phase: HomeTodayPhase;
+  deliveryTiming: string;
   deliveryCheckState?: EveningDeliveryCheckStatus["state"];
   onRetry?: () => void;
   systemOpenedDeliveryNotice?: boolean;
@@ -1979,14 +1985,14 @@ function HomeLetterTrayText({
     );
   }
 
-  if (phase === "late-sent") {
+  if (phase === "late-sent" || phase === "sent-before") {
     return (
       <>
         <strong style={deskStyles.letterTrayTitle}>
           {keyword("「うちのこ」")}に保存しました
         </strong>
         <span style={deskStyles.letterTraySub}>
-          あしたの よる8時ごろ、ねこだよりがとどきます
+          {deliveryTiming}、4匹から1匹をえらべます
         </span>
       </>
     );
@@ -1995,22 +2001,9 @@ function HomeLetterTrayText({
   if (phase === "empty-after") {
     return (
       <>
-        <strong style={deskStyles.letterTrayTitle}>ねがおを とる</strong>
+        <strong style={deskStyles.letterTrayTitle}>きょうのねがおを残す</strong>
         <span style={deskStyles.letterTraySub}>
-          保存すると、次のよる8時ごろにねこだよりがとどきます
-        </span>
-      </>
-    );
-  }
-
-  if (phase === "sent-before") {
-    return (
-      <>
-        <strong style={deskStyles.letterTrayTitle}>
-          {keyword("「うちのこ」")}に保存しました
-        </strong>
-        <span style={deskStyles.letterTraySub}>
-          よる8時ごろ、ねこだよりがとどきます
+          保存すると、{deliveryTiming}にねこだよりがとどきます
         </span>
       </>
     );

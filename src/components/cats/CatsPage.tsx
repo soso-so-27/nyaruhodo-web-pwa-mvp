@@ -17,6 +17,7 @@ import { queueOriginalPhotoPreservation } from "../../lib/photoOriginals";
 import {
   clearAccountCatCoverPhoto,
   deleteAccountCatGalleryPhoto,
+  deleteAccountSleepingPhoto,
   restoreCatGalleryPhotosFromAccount,
 } from "../../lib/accountSync";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
@@ -50,6 +51,7 @@ import {
   type CatCoverCrop,
 } from "../../lib/cats/coverCrop";
 import {
+  deleteOwnSleepingPhoto,
   readCatSleepingMilestones,
   readOwnSleepingPhotos,
   readOwnSleepingPhotosForAlbum,
@@ -57,6 +59,7 @@ import {
   type CatSleepingMilestone,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
+import { persistOwnPhotoSharing } from "../../lib/home/ownPhotoSharing";
 import {
   getJstDateKey,
   readEveningDeliveryStore,
@@ -89,6 +92,7 @@ import { AppCard } from "../ui/AppCard";
 import { AppIcon } from "../ui/AppIcons";
 import { AppSegmented } from "../ui/AppSegmented";
 import { AppTextField } from "../ui/AppTextField";
+import { AppToggle } from "../ui/AppToggle";
 import { PhotoTile } from "../ui/PhotoTile";
 import {
   decodePhotoSourcesForDisplay,
@@ -127,6 +131,10 @@ type LensPhoto = {
   catNames: string[];
   kind: "sleeping" | "photo";
   deliveryCount?: number;
+  shared?: boolean;
+  ownerCatId?: string;
+  sourceMomentId?: string;
+  shareManageable?: boolean;
 };
 type DeleteCatTarget = {
   profile: CatProfile;
@@ -145,6 +153,10 @@ type RecordPhotoPreview = {
   timestamp: number;
   kind?: LensPhoto["kind"];
   catIds?: string[];
+  shared?: boolean;
+  ownerCatId?: string;
+  sourceMomentId?: string;
+  shareManageable?: boolean;
 };
 
 const CATS_TEXT = "var(--ink)";
@@ -216,8 +228,6 @@ export function CatsPage() {
     sourceLocalAssetId?: string;
   } | null>(null);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
-  const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
-    useState(false);
   const [isOnboardingExistingCat, setIsOnboardingExistingCat] = useState(false);
   const [isOnboardingAlbumCreated, setIsOnboardingAlbumCreated] =
     useState(false);
@@ -263,6 +273,10 @@ export function CatsPage() {
     useState(false);
   const [selectedRecordPhoto, setSelectedRecordPhoto] =
     useState<RecordPhotoPreview | null>(null);
+  const [pendingPhotoSharingId, setPendingPhotoSharingId] = useState<
+    string | null
+  >(null);
+  const [photoSharingFeedback, setPhotoSharingFeedback] = useState("");
   const [selectedOmoideMemory, setSelectedOmoideMemory] = useState<{
     memory: OmoideMemory;
     source: OmoideOpenSource;
@@ -274,11 +288,17 @@ export function CatsPage() {
   const [selectedYearSummary, setSelectedYearSummary] =
     useState<CatYearSummary | null>(null);
 
+  useEffect(() => {
+    setPhotoSharingFeedback("");
+  }, [selectedRecordPhoto?.id]);
+
   const activeCatProfile =
     catProfiles.length > 0
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
-  const catName = getCatName(activeCatProfile);
+  const catName = isCatProfileNameUnset(activeCatProfile)
+    ? "この子"
+    : getCatName(activeCatProfile);
   const familyDuration = formatFamilyDuration(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
@@ -298,9 +318,11 @@ export function CatsPage() {
     (memory) => !memory.openedAt,
   );
   const sleepingMilestones = readCatSleepingMilestones(activeCatId);
-  const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
-  const isOnboardingCompletionView =
-    isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
+  const isOnboardingProfileSetup =
+    isOnboardingMode && isEditingProfile && !isCatManageOpen;
+  // Completing onboarding should lead into the actual photo-first album.
+  // Naming the cat remains available there as an optional action.
+  const isOnboardingCompletionView = false;
   const isFocusedProfileSetup =
     isOnboardingProfileSetup || isDirectProfileRecovery;
   const canManageCats = !isFocusedProfileSetup && !isOnboardingCompletionView;
@@ -405,21 +427,6 @@ export function CatsPage() {
   const hasCustomCoverCrop = Boolean(activeCatProfile?.coverCrop);
   const activeCoverCrop = normalizeCoverCrop(activeCatProfile?.coverCrop);
   const activeCoverFit = activeCoverSrc ? "cover" : "contain";
-  const activeCoverRecordPhoto =
-    activeCoverPhoto && !hasCustomCoverPhoto
-      ? toRecordPhotoPreview(activeCoverPhoto)
-      : activeCoverSrc
-        ? {
-            src: activeCoverSrc,
-            title: "カバー写真",
-            timestamp:
-              Date.parse(
-                activeCatProfile?.updatedAt ??
-                  activeCatProfile?.createdAt ??
-                  "",
-              ) || Date.now(),
-          }
-        : null;
   useEffect(() => {
     tabContentScrollerRef.current?.scrollTo({ top: 0, left: 0 });
   }, [activeCatId, activeLens, activeSection]);
@@ -513,26 +520,14 @@ export function CatsPage() {
       savedActiveCatId,
     );
 
-    const shouldEditOnboardingProfile =
-      onboardingMode && isCatProfileNameUnset(activeProfile);
-    const shouldRecoverDirectProfile =
-      !onboardingMode && isCatProfileNameUnset(activeProfile);
-
     setCatProfiles(savedCatProfiles);
     setActiveCatId(activeProfile.id);
     setCatNameInput(
-      shouldEditOnboardingProfile || shouldRecoverDirectProfile
-        ? ""
-        : getCatName(activeProfile),
+      isCatProfileNameUnset(activeProfile) ? "" : getCatName(activeProfile),
     );
     setIsOnboardingMode(onboardingMode);
-    setIsOnboardingCompletionReady(onboardingCompletionReady);
-    setIsOnboardingExistingCat(onboardingMode && !shouldEditOnboardingProfile);
-    setIsDirectProfileRecovery(shouldRecoverDirectProfile);
-    if (shouldEditOnboardingProfile || shouldRecoverDirectProfile) {
-      setIsEditingCatName(true);
-      setIsEditingProfile(true);
-    }
+    setIsOnboardingExistingCat(onboardingMode);
+    setIsDirectProfileRecovery(false);
     saveActiveCatId(activeProfile.id);
 
     selectLinkedSection();
@@ -735,7 +730,11 @@ export function CatsPage() {
 
     saveActiveCatId(nextActiveProfile.id);
     setActiveCatId(nextActiveProfile.id);
-    setCatNameInput(getCatName(nextActiveProfile));
+    setCatNameInput(
+      isCatProfileNameUnset(nextActiveProfile)
+        ? ""
+        : getCatName(nextActiveProfile),
+    );
     setIsAddingCat(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
@@ -828,7 +827,11 @@ export function CatsPage() {
   }
 
   function handleStartEdit() {
-    setCatNameInput(activeCatProfile?.name ?? catName);
+    setCatNameInput(
+      isCatProfileNameUnset(activeCatProfile)
+        ? ""
+        : (activeCatProfile?.name ?? catName),
+    );
     setEditFamilySinceDate(activeCatProfile?.basicInfo?.familySinceDate ?? "");
     setEditBirthDate(activeCatProfile?.basicInfo?.birthDate ?? "");
     setEditGender(activeCatProfile?.basicInfo?.gender ?? "");
@@ -937,11 +940,15 @@ export function CatsPage() {
         vaccineNote: editVaccineNote,
       });
       const savedAt = new Date().toISOString();
+      const confirmedName = catNameInput.trim();
       const nextProfile = {
         ...profiles[index],
-        name: catNameInput.trim() || profiles[index].name,
-        nameConfirmedAt: isFocusedProfileSetup
-          ? savedAt
+        name: confirmedName || profiles[index].name,
+        nameState: confirmedName
+          ? ("confirmed" as const)
+          : profiles[index].nameState,
+        nameConfirmedAt: confirmedName
+          ? (profiles[index].nameConfirmedAt ?? savedAt)
           : profiles[index].nameConfirmedAt,
         basicInfo: {
           familySinceDate: editFamilySinceDate || undefined,
@@ -960,7 +967,10 @@ export function CatsPage() {
       const nextProfiles = profiles.map((profile, profileIndex) =>
         profileIndex === index ? nextProfile : profile,
       );
-      const didSaveName = nextProfile.name !== profiles[index].name;
+      const didSaveName =
+        nextProfile.name !== profiles[index].name ||
+        (profiles[index].nameState !== "confirmed" &&
+          Boolean(confirmedName));
 
       window.localStorage.setItem(
         STORAGE_KEYS.catProfiles,
@@ -988,7 +998,7 @@ export function CatsPage() {
       }
       const shouldCloseCatManageAfterSave = catManageEditSource !== "manage";
       setCatManageEditSource(null);
-      if (isOnboardingMode) {
+      if (isOnboardingMode && !isCatManageOpen) {
         trackProductEvent(
           "cat_album_created",
           {
@@ -1061,7 +1071,7 @@ export function CatsPage() {
     setCatProfiles(nextProfiles);
     const remoteSaveResult = await saveRemoteCatProfile(nextProfile);
     setSaveMessage(
-      photoSrc ? "カバー写真を変えました。" : "自動表示にもどしました。",
+      photoSrc ? "代表写真を変えました。" : "自動表示にもどしました。",
     );
     if (remoteSaveResult.status === "error") {
       setSaveMessage(
@@ -1106,7 +1116,7 @@ export function CatsPage() {
           fileName: sourceLocalAssetId,
         });
         if (!isStoragePhotoReference(photoSrc)) {
-          setSaveMessage("カバー写真を保存できませんでした。");
+          setSaveMessage("代表写真を保存できませんでした。");
           setTimeout(() => setSaveMessage(""), 2400);
           return;
         }
@@ -1119,7 +1129,7 @@ export function CatsPage() {
         });
         setIsCoverPhotoSheetOpen(false);
       } catch {
-        setSaveMessage("カバー写真を保存できませんでした。");
+        setSaveMessage("代表写真を保存できませんでした。");
         setTimeout(() => setSaveMessage(""), 2400);
         return;
       }
@@ -1261,8 +1271,124 @@ export function CatsPage() {
     void startAddCatPhoto();
   }
 
+  async function handlePhotoSharingChange(
+    photo: RecordPhotoPreview,
+    nextShared: boolean,
+  ) {
+    if (
+      !photo.id ||
+      photo.kind !== "sleeping" ||
+      !photo.shareManageable ||
+      pendingPhotoSharingId
+    ) {
+      return;
+    }
+
+    const photoId = photo.id;
+    const ownerCatId =
+      photo.ownerCatId ?? photo.catIds?.[0] ?? activeCatId ?? null;
+
+    if (!ownerCatId) {
+      setPhotoSharingFeedback(
+        "この写真の猫を確認できませんでした。画面を開き直してください。",
+      );
+      return;
+    }
+
+    setPendingPhotoSharingId(photoId);
+    setPhotoSharingFeedback("");
+
+    try {
+      const result = await persistOwnPhotoSharing(photoId, nextShared, {
+        id: photoId,
+        ownerCatId,
+        catId: photo.catIds?.[0] ?? ownerCatId,
+        src: photo.src,
+        state: "sleeping",
+        visibility: photo.shared ? "shared" : "private",
+        deliveryStatus: "available",
+        triggerLabel: "ねがお",
+        theme: "sleeping",
+        shared: Boolean(photo.shared),
+        createdAt: photo.timestamp,
+        sourceMomentId: photo.sourceMomentId,
+        captureContext: "daily",
+      });
+      const displayedShared =
+        result.photo?.shared ?? result.photo?.visibility === "shared";
+
+      if (result.photo) {
+        setSelectedRecordPhoto((current) =>
+          current?.id === photoId
+            ? {
+                ...current,
+                shared: displayedShared,
+              }
+            : current,
+        );
+        setRemoteLensPhotosByCat((current) =>
+          Object.fromEntries(
+            Object.entries(current).map(([catId, photos]) => [
+              catId,
+              photos.map((candidate) =>
+                candidate.id === photoId
+                  ? { ...candidate, shared: displayedShared }
+                  : candidate,
+              ),
+            ]),
+          ),
+        );
+        setGalleryRefreshTick((value) => value + 1);
+      }
+
+      if (result.error === "photo_not_found") {
+        setPhotoSharingFeedback(
+          "写真の保存状態を確認できませんでした。画面を開き直してください。",
+        );
+      } else if (
+        result.error === "local_share_update_failed" ||
+        result.error === "share_backup_failed_restored"
+      ) {
+        setPhotoSharingFeedback(
+          "送る候補に変更できませんでした。通信を確認して、もう一度お試しください。",
+        );
+      } else if (result.error === "share_backup_failed_uncertain") {
+        setPhotoSharingFeedback(
+          "変更結果を確認できませんでした。安全のため、送る候補として表示しています。",
+        );
+      } else if (result.error === "private_backup_failed") {
+        setPhotoSharingFeedback(
+          "候補から外せませんでした。通信を確認して、もう一度お試しください。",
+        );
+      } else if (result.error === "local_private_update_failed") {
+        setPhotoSharingFeedback(
+          "今後は送られません。端末の表示は、画面を開き直すと更新されます。",
+        );
+      }
+
+      trackProductEvent(
+        "cats_photo_sharing_changed",
+        {
+          route: "/cats",
+          photo_id: photoId,
+          shared: displayedShared,
+          requested_shared: nextShared,
+          confirmed: result.confirmed,
+          error_code: result.error,
+        },
+        { localCatId: photo.catIds?.[0] ?? activeCatId },
+      );
+    } finally {
+      setPendingPhotoSharingId(null);
+    }
+  }
+
   function requestDeleteGalleryPhoto(photo: RecordPhotoPreview) {
-    if (photo.kind !== "photo" || !photo.id) {
+    if (
+      !photo.id ||
+      (photo.kind !== "photo" &&
+        !(photo.kind === "sleeping" && photo.shareManageable))
+    ) {
       return;
     }
 
@@ -1275,13 +1401,23 @@ export function CatsPage() {
     }
 
     if (deleteGalleryPhotoTarget) {
+      const isSleepingPhoto =
+        deleteGalleryPhotoTarget.kind === "sleeping";
       trackProductEvent(
-        "cat_gallery_photo_delete_cancelled",
+        isSleepingPhoto
+          ? "cats_sleeping_photo_delete_cancelled"
+          : "cat_gallery_photo_delete_cancelled",
         {
           route: "/cats",
           source: "photo_viewer",
           cat_id: deleteGalleryPhotoTarget.catIds?.[0] ?? null,
-          is_cover_photo: isGalleryPhotoCover(deleteGalleryPhotoTarget),
+          ...(isSleepingPhoto
+            ? {}
+            : {
+                is_cover_photo: isGalleryPhotoCover(
+                  deleteGalleryPhotoTarget,
+                ),
+              }),
         },
         { localCatId: deleteGalleryPhotoTarget.catIds?.[0] ?? activeCatId },
       );
@@ -1302,6 +1438,46 @@ export function CatsPage() {
     setIsDeletingGalleryPhoto(true);
 
     try {
+      if (target.kind === "sleeping") {
+        await deleteAccountSleepingPhoto(target.id, target.sourceMomentId);
+        const deletedLocally = await deleteOwnSleepingPhoto(target.id);
+
+        if (!deletedLocally) {
+          throw new Error("Sleeping photo local delete failed");
+        }
+
+        setRemoteLensPhotosByCat((current) =>
+          Object.fromEntries(
+            Object.entries(current).map(([catId, photos]) => [
+              catId,
+              photos.filter(
+                (candidate) =>
+                  candidate.id !== target.id &&
+                  !(
+                    target.sourceMomentId &&
+                    candidate.sourceMomentId === target.sourceMomentId
+                  ),
+              ),
+            ]),
+          ),
+        );
+        setGalleryRefreshTick((value) => value + 1);
+        setSelectedRecordPhoto(null);
+        setDeleteGalleryPhotoTarget(null);
+        trackProductEvent(
+          "cats_sleeping_photo_deleted",
+          {
+            route: "/cats",
+            source: "photo_viewer",
+            cat_id: targetCatId ?? null,
+          },
+          { localCatId: targetCatId ?? activeCatId },
+        );
+        setSaveMessage("写真を削除しました。");
+        setTimeout(() => setSaveMessage(""), 2200);
+        return;
+      }
+
       if (wasCoverPhoto && targetCatId) {
         await clearAccountCatCoverPhoto(targetCatId);
       }
@@ -1410,7 +1586,11 @@ export function CatsPage() {
     saveActiveCatId(nextActiveProfile.id);
     setCatProfiles(nextProfiles);
     setActiveCatId(nextActiveProfile.id);
-    setCatNameInput(getCatName(nextActiveProfile));
+    setCatNameInput(
+      isCatProfileNameUnset(nextActiveProfile)
+        ? ""
+        : getCatName(nextActiveProfile),
+    );
     setDeleteCatTarget(null);
     setIsDeletingCat(false);
     setIsAddingCat(false);
@@ -1543,162 +1723,23 @@ export function CatsPage() {
                       {catName}
                     </h1>
                   </div>
-                  {activeSection === "photos" && shouldShowCatSwitchButton ? (
-                    <button
-                      type="button"
-                      style={styles.profileIdentitySwitchButton}
-                      onClick={handleCycleCat}
-                      aria-label="次のねこに切り替える"
-                    >
-                      <img
-                        src={catIllustrations.catSwitcherIcon}
-                        alt=""
-                        style={styles.profileCoverSwitchIcon}
-                        onError={(event) =>
-                          fallBackCatIllustrationImage(
-                            event.currentTarget,
-                            "catSwitcherIcon",
-                          )
-                        }
-                      />
-                    </button>
-                  ) : null}
-                </header>
-                <UchinokoSectionTabs
-                  value={activeSection}
-                  onChange={setActiveSection}
-                  options={[
-                    { value: "photos", label: "写真" },
-                    {
-                      value: "record",
-                      label: "記録",
-                      hasIndicator: hasUnopenedOmoide,
-                    },
-                    { value: "basic", label: "基本" },
-                  ]}
-                />
-                {activeSection !== "photos" ? (
-                  <div style={styles.profileCoverHero}>
-                    <div
-                      data-testid="cats-profile-cover"
-                      style={styles.profileCoverFrame}
-                    >
-                      {activeCoverSrc && hasCustomCoverPhoto ? (
+                  {isCatProfileNameUnset(activeCatProfile) ||
+                  shouldShowCatSwitchButton ? (
+                    <div style={styles.profileIdentityActions}>
+                      {isCatProfileNameUnset(activeCatProfile) ? (
                         <button
                           type="button"
-                          aria-label={activeCoverRecordPhoto?.title}
-                          style={styles.profileCoverCustomButton}
-                          onClick={
-                            activeCoverRecordPhoto
-                              ? () =>
-                                  setSelectedRecordPhoto(activeCoverRecordPhoto)
-                              : undefined
-                          }
+                          data-testid="cats-name-registration-button"
+                          style={styles.profileIdentityNameButton}
+                          onClick={() => openCatManageEditor("basic")}
                         >
-                          {hasCustomCoverCrop ? (
-                            <CoverCropPhoto
-                              src={activeCoverSrc}
-                              crop={activeCoverCrop}
-                              alt=""
-                              storageVariant="hero"
-                              style={styles.profileCoverCustomCroppedImage}
-                            />
-                          ) : (
-                            <StoredPhotoImage
-                              src={activeCoverSrc}
-                              alt=""
-                              storageVariant="hero"
-                              loading="eager"
-                              style={styles.profileCoverCustomImage}
-                              width={420}
-                              height={232}
-                            />
-                          )}
+                          名前を登録
                         </button>
-                      ) : (
-                        <PhotoTile
-                          src={activeCoverSrc}
-                          previewSrc={activeCoverPreviewSrc}
-                          alt=""
-                          variant="bare"
-                          fit={activeCoverFit}
-                          aspect="auto"
-                          storageVariant={
-                            activeCoverPhoto
-                              ? getLensPhotoStorageVariant(
-                                  activeCoverPhoto,
-                                  "cover",
-                                )
-                              : "display"
-                          }
-                          fallbackSrcs={
-                            activeCoverPhoto
-                              ? getLensPhotoFallbackSrcs(activeCoverPhoto)
-                              : undefined
-                          }
-                          loading="eager"
-                          style={styles.profileCoverTileRoot}
-                          frameStyle={styles.profileCoverTileFrame}
-                          imageStyle={styles.profileCoverImage}
-                          onClick={
-                            activeCoverRecordPhoto
-                              ? () =>
-                                  setSelectedRecordPhoto(activeCoverRecordPhoto)
-                              : undefined
-                          }
-                        />
-                      )}
-                      {activeSection === "basic" ? (
-                        <div style={styles.profileCoverActionStack}>
-                          {shouldShowCatSwitchButton ? (
-                            <button
-                              type="button"
-                              style={styles.profileCoverActionButton}
-                              onClick={handleCycleCat}
-                              aria-label="次のねこに切り替える"
-                            >
-                              <img
-                                src={catIllustrations.catSwitcherIcon}
-                                alt=""
-                                style={styles.profileCoverSwitchIcon}
-                                onError={(event) =>
-                                  fallBackCatIllustrationImage(
-                                    event.currentTarget,
-                                    "catSwitcherIcon",
-                                  )
-                                }
-                              />
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            data-testid="cats-cover-photo-button"
-                            style={styles.profileCoverActionButton}
-                            onClick={() => setIsCoverPhotoSheetOpen(true)}
-                            aria-label={
-                              "\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5909\u3048\u308b"
-                            }
-                          >
-                            <PhotoSmallIcon />
-                          </button>
-                          <button
-                            type="button"
-                            style={styles.profileCoverActionButton}
-                            onClick={() => {
-                              setIsCatManageEditing(false);
-                              setCatManageEditSource(null);
-                              setIsAddingCat(false);
-                              setIsCatManageOpen(true);
-                            }}
-                            aria-label="猫を追加・管理"
-                          >
-                            <AddSmallIcon />
-                          </button>
-                        </div>
-                      ) : shouldShowCatSwitchButton ? (
+                      ) : null}
+                      {shouldShowCatSwitchButton ? (
                         <button
                           type="button"
-                          style={styles.profileCoverSwitchButton}
+                          style={styles.profileIdentitySwitchButton}
                           onClick={handleCycleCat}
                           aria-label="次のねこに切り替える"
                         >
@@ -1716,8 +1757,21 @@ export function CatsPage() {
                         </button>
                       ) : null}
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
+                </header>
+                <UchinokoSectionTabs
+                  value={activeSection}
+                  onChange={setActiveSection}
+                  options={[
+                    { value: "photos", label: "写真" },
+                    {
+                      value: "record",
+                      label: "記録",
+                      hasIndicator: hasUnopenedOmoide,
+                    },
+                    { value: "basic", label: "プロフィール" },
+                  ]}
+                />
               </>
             ) : null}
 
@@ -1850,6 +1904,80 @@ export function CatsPage() {
                   profile={activeCatProfile}
                   onEdit={() => openCatManageEditor("basic")}
                 />
+                <div style={styles.profileSettings}>
+                  <button
+                    type="button"
+                    data-testid="cats-cover-photo-button"
+                    style={styles.profileSettingsRow}
+                    onClick={() => setIsCoverPhotoSheetOpen(true)}
+                    aria-label="代表写真を変更"
+                  >
+                    <span
+                      data-testid="cats-representative-photo"
+                      style={styles.profileRepresentativePhoto}
+                      aria-hidden="true"
+                    >
+                      {activeCoverSrc && hasCustomCoverCrop ? (
+                        <CoverCropPhoto
+                          src={activeCoverSrc}
+                          fallbackSrcs={activeCoverFallbackSrcs}
+                          crop={activeCoverCrop}
+                          alt=""
+                          storageVariant="thumbnail"
+                          style={styles.profileRepresentativePhotoImage}
+                        />
+                      ) : activeCoverSrc ? (
+                        <PhotoTile
+                          src={activeCoverSrc}
+                          previewSrc={activeCoverPreviewSrc}
+                          alt=""
+                          variant="bare"
+                          fit={activeCoverFit}
+                          aspect="auto"
+                          storageVariant="thumbnail"
+                          fallbackSrcs={activeCoverFallbackSrcs}
+                          loading="eager"
+                          style={styles.profileRepresentativePhotoTile}
+                          frameStyle={styles.profileRepresentativePhotoFrame}
+                          imageStyle={styles.profileRepresentativePhotoImage}
+                        />
+                      ) : (
+                        <PhotoSmallIcon />
+                      )}
+                    </span>
+                    <span style={styles.profileSettingsText}>
+                      <span style={styles.profileSettingsLabel}>代表写真</span>
+                      <span style={styles.profileSettingsHint}>
+                        ホームに表示する写真
+                      </span>
+                    </span>
+                    <ChevronRightSmallIcon />
+                  </button>
+                  <button
+                    type="button"
+                    style={styles.profileSettingsRow}
+                    onClick={() => {
+                      setIsCatManageEditing(false);
+                      setCatManageEditSource(null);
+                      setIsAddingCat(false);
+                      setIsCatManageOpen(true);
+                    }}
+                    aria-label="猫を追加・管理"
+                  >
+                    <span
+                      style={styles.profileSettingsIcon}
+                      aria-hidden="true"
+                    >
+                      <AddSmallIcon />
+                    </span>
+                    <span style={styles.profileSettingsText}>
+                      <span style={styles.profileSettingsLabel}>
+                        猫を追加・管理
+                      </span>
+                    </span>
+                    <ChevronRightSmallIcon />
+                  </button>
+                </div>
               </AppCard>
             ) : null}
 
@@ -2172,153 +2300,166 @@ export function CatsPage() {
                   </div>
                 </section>
 
-                <section style={styles.catManageFormSection}>
-                  <div style={styles.catManageFormHeading}>
-                    <p style={styles.catManageFormTitle}>見た目</p>
-                  </div>
-                  <AppSegmented<EditableGender>
-                    value={editGender}
-                    ariaLabel="性別"
-                    columns={3}
-                    selectedStyle={styles.catManageSelectedOption}
-                    onChange={setEditGender}
-                    options={[
-                      { value: "male", label: "男の子" },
-                      { value: "female", label: "女の子" },
-                      { value: "unknown", label: "わからない" },
-                    ]}
-                  />
-                  <AppTextField
-                    type="text"
-                    label="毛柄"
-                    value={editCoat || selectedCoat || ""}
-                    maxLength={40}
-                    onChange={(event) => setEditCoat(event.target.value)}
-                    placeholder="例：茶トラ"
-                  />
-                  <AppTextField
-                    type="text"
-                    label="猫種"
-                    value={editBreed}
-                    maxLength={40}
-                    onChange={(event) => setEditBreed(event.target.value)}
-                    placeholder="例：ミックス"
-                  />
-                </section>
+                <details style={styles.catManageAdvancedDisclosure}>
+                  <summary style={styles.catManageAdvancedSummary}>
+                    その他のプロフィールを編集
+                  </summary>
+                  <div style={styles.catManageAdvancedContent}>
+                    <section style={styles.catManageFormSection}>
+                      <div style={styles.catManageFormHeading}>
+                        <p style={styles.catManageFormTitle}>見た目</p>
+                      </div>
+                      <AppSegmented<EditableGender>
+                        value={editGender}
+                        ariaLabel="性別"
+                        columns={3}
+                        selectedStyle={styles.catManageSelectedOption}
+                        onChange={setEditGender}
+                        options={[
+                          { value: "male", label: "男の子" },
+                          { value: "female", label: "女の子" },
+                          { value: "unknown", label: "わからない" },
+                        ]}
+                      />
+                      <AppTextField
+                        type="text"
+                        label="毛柄"
+                        value={editCoat || selectedCoat || ""}
+                        maxLength={40}
+                        onChange={(event) => setEditCoat(event.target.value)}
+                        placeholder="例：茶トラ"
+                      />
+                      <AppTextField
+                        type="text"
+                        label="猫種"
+                        value={editBreed}
+                        maxLength={40}
+                        onChange={(event) => setEditBreed(event.target.value)}
+                        placeholder="例：ミックス"
+                      />
+                    </section>
 
-                <section style={styles.catManageFormSection}>
-                  <div style={styles.catManageFormHeading}>
-                    <p style={styles.catManageFormTitle}>この子らしさ</p>
-                  </div>
-                  <AppTextField
-                    type="text"
-                    label="よく呼ぶ名前"
-                    value={editCallName}
-                    maxLength={40}
-                    onChange={(event) => setEditCallName(event.target.value)}
-                    placeholder="例：むぎちゃん"
-                  />
-                  <AppTextField
-                    type="text"
-                    label="好きな場所"
-                    value={editFavoritePlace}
-                    maxLength={40}
-                    onChange={(event) =>
-                      setEditFavoritePlace(event.target.value)
-                    }
-                    placeholder="例：ソファの右端"
-                  />
-                  <AppTextField
-                    type="text"
-                    label="好きな遊び"
-                    value={editFavoritePlay}
-                    maxLength={40}
-                    onChange={(event) =>
-                      setEditFavoritePlay(event.target.value)
-                    }
-                    placeholder="例：ひも、追いかけっこ"
-                  />
-                  <AppTextField
-                    type="text"
-                    label="なでられると好きなところ"
-                    value={editFavoriteTouch}
-                    maxLength={40}
-                    onChange={(event) =>
-                      setEditFavoriteTouch(event.target.value)
-                    }
-                    placeholder="例：あごの下"
-                  />
-                  <AppTextField
-                    type="text"
-                    label="苦手なこと"
-                    value={editDislikes}
-                    maxLength={40}
-                    onChange={(event) => setEditDislikes(event.target.value)}
-                    placeholder="例：掃除機、大きな音"
-                  />
-                </section>
+                    <section style={styles.catManageFormSection}>
+                      <div style={styles.catManageFormHeading}>
+                        <p style={styles.catManageFormTitle}>この子らしさ</p>
+                      </div>
+                      <AppTextField
+                        type="text"
+                        label="よく呼ぶ名前"
+                        value={editCallName}
+                        maxLength={40}
+                        onChange={(event) => setEditCallName(event.target.value)}
+                        placeholder="例：むぎちゃん"
+                      />
+                      <AppTextField
+                        type="text"
+                        label="好きな場所"
+                        value={editFavoritePlace}
+                        maxLength={40}
+                        onChange={(event) =>
+                          setEditFavoritePlace(event.target.value)
+                        }
+                        placeholder="例：ソファの右端"
+                      />
+                      <AppTextField
+                        type="text"
+                        label="好きな遊び"
+                        value={editFavoritePlay}
+                        maxLength={40}
+                        onChange={(event) =>
+                          setEditFavoritePlay(event.target.value)
+                        }
+                        placeholder="例：ひも、追いかけっこ"
+                      />
+                      <AppTextField
+                        type="text"
+                        label="なでられると好きなところ"
+                        value={editFavoriteTouch}
+                        maxLength={40}
+                        onChange={(event) =>
+                          setEditFavoriteTouch(event.target.value)
+                        }
+                        placeholder="例：あごの下"
+                      />
+                      <AppTextField
+                        type="text"
+                        label="苦手なこと"
+                        value={editDislikes}
+                        maxLength={40}
+                        onChange={(event) => setEditDislikes(event.target.value)}
+                        placeholder="例：掃除機、大きな音"
+                      />
+                    </section>
 
-                <section style={styles.catManageFormSection}>
-                  <div style={styles.catManageFormHeading}>
-                    <p style={styles.catManageFormTitle}>ケアのメモ</p>
+                    <section style={styles.catManageFormSection}>
+                      <div style={styles.catManageFormHeading}>
+                        <p style={styles.catManageFormTitle}>ケアのメモ</p>
+                      </div>
+                      <div style={styles.catManageCareGrid}>
+                        <AppTextField
+                          type="number"
+                          label="体重（kg）"
+                          value={editWeightKg}
+                          min="0.5"
+                          max="20"
+                          step="0.1"
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            setEditWeightKg(event.target.value)
+                          }
+                          placeholder="例：4.8"
+                        />
+                        <AppTextField
+                          type="date"
+                          className="cat-basic-date-field"
+                          label="はかった日"
+                          value={editWeightMeasuredDate}
+                          onChange={(event) =>
+                            setEditWeightMeasuredDate(event.target.value)
+                          }
+                          max={new Date().toISOString().split("T")[0]}
+                        />
+                      </div>
+                      <AppTextField
+                        type="text"
+                        label="かかりつけ"
+                        value={editVetClinic}
+                        maxLength={80}
+                        onChange={(event) => setEditVetClinic(event.target.value)}
+                        placeholder="例：○○動物病院"
+                      />
+                      <AppTextField
+                        type="date"
+                        className="cat-basic-date-field"
+                        label="ワクチンを打った日"
+                        value={editVaccineDate}
+                        onChange={(event) =>
+                          setEditVaccineDate(event.target.value)
+                        }
+                        max={new Date().toISOString().split("T")[0]}
+                      />
+                      <AppTextField
+                        type="text"
+                        label="ワクチンのメモ"
+                        value={editVaccineNote}
+                        maxLength={80}
+                        onChange={(event) =>
+                          setEditVaccineNote(event.target.value)
+                        }
+                        placeholder="例：3種混合"
+                      />
+                      <AppTextField
+                        as="textarea"
+                        label="気をつけること"
+                        value={editCareNote}
+                        maxLength={180}
+                        onChange={(event) => setEditCareNote(event.target.value)}
+                        placeholder="例：爪切りが苦手"
+                        fieldStyle={styles.catManageCareNoteField}
+                      />
+                    </section>
                   </div>
-                  <div style={styles.catManageCareGrid}>
-                    <AppTextField
-                      type="number"
-                      label="体重（kg）"
-                      value={editWeightKg}
-                      min="0.5"
-                      max="20"
-                      step="0.1"
-                      inputMode="decimal"
-                      onChange={(event) => setEditWeightKg(event.target.value)}
-                      placeholder="例：4.8"
-                    />
-                    <AppTextField
-                      type="date"
-                      className="cat-basic-date-field"
-                      label="はかった日"
-                      value={editWeightMeasuredDate}
-                      onChange={(event) =>
-                        setEditWeightMeasuredDate(event.target.value)
-                      }
-                      max={new Date().toISOString().split("T")[0]}
-                    />
-                  </div>
-                  <AppTextField
-                    type="text"
-                    label="かかりつけ"
-                    value={editVetClinic}
-                    maxLength={80}
-                    onChange={(event) => setEditVetClinic(event.target.value)}
-                    placeholder="例：○○動物病院"
-                  />
-                  <AppTextField
-                    type="date"
-                    className="cat-basic-date-field"
-                    label="ワクチンを打った日"
-                    value={editVaccineDate}
-                    onChange={(event) => setEditVaccineDate(event.target.value)}
-                    max={new Date().toISOString().split("T")[0]}
-                  />
-                  <AppTextField
-                    type="text"
-                    label="ワクチンのメモ"
-                    value={editVaccineNote}
-                    maxLength={80}
-                    onChange={(event) => setEditVaccineNote(event.target.value)}
-                    placeholder="例：3種混合"
-                  />
-                  <AppTextField
-                    as="textarea"
-                    label="気をつけること"
-                    value={editCareNote}
-                    maxLength={180}
-                    onChange={(event) => setEditCareNote(event.target.value)}
-                    placeholder="例：爪切りが苦手"
-                    fieldStyle={styles.catManageCareNoteField}
-                  />
-                </section>
+                </details>
               </div>
             ) : (
               <>
@@ -2434,10 +2575,24 @@ export function CatsPage() {
           <PhotoFullscreenViewer
             key={`${selectedRecordPhoto.kind}-${selectedRecordPhoto.id}`}
             photo={selectedRecordPhoto}
-            canDelete={selectedRecordPhoto.kind === "photo"}
+            canDelete={
+              selectedRecordPhoto.kind === "photo" ||
+              (selectedRecordPhoto.kind === "sleeping" &&
+                selectedRecordPhoto.shareManageable === true)
+            }
             onRequestDelete={() =>
               requestDeleteGalleryPhoto(selectedRecordPhoto)
             }
+            isSharingPending={
+              pendingPhotoSharingId === selectedRecordPhoto.id
+            }
+            sharingFeedback={photoSharingFeedback}
+            onSharingChange={(nextShared) => {
+              void handlePhotoSharingChange(
+                selectedRecordPhoto,
+                nextShared,
+              );
+            }}
             onClose={() => setSelectedRecordPhoto(null)}
           />
         ) : null}
@@ -2449,14 +2604,18 @@ export function CatsPage() {
         >
           <div style={styles.deleteCatConfirm}>
             <p style={styles.deleteCatConfirmTitle}>
-              この子の写真から削除します。
+              {deleteGalleryPhotoTarget.kind === "sleeping"
+                ? "うちのこの記録から削除します。"
+                : "この子の写真から削除します。"}
             </p>
             <p style={styles.deleteCatConfirmText}>
-              ねこだよりや、ほかの人にとどいたねこだよりには影響しません。
+              {deleteGalleryPhotoTarget.kind === "sleeping"
+                ? "今後のねこだよりには使われません。すでに届いた写真は、相手の記録に残ります。"
+                : "ねこだよりや、ほかの人にとどいたねこだよりには影響しません。"}
             </p>
             {isGalleryPhotoCover(deleteGalleryPhotoTarget) ? (
               <p style={styles.deleteCatConfirmText}>
-                この写真はカバー写真にも使われています。削除すると、カバー写真は自動表示に戻ります。
+                この写真は代表写真にも使われています。削除すると、代表写真は自動表示に戻ります。
               </p>
             ) : null}
             <div style={styles.deleteCatConfirmActions}>
@@ -2699,6 +2858,9 @@ function RecordOverview({
 
   return (
     <div style={styles.recordOverview}>
+      <p style={styles.recordOverviewLead}>
+        写真を残すと、この子の記録が自動でたまります。
+      </p>
       {pickups.length > 0 ? (
         <section
           style={styles.recordBlock}
@@ -3117,11 +3279,7 @@ function BasicInfoTable({
       valueTone: "numeric",
     }),
   ];
-  const groups = [
-    {
-      title: "たいせつな日",
-      rows: importantDateRows,
-    },
+  const advancedGroups = [
     {
       title: "見た目",
       rows: appearanceRows,
@@ -3135,19 +3293,8 @@ function BasicInfoTable({
       rows: careRows,
     },
   ].filter((group) => group.rows.some((row) => row.value));
-
-  const renderGroup = (group: {
-    title: string;
-    rows: BasicInfoDisplayRow[];
-  }) => (
-    <BasicInfoSubsection
-      key={group.title}
-      title={group.title}
-      rows={group.rows}
-    />
-  );
-
-  const hasAnyGroup = groups.length > 0;
+  const hasImportantDates = importantDateRows.some((row) => row.value);
+  const hasAdvancedProfile = advancedGroups.length > 0;
 
   return (
     <div style={styles.basicInfoBlock}>
@@ -3159,14 +3306,35 @@ function BasicInfoTable({
             data-testid="cats-basic-info-edit-button"
             style={styles.basicInfoEditButton}
             onClick={onEdit}
-            aria-label="基本情報を編集"
-            title="基本情報を編集"
+            aria-label="プロフィールを編集"
+            title="プロフィールを編集"
           >
             <PencilSmallIcon />
           </button>
         ) : null}
       </div>
-      {hasAnyGroup ? groups.map(renderGroup) : null}
+      {hasImportantDates ? (
+        <BasicInfoSubsection title="たいせつな日" rows={importantDateRows} />
+      ) : null}
+      {hasAdvancedProfile ? (
+        <details
+          data-testid="cats-advanced-profile"
+          style={styles.basicInfoDisclosure}
+        >
+          <summary style={styles.basicInfoDisclosureSummary}>
+            その他のプロフィール
+          </summary>
+          <div style={styles.basicInfoDisclosureContent}>
+            {advancedGroups.map((group) => (
+              <BasicInfoSubsection
+                key={group.title}
+                title={group.title}
+                rows={group.rows}
+              />
+            ))}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -3344,11 +3512,7 @@ function UchinokoPhotoSection({
           data-source-photo-id={keptFourChoiceSourcePhoto.id}
           style={styles.uchinokoPhotoBridge}
         >
-          <span>
-            {keptFourChoiceSourcePhoto.id === todayPhoto?.id
-              ? `きょうの${catName}から、ねこだよりが届きました`
-              : `${formatUchinokoHighlightDate(keptFourChoiceSourcePhoto.createdAt)}の${catName}から、ねこだよりが届きました`}
-          </span>
+          <span>この写真を残した日に届いたねこだより</span>
           <a href="/collection" style={styles.uchinokoPhotoBridgeLink}>
             ねこだよりを見る
           </a>
@@ -4116,7 +4280,7 @@ function CoverPhotoSheet({
 }) {
   return (
     <AppBottomSheet
-      title={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5909\u3048\u308b"}
+      title="代表写真を変える"
       onClose={onClose}
     >
       <div style={styles.thumbnailPicker}>
@@ -4178,7 +4342,7 @@ function CoverPhotoSheet({
                   data-testid="cover-photo-picker-photo"
                   style={styles.thumbnailPickerPhoto}
                   onClick={() => onPickPhoto(photo)}
-                  aria-label={`${formatLensPhotoDate(photo.createdAt)}\u306e\u5199\u771f\u3092\u30ab\u30d0\u30fc\u5199\u771f\u306b\u3059\u308b`}
+                  aria-label={`${formatLensPhotoDate(photo.createdAt)}の写真を代表写真にする`}
                 >
                   <PhotoTile
                     src={getLensPhotoThumbnailSrc(photo)}
@@ -4551,11 +4715,17 @@ function PhotoFullscreenViewer({
   photo,
   canDelete = false,
   onRequestDelete,
+  isSharingPending = false,
+  sharingFeedback,
+  onSharingChange,
   onClose,
 }: {
   photo: RecordPhotoPreview;
   canDelete?: boolean;
   onRequestDelete?: () => void;
+  isSharingPending?: boolean;
+  sharingFeedback?: string;
+  onSharingChange?: (shared: boolean) => void;
   onClose: () => void;
 }) {
   const reduceMotion = useReducedMotion();
@@ -4565,6 +4735,11 @@ function PhotoFullscreenViewer({
       onClose,
       manageHistory: true,
     });
+  const canManageSharing =
+    photo.kind === "sleeping" &&
+    photo.shareManageable === true &&
+    Boolean(onSharingChange);
+  const isShared = Boolean(photo.shared);
 
   return (
     <motion.div
@@ -4576,6 +4751,8 @@ function PhotoFullscreenViewer({
       tabIndex={-1}
       onKeyDown={handleModalKeyDown}
       onClick={requestModalClose}
+      data-testid="cats-photo-viewer"
+      data-photo-id={photo.id}
       data-photo-viewer-motion="continuous"
       initial={{ opacity: reduceMotion ? 1 : 0 }}
       animate={{ opacity: 1 }}
@@ -4609,11 +4786,23 @@ function PhotoFullscreenViewer({
         >
           <AppIcon name="close" size={18} />
         </button>
-        <div style={styles.photoViewerImageFrame}>
+        <div
+          style={{
+            ...styles.photoViewerImageFrame,
+            ...(canManageSharing
+              ? styles.photoViewerImageFrameWithSharing
+              : null),
+          }}
+        >
           <StoredPhotoImage
             src={photo.src}
             alt=""
-            style={styles.photoViewerImage}
+            style={{
+              ...styles.photoViewerImage,
+              ...(canManageSharing
+                ? styles.photoViewerImageWithSharing
+                : null),
+            }}
             loading="eager"
             fetchPriority="high"
             width={390}
@@ -4626,6 +4815,50 @@ function PhotoFullscreenViewer({
             {formatFootprintDate(photo.timestamp)}
           </p>
         </div>
+        {canManageSharing ? (
+          <div
+            style={styles.photoViewerSharing}
+            data-testid="cats-photo-delivery-setting"
+          >
+            <div style={styles.photoViewerSharingCopy}>
+              <p style={styles.photoViewerSharingTitle}>
+                ほかのおうちへ送る
+              </p>
+              <p
+                style={styles.photoViewerSharingStatus}
+                data-testid="cats-photo-delivery-status"
+                role="status"
+                aria-live="polite"
+              >
+                {isSharingPending
+                  ? "変更しています…"
+                  : isShared
+                    ? "ねこだよりとして届く候補です"
+                    : "この写真は今後送られません"}
+              </p>
+            </div>
+            <AppToggle
+              checked={isShared}
+              disabled={isSharingPending}
+              label="この写真をほかのおうちへ送る"
+              showStateText={false}
+              onChange={(nextShared) => onSharingChange?.(nextShared)}
+              style={styles.photoViewerSharingToggle}
+            />
+            <p style={styles.photoViewerSharingNote}>
+              変更はこれから届く分に反映されます。すでに届いた写真は、相手の記録に残ります。
+            </p>
+            {sharingFeedback ? (
+              <p
+                style={styles.photoViewerSharingFeedback}
+                role="alert"
+                data-testid="cats-photo-delivery-feedback"
+              >
+                {sharingFeedback}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         {canDelete && onRequestDelete ? (
           <button
             type="button"
@@ -4876,7 +5109,10 @@ function createLocalLensPhoto(
     catIds: [profile.id],
     catNames: [getCatName(profile)],
     kind: "sleeping",
-    deliveryCount: photo.shared ? 1 : 0,
+    shared: photo.shared ?? photo.visibility === "shared",
+    ownerCatId: photo.ownerCatId ?? photo.catId,
+    sourceMomentId: photo.sourceMomentId,
+    shareManageable: true,
   };
 }
 
@@ -4891,6 +5127,10 @@ function createLocalOrphanLensPhoto(photo: OwnSleepingPhoto): LensPhoto {
     catIds: [],
     catNames: [],
     kind: "sleeping",
+    shared: photo.shared ?? photo.visibility === "shared",
+    ownerCatId: photo.ownerCatId ?? photo.catId,
+    sourceMomentId: photo.sourceMomentId,
+    shareManageable: true,
   };
 }
 
@@ -4925,6 +5165,11 @@ function createRemoteLensPhoto(
     catNames: [getCatName(profile)],
     kind: "sleeping",
     deliveryCount: row.deliveryCount,
+    shared:
+      row.visibility === "shared" && row.deliveryStatus === "available",
+    ownerCatId: row.ownerCatId,
+    sourceMomentId: row.catMomentId,
+    shareManageable: true,
   };
 }
 
@@ -4991,6 +5236,11 @@ function dedupeLensPhotos(photos: LensPhoto[]) {
         existing.deliveryCount ?? 0,
         photo.deliveryCount ?? 0,
       ),
+      shared: existing.shared ?? photo.shared,
+      ownerCatId: existing.ownerCatId ?? photo.ownerCatId,
+      sourceMomentId: existing.sourceMomentId ?? photo.sourceMomentId,
+      shareManageable:
+        existing.shareManageable === true || photo.shareManageable === true,
     });
   }
 
@@ -5239,6 +5489,10 @@ function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
     timestamp: photo.createdAt,
     kind: photo.kind,
     catIds: photo.catIds,
+    shared: photo.shared,
+    ownerCatId: photo.ownerCatId,
+    sourceMomentId: photo.sourceMomentId,
+    shareManageable: photo.shareManageable,
   };
 }
 
@@ -5278,7 +5532,7 @@ function CoverCropPhoto({
   fallbackSrcs?: string[];
   crop: CatCoverCrop;
   alt: string;
-  storageVariant?: "display" | "hero";
+  storageVariant?: "thumbnail" | "display" | "hero";
   style: CSSProperties;
   onNaturalSize?: (size: { width: number; height: number }) => void;
 }) {
@@ -5685,6 +5939,13 @@ async function saveRemoteCatProfile(
       ? getStoragePhotoPath(profile.coverPhotoDataUrl)
       : null,
     cover_crop: profile.coverCrop ? toJsonObject(profile.coverCrop) : null,
+    metadata: {
+      source: "cat-profile-v1",
+      cat_name_state: profile.nameState ?? "confirmed",
+      ...(profile.nameConfirmedAt
+        ? { cat_name_confirmed_at: profile.nameConfirmedAt }
+        : {}),
+    },
     local_created_at: profile.createdAt,
     local_updated_at: profile.updatedAt,
   };
@@ -6355,6 +6616,26 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+  profileIdentityActions: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "8px",
+  },
+  profileIdentityNameButton: {
+    minHeight: "40px",
+    padding: "0 4px",
+    border: "none",
+    background: "transparent",
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: CATS_META_TRACKING,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
   profileIdentitySwitchButton: {
     width: "40px",
     height: "40px",
@@ -6440,82 +6721,6 @@ const styles = {
     boxShadow:
       "0 0 0 2px color-mix(in srgb, var(--paper) 84%, transparent)",
   },
-  profileCoverHero: {
-    position: "relative" as const,
-    display: "block",
-    minHeight: "clamp(168px, 23dvh, 184px)",
-  },
-  profileCoverFrame: {
-    position: "relative" as const,
-    display: "block",
-    width: "calc(100% + 32px)",
-    height: "clamp(168px, 23dvh, 184px)",
-    marginLeft: "-16px",
-    overflow: "hidden",
-    borderRadius: "18px",
-    background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
-    border: "1px solid color-mix(in srgb, var(--paper) 72%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 76%, transparent), 0 16px 34px -30px color-mix(in srgb, var(--ink) 30%, transparent)",
-  },
-  profileCoverTileRoot: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-  },
-  profileCoverTileFrame: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-  },
-  profileCoverImage: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    // Temporary framing until face-aware cover positioning is introduced.
-    objectPosition: "50% 30%",
-    border: "none",
-    borderRadius: 0,
-    boxShadow: "none",
-    background: "color-mix(in srgb, var(--paper-card) 80%, transparent)",
-  },
-  profileCoverCustomButton: {
-    position: "relative" as const,
-    display: "block",
-    width: "100%",
-    height: "100%",
-    padding: 0,
-    border: "none",
-    background: "transparent",
-    color: "inherit",
-    cursor: "pointer",
-    overflow: "hidden",
-    WebkitTapHighlightColor: "transparent",
-  },
-  profileCoverCustomImage: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    objectPosition: "50% 30%",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 88%, white), color-mix(in srgb, var(--paper) 86%, white))",
-    border: "none",
-    borderRadius: 0,
-    boxShadow: "none",
-  },
-  profileCoverCustomCroppedImage: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    objectPosition: "center",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 88%, white), color-mix(in srgb, var(--paper) 86%, white))",
-    border: "none",
-    borderRadius: 0,
-    boxShadow: "none",
-  },
   coverCropBackdropImage: {
     width: "100%",
     height: "100%",
@@ -6524,141 +6729,12 @@ const styles = {
     transform: "scale(1.04)",
     filter: "saturate(0.72) brightness(0.86)",
   },
-  profileCoverEditButton: {
-    position: "absolute" as const,
-    top: "10px",
-    right: "10px",
-    zIndex: 2,
-    width: "40px",
-    height: "40px",
-    minWidth: "40px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 0,
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
-    color: "color-mix(in srgb, var(--ink) 78%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-    backdropFilter: "blur(10px)",
-    WebkitBackdropFilter: "blur(10px)",
-  },
-  profileCoverActionStack: {
-    position: "absolute" as const,
-    right: "10px",
-    top: "10px",
-    zIndex: 2,
-    display: "grid",
-    gap: "8px",
-  },
-  profileCoverActionButton: {
-    width: "40px",
-    height: "40px",
-    minWidth: "40px",
-    minHeight: "40px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "7px",
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 80%, transparent)",
-    color: "color-mix(in srgb, var(--ink) 78%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-    backdropFilter: "blur(10px)",
-    WebkitBackdropFilter: "blur(10px)",
-  },
-  profileCoverThumbnailButton: {
-    position: "absolute" as const,
-    right: "10px",
-    bottom: "10px",
-    zIndex: 2,
-    width: "40px",
-    height: "40px",
-    minWidth: "40px",
-    minHeight: "40px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 0,
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
-    color: "color-mix(in srgb, var(--ink) 78%, transparent)",
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 500,
-    lineHeight: 1,
-    letterSpacing: "0",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-    backdropFilter: "blur(10px)",
-    WebkitBackdropFilter: "blur(10px)",
-  },
-  profileCoverSwitchButton: {
-    position: "absolute" as const,
-    right: "10px",
-    top: "10px",
-    zIndex: 2,
-    width: "40px",
-    height: "40px",
-    minWidth: "40px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "7px",
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
-    color: "color-mix(in srgb, var(--ink) 78%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-    backdropFilter: "blur(10px)",
-    WebkitBackdropFilter: "blur(10px)",
-  },
   profileCoverSwitchIcon: {
     width: "26px",
     height: "26px",
     display: "block",
     objectFit: "contain",
     opacity: 0.82,
-  },
-  profileCoverManageButton: {
-    position: "absolute" as const,
-    left: "10px",
-    top: "10px",
-    zIndex: 2,
-    width: "40px",
-    height: "40px",
-    minWidth: "40px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 0,
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
-    color: "color-mix(in srgb, var(--ink) 78%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-    backdropFilter: "blur(10px)",
-    WebkitBackdropFilter: "blur(10px)",
-  },
-  profileCoverManageButtonWithSwitch: {
-    left: "58px",
   },
   profileHero: {
     display: "grid",
@@ -6860,6 +6936,15 @@ const styles = {
     display: "grid",
     gap: "24px",
     padding: "0 0 24px",
+  },
+  recordOverviewLead: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.65,
+    letterSpacing: CATS_META_TRACKING,
   },
   recordBlock: {
     display: "grid",
@@ -7297,6 +7382,9 @@ const styles = {
     display: "grid",
     gap: "12px",
     alignContent: "center",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    WebkitOverflowScrolling: "touch",
   },
   photoViewerCloseButton: {
     justifySelf: "end",
@@ -7331,6 +7419,12 @@ const styles = {
     objectFit: "contain",
     borderRadius: "18px",
   },
+  photoViewerImageFrameWithSharing: {
+    maxHeight: "min(56dvh, 560px)",
+  },
+  photoViewerImageWithSharing: {
+    maxHeight: "min(56dvh, 560px)",
+  },
   photoViewerMeta: {
     display: "grid",
     gap: "2px",
@@ -7351,6 +7445,60 @@ const styles = {
     fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.5,
+  },
+  photoViewerSharing: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: "8px 12px",
+    padding: "12px 14px",
+    border:
+      "1px solid color-mix(in srgb, var(--paper) 24%, transparent)",
+    borderRadius: "14px",
+    background:
+      "color-mix(in srgb, var(--app-night-ink, #1d1a18) 58%, transparent)",
+  },
+  photoViewerSharingCopy: {
+    minWidth: 0,
+    display: "grid",
+    gap: "2px",
+  },
+  photoViewerSharingTitle: {
+    margin: 0,
+    color: "var(--paper)",
+    fontFamily: CATS_UI,
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.45,
+  },
+  photoViewerSharingStatus: {
+    margin: 0,
+    color: "color-mix(in srgb, var(--paper) 78%, transparent)",
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+  },
+  photoViewerSharingToggle: {
+    flexShrink: 0,
+  },
+  photoViewerSharingNote: {
+    gridColumn: "1 / -1",
+    margin: 0,
+    color: "color-mix(in srgb, var(--paper) 62%, transparent)",
+    fontFamily: CATS_UI,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.55,
+  },
+  photoViewerSharingFeedback: {
+    gridColumn: "1 / -1",
+    margin: 0,
+    color: "color-mix(in srgb, var(--danger) 56%, var(--paper))",
+    fontFamily: CATS_UI,
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.55,
   },
   photoViewerDeleteButton: {
     justifySelf: "start",
@@ -7569,6 +7717,98 @@ const styles = {
     boxShadow: "none",
     backdropFilter: "none",
   },
+  profileSettings: {
+    display: "grid",
+    marginTop: "22px",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
+  },
+  profileSettingsRow: {
+    width: "100%",
+    minHeight: "64px",
+    display: "grid",
+    gridTemplateColumns: "64px minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: "12px",
+    padding: "11px 0",
+    border: "none",
+    borderBottom:
+      "1px solid color-mix(in srgb, var(--line) 42%, transparent)",
+    background: "transparent",
+    color: CATS_MUTED,
+    textAlign: "left" as const,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  profileSettingsText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "2px",
+  },
+  profileSettingsLabel: {
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  profileSettingsHint: {
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  profileRepresentativePhoto: {
+    position: "relative" as const,
+    width: "64px",
+    height: "40px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: "9px",
+    border: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 56%, transparent)",
+    color: CATS_FAINT,
+  },
+  profileRepresentativePhotoTile: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+  },
+  profileRepresentativePhotoFrame: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    border: "none",
+    borderRadius: 0,
+    background: "transparent",
+  },
+  profileRepresentativePhotoImage: {
+    position: "absolute" as const,
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
+    objectPosition: "center",
+    border: "none",
+    borderRadius: 0,
+    background: "transparent",
+  },
+  profileSettingsIcon: {
+    width: "40px",
+    height: "40px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--line) 55%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 36%, transparent)",
+    color: CATS_MUTED,
+  },
   basicInfoHeader: {
     display: "flex",
     alignItems: "center",
@@ -7631,6 +7871,26 @@ const styles = {
     gap: "4px",
     paddingTop: "16px",
     borderTop: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
+  },
+  basicInfoDisclosure: {
+    borderTop: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
+  },
+  basicInfoDisclosureSummary: {
+    minHeight: "44px",
+    display: "flex",
+    alignItems: "center",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: CATS_META_TRACKING,
+    cursor: "pointer",
+  },
+  basicInfoDisclosureContent: {
+    display: "grid",
+    gap: "18px",
+    paddingBottom: "4px",
   },
   basicInfoSubsectionTitle: {
     margin: 0,
@@ -7881,6 +8141,28 @@ const styles = {
     minWidth: 0,
     padding: "18px 2px 0",
     borderTop: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+  },
+  catManageAdvancedDisclosure: {
+    minWidth: 0,
+    borderTop: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+  },
+  catManageAdvancedSummary: {
+    minHeight: "48px",
+    display: "flex",
+    alignItems: "center",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: CATS_META_TRACKING,
+    cursor: "pointer",
+  },
+  catManageAdvancedContent: {
+    display: "grid",
+    gap: "18px",
+    minWidth: 0,
+    paddingBottom: "4px",
   },
   catManageFormHeading: {
     display: "grid",

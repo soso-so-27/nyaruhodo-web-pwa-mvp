@@ -16,7 +16,7 @@
 | 一覧・小タイル | thumbnail | 480〜800px |
 | ねこだよりボード | thumbnail transform | 800px |
 | ホームの今日の写真 | hero transform | 1440px / quality 84 |
-| うちのこカバー | hero transform | 1440px / quality 84 |
+| うちのこ代表写真（プロフィール内） | thumbnail transform | 800px |
 | 詳細ビューア・crop編集 | display | 保存済み表示画像の最大サイズ |
 
 新規取り込み時の表示画像は、寝顔・オンボが最大2048px、うちのこ写真とカバーが最大2560px、記録写真が最大1600px。小タイルには別のthumbnailを使い、大きな表示でthumbnailを引き伸ばさない。
@@ -31,7 +31,7 @@ Storage画像のtransform取得に失敗した場合は、同じStorageオブジ
 - オンボーディング写真
 - うちのこ写真
 - 記録写真
-- カバー写真
+- 代表写真
 
 原本はまずIndexedDB `neteruneko-photo-originals` の `pending-originals` に保存する。通常アカウントでログイン済みなら、次の非公開Storageパスへアップロードし、`photo_assets` に寸法・byte数・MIME type・表示画像の参照を記録する。
 

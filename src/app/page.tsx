@@ -1,5 +1,5 @@
-import { HomePageContent } from "./home/HomePageContent";
+import { EntryRouter } from "./EntryRouter";
 
 export default function Page() {
-  return <HomePageContent />;
+  return <EntryRouter />;
 }

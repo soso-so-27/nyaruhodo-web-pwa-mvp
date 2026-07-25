@@ -101,6 +101,65 @@ function readPendingOriginalPhotos(page: Page) {
 }
 
 test.describe("home sleeping exchange flow", () => {
+  test("after 20:00, leaves a chosen photo for the next evening delivery", async ({
+    page,
+  }) => {
+    const afterDelivery = Date.parse("2026-06-10T11:05:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "cat-after-eight");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-after-eight",
+            name: "むぎ",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+    }, afterDelivery);
+
+    await page.goto("/home");
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "1b",
+    );
+    await page.getByTestId("home-empty-action").click();
+    await expect(page.getByTestId("home-sleeping-source-camera")).toBeVisible();
+    await page.getByTestId("home-sleeping-source-library").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "after-eight-sleeping.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
+    });
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByText("保存すると、あしたのよる8時ごろにねこだよりがとどきます。"),
+    ).toBeVisible();
+    await confirmSleepingPhotoShare(page);
+
+    await waitForOwnSleepingPhotoCount(page, 1);
+    await expect
+      .poll(() => readEveningTargetOwnPhotoId(page, "2026-06-11"))
+      .not.toBeNull();
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "2",
+    );
+    await expect(page.getByTestId("home-letter-tray")).toContainText(
+      "あしたのよる8時ごろ、4匹から1匹をえらべます",
+    );
+  });
+
   test("saves the taken photo, waits until evening, then opens the delivered pair", async ({
     page,
   }) => {
@@ -2739,10 +2798,7 @@ test.describe("home sleeping exchange flow", () => {
     expect(storage).toHaveLength(1);
     expect(String(storage[0]?.src)).toMatch(/^data:image\//);
 
-    await page.goto("/collection");
-    await page
-      .getByRole("button", { name: "ねこだよりに送る写真の設定" })
-      .click();
+    await page.goto("/collection?manage=sent");
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
@@ -2829,12 +2885,8 @@ test.describe("home sleeping exchange flow", () => {
     expect(new Set(storage.map((photo) => photo.id)).size).toBe(2);
     expect(storage.every((photo) => String(photo.src).startsWith("data:image/"))).toBe(true);
 
-    await page.goto("/collection");
+    await page.goto("/collection?manage=sent");
     await page.waitForLoadState("networkidle");
-
-    await page
-      .getByRole("button", { name: "ねこだよりに送る写真の設定" })
-      .click();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 });

@@ -469,10 +469,12 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("ねがおを とる", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("きょうのねがおを残す", { exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByText(
-        "写真は「うちのこ」に残ります。「ねこだよりにする」と、よる8時ごろ届きます。",
+        "写真は「うちのこ」に残ります。「ねこだよりにする」と、よる8時ごろ、4匹から1匹をえらべます。",
       ),
     ).toBeVisible();
     await expect(
@@ -518,6 +520,60 @@ test.describe("home desk model", () => {
     await expect(
       page.getByRole("button", { name: "あしたの一枚を入れる" }),
     ).toHaveCount(0);
+  });
+
+  test("waits until a later home visit before showing the install invitation", async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ now, dateKey }) => {
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        const originalDateNow = Date.now.bind(Date);
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        Object.defineProperty(window.navigator, "userAgent", {
+          configurable: true,
+          get: () =>
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1",
+        });
+
+        if (window.localStorage.getItem("home-install-visit-test-seeded")) {
+          return;
+        }
+
+        window.localStorage.clear();
+        window.localStorage.setItem("home-install-visit-test-seeded", "1");
+        window.localStorage.setItem("onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "cat-install-visit");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "cat-install-visit",
+              name: "むぎ",
+              createdAt: new Date(now).toISOString(),
+              updatedAt: new Date(now).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({}),
+        );
+        window.localStorage.setItem("home-install-test-date", dateKey);
+      },
+      { now: beforeEightToday, dateKey: currentJstDateKey },
+    );
+
+    await page.goto("/home");
+    await expect(page.getByTestId("home-desk-model")).toBeVisible();
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
+
+    await page.goto("/cats");
+    await page.goto("/home");
+
+    await expect(page.getByTestId("home-install-invitation")).toBeVisible();
   });
 
   test("does not label an unscheduled onboarding photo as tonight's sent photo", async ({
@@ -788,9 +844,98 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("desk-empty-frame")).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("home-letter-tray")).toContainText(
-      "保存すると、次のよる8時ごろにねこだよりがとどきます",
+      "保存すると、あしたのよる8時ごろにねこだよりがとどきます",
     );
+    const captureAction = page.getByTestId("home-empty-action");
+    await expect(captureAction).toHaveAccessibleName(
+      "むぎのきょうのねがおを残す",
+    );
+    await captureAction.click();
+    await expect(page.getByTestId("home-sleeping-source-camera")).toBeVisible();
+    await expect(page.getByTestId("home-sleeping-source-library")).toBeVisible();
     await expect(page.getByText("きょうは とどかない")).toHaveCount(0);
+  });
+
+  test("describes a 02:00 target as the same evening rather than tomorrow", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "2", { now: getCurrentJstTime(2, 0) });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    const tray = page.getByTestId("home-letter-tray");
+    await expect(tray).toContainText(
+      "よる8時ごろ、4匹から1匹をえらべます",
+    );
+    await expect(tray).not.toContainText("あした");
+  });
+
+  test("shows an arrival dot away from きょう and clears it when きょう opens", async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ now, dateKey }) => {
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        const originalDateNow = Date.now.bind(Date);
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+
+        if (window.localStorage.getItem("home-arrival-dot-test-seeded")) {
+          return;
+        }
+
+        window.localStorage.clear();
+        window.localStorage.setItem("home-arrival-dot-test-seeded", "1");
+        window.localStorage.setItem("onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "cat-arrival-dot");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "cat-arrival-dot",
+              name: "むぎ",
+              createdAt: new Date(now).toISOString(),
+              updatedAt: new Date(now).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            [dateKey]: {
+              dateKey,
+              targetOwnPhotoId: "own-arrival-dot",
+              targetCatId: "cat-arrival-dot",
+              targetCapturedAt: now - 60 * 60 * 1000,
+            },
+          }),
+        );
+      },
+      { now: afterEightToday, dateKey: currentJstDateKey },
+    );
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      await route.fulfill({ status: 204, body: "" });
+    });
+
+    await page.goto("/collection");
+    await expect(
+      page.getByTestId("today-nav-unopened-delivery-dot"),
+    ).toBeVisible();
+
+    await page
+      .getByRole("navigation", { name: "下部ナビゲーション" })
+      .getByRole("link", { name: "きょう" })
+      .click();
+    await expect(page.getByTestId("home-desk-model")).toBeVisible();
+    await expect(
+      page.getByTestId("today-nav-unopened-delivery-dot"),
+    ).toHaveCount(0);
+
+    await page.goto("/collection");
+    await expect(
+      page.getByTestId("today-nav-unopened-delivery-dot"),
+    ).toHaveCount(0);
   });
 
   test("keeps the home frame, tray, and bottom navigation separated", async ({

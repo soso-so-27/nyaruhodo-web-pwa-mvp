@@ -85,6 +85,94 @@ test.describe("onboarding delivery flow", () => {
     hasTouch: devices["iPhone 12 Pro"].hasTouch,
   });
 
+  test("guides a new root visit to onboarding and preserves attribution", async ({
+    page,
+  }) => {
+    await page.goto("/?source=instagram_story");
+
+    await expect(page).toHaveURL(
+      /\/onboarding\?source=instagram_story$/,
+    );
+    await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
+  });
+
+  test("continues a completed root visit to home", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "existing-completed-user",
+          dateKey: "2026-07-25",
+          stage: "opened",
+          source: "direct",
+          submissionId: "onboarding:existing-completed-user:2026-07-25",
+          updatedAt: Date.now(),
+        }),
+      );
+    });
+
+    await page.goto("/");
+
+    await expect(page).toHaveURL(/\/home$/);
+  });
+
+  test("keeps a legacy root visit with profile evidence on home", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.removeItem("onboarding_completed");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([{ id: "legacy-cat", name: "むぎ" }]),
+      );
+    });
+
+    await page.goto("/");
+
+    await expect(page).toHaveURL(/\/home$/);
+  });
+
+  test("keeps a legacy root visit with own-photo evidence on home", async ({
+    page,
+  }) => {
+    await page.addInitScript((photoSrc) => {
+      window.localStorage.removeItem("onboarding_completed");
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "legacy-own-photo",
+            catId: "legacy-own-cat",
+            ownerCatId: "legacy-own-cat",
+            src: photoSrc,
+            createdAt: Date.now() - 60_000,
+            captureContext: "daily",
+          },
+        ]),
+      );
+    }, `data:image/png;base64,${testPng.toString("base64")}`);
+
+    await page.goto("/");
+
+    await expect(page).toHaveURL(/\/home$/);
+  });
+
+  test("does not trust a lone stale root completion marker", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.removeItem("neteruneko_onboarding_progress");
+      window.localStorage.removeItem("nyaruhodo_exchange_own_sleeping_photos");
+      window.localStorage.removeItem("cat_profiles");
+    });
+
+    await page.goto("/");
+
+    await expect(page).toHaveURL(/\/onboarding$/);
+    await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
+  });
+
   test("reaches the album after adding a real test candidate", async ({ page }) => {
     test.slow();
     const originalQueueWarnings: string[] = [];
@@ -238,16 +326,15 @@ test.describe("onboarding delivery flow", () => {
 
     const introCopy = page.getByTestId("onboarding-exchange-explanation");
     await expect(introCopy).toBeVisible();
-    await expect(introCopy).toContainText("最初の1枚は、この子の記録に残ります。");
-    await expect(introCopy).toContainText(
-      "とどいた写真から、好きな1枚も保存できます。",
+    await expect(introCopy).toHaveText(
+      "とどいた猫から、残したい1匹をえらべます。",
     );
     await expect(page.getByTestId("onboarding-privacy-note")).toHaveText(
       "最初の1枚は、運営確認後にほかの利用者へとどくことがあります。公開一覧やSNSには表示されません",
     );
     await expect(
       page.locator('[data-onboarding-title="true"]'),
-    ).toHaveText("うちの猫のねがおを1枚残すとほかの猫の写真がとどく");
+    ).toHaveText("うちの猫の写真を1枚残すと4匹の猫がとどきます");
     await expect(
       page.getByText("自分のねこのねがおの写真を1枚選ぶと、", { exact: true }),
     ).toHaveCount(0);
@@ -338,10 +425,10 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
     await expect(
-      page.getByText("「ねこだより」に残しました"),
+      page.getByText("「ねこだより」に残りました"),
     ).toBeVisible();
     await expect(
-      page.getByText("ほかのおうちからとどいたねこだよりです。"),
+      page.getByText("あなたの猫の写真は「うちのこ」に、"),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "ホームへ進む" }),
@@ -420,7 +507,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "ホームへ進む" }),
     ).toBeVisible();
     await expect(
-      page.getByText("「ねこだより」に残しました"),
+      page.getByText("「ねこだより」に残りました"),
     ).toBeVisible();
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await expect(page.getByTestId("onboarding-delivered-photos").locator("img")).toHaveCount(1);
@@ -559,6 +646,7 @@ test.describe("onboarding delivery flow", () => {
     }));
     let exchangeCalls = 0;
     let exchangeRequestBody: Record<string, unknown> | null = null;
+    let selectedOperation: string | null = null;
     let selectedPhotoId: string | null = null;
 
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
@@ -593,8 +681,10 @@ test.describe("onboarding delivery flow", () => {
     });
     await page.route("**/api/onboarding/choice", async (route) => {
       const body = route.request().postDataJSON() as {
+        operation?: string;
         selectedPhotoId?: string | null;
       };
+      selectedOperation = body.operation ?? null;
       selectedPhotoId = body.selectedPhotoId ?? null;
       await route.fulfill({
         contentType: "application/json",
@@ -653,6 +743,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "ホームへ進む" }),
     ).toBeVisible();
+    expect(selectedOperation).toBe("keep");
     expect(selectedPhotoId).toBe(deliveredPhotos[2].id);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     const keptPhotoIds = await page.evaluate(() => {
@@ -666,7 +757,100 @@ test.describe("onboarding delivery flow", () => {
     expect(keptPhotoIds).toEqual([deliveredPhotos[2].id]);
   });
 
-  test("uses the tayori frame and selected photo aspect while waiting and naming", async ({
+  test("keeps the own photo and completes when no delivered cat is saved", async ({
+    page,
+  }) => {
+    const bundleId = "delivered-sleeping-2026-07-25-onboarding-skip";
+    const deliveredPhotos = Array.from({ length: 4 }, (_, index) => ({
+      id: `${bundleId}-choice-${index + 1}`,
+      sourcePhotoId: `onboarding-skip-source-${index + 1}`,
+      src: onboardingFourSampleDataUrls[index],
+      title: "ほかの猫のねがお",
+      subtitle: "",
+      triggerLabel: "ねがお",
+      theme: "sleeping",
+      deliveredAt: Date.now(),
+    }));
+    let choiceBody: Record<string, unknown> | null = null;
+
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: deliveredPhotos[0],
+          photos: deliveredPhotos,
+          source: "remote",
+          bundleId,
+          experienceVersion: "onboarding_choice_v1",
+          assignedVariant: "four_choice_v1",
+          servedVariant: "four_choice_v1",
+          requestedCount: 4,
+          servedCount: 4,
+          fallbackReason: null,
+        }),
+      });
+    });
+    await page.route("**/api/onboarding/choice", async (route) => {
+      choiceBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          state: "skipped",
+          selectedPhotoId: null,
+          resolvedAt: new Date().toISOString(),
+        }),
+      });
+    });
+
+    await page.goto("/onboarding");
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
+    await page.getByTestId("onboarding-four-choice-skip").click();
+
+    await expect(
+      page.getByRole("heading", {
+        name: "あなたの猫の写真は 「うちのこ」に残りました",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("ほかの猫をえらんだときは、"),
+    ).toBeVisible();
+    expect(choiceBody).toMatchObject({
+      operation: "skip",
+      selectedPhotoId: null,
+    });
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const photos = JSON.parse(
+            window.localStorage.getItem(
+              "nyaruhodo_exchange_own_sleeping_photos",
+            ) ?? "[]",
+          );
+          return Array.isArray(photos) ? photos.length : 0;
+        }),
+      )
+      .toBe(1);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem("onboarding_completed"),
+        ),
+      )
+      .toBe("true");
+
+    await page.getByRole("button", { name: "ホームへ進む" }).click();
+    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+  });
+
+  test("uses the tayori frame and selected photo aspect while waiting", async ({
     page,
   }) => {
     const releaseExchange = await routeBlockedExchangeDelivery(page);
@@ -726,50 +910,7 @@ test.describe("onboarding delivery flow", () => {
       await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
       await expect(page.getByTestId("onboarding-delivered-continue")).toBeEnabled();
       await page.getByTestId("onboarding-delivered-continue").click();
-
-      const namePreview = page.getByTestId("onboarding-name-photo-preview");
-      await expect(namePreview).toHaveAttribute("data-photo-frame", "f3");
-      await expect
-        .poll(() =>
-          namePreview.evaluate((frame) =>
-            Number((frame as HTMLElement).dataset.photoAspect ?? 0),
-          ),
-        )
-        .toBeGreaterThan(1.4);
-
-      const nameLayout = await namePreview.evaluate((frame) => {
-        const image = frame.querySelector("img") as HTMLImageElement | null;
-        const frameRect = frame.getBoundingClientRect();
-        const frameStyle = window.getComputedStyle(frame);
-        const imageStyle = image ? window.getComputedStyle(image) : null;
-
-        return {
-          frameAspect: frameRect.width / frameRect.height,
-          frameHeight: frameRect.height,
-          photoAspect:
-            image?.naturalWidth && image.naturalHeight
-              ? image.naturalWidth / image.naturalHeight
-              : 0,
-          borderRadius: frameStyle.borderRadius,
-          borderWidth: frameStyle.borderTopWidth,
-          boxShadow: frameStyle.boxShadow,
-          objectFit: imageStyle?.objectFit ?? "",
-        };
-      });
-
-      expect(nameLayout.frameAspect).toBeCloseTo(nameLayout.photoAspect, 1);
-      expect(nameLayout.frameHeight).toBeLessThanOrEqual(240);
-      expect(nameLayout.borderRadius).toBe("0px");
-      expect(nameLayout.borderWidth).toBe("1px");
-      expect(nameLayout.boxShadow).not.toBe("none");
-      expect(nameLayout.objectFit).toBe("contain");
-
-      if (process.env.CAPTURE_ONBOARDING_NAME === "1") {
-        await page.screenshot({
-          path: "artifacts/onboarding-name-natural-photo-frame.png",
-          animations: "disabled",
-        });
-      }
+      await expect(page).toHaveURL(/\/home(?:\?|$)/);
     } finally {
       releaseExchange();
     }
@@ -918,9 +1059,7 @@ test.describe("onboarding delivery flow", () => {
       await captureAndroidOnboardingStep(page, "delivered");
 
       await page.getByTestId("onboarding-delivered-continue").click();
-      await expect(page.getByRole("heading", { name: "この子の名前は？" })).toBeVisible();
-      await expectOnboardingLayoutWithinViewport(page);
-      await captureAndroidOnboardingStep(page, "naming");
+      await expect(page).toHaveURL(/\/home(?:\?|$)/);
     } finally {
       releaseExchange();
     }
@@ -995,7 +1134,7 @@ test.describe("onboarding delivery flow", () => {
     });
     await routeDelayedOnboardingDelivery(page);
     await page.goto("/onboarding?source=instagram_bio");
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
@@ -1305,7 +1444,7 @@ test.describe("onboarding delivery flow", () => {
   });
 
 
-  test("routes the embedded onboarding completion through account handoff", async ({
+  test("completes embedded onboarding in place and goes home", async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -1321,9 +1460,9 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
     await expect(
-      page.getByRole("heading", { name: "SafariやChromeで つづけられます" }),
+      page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.locator("main button").first().click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
@@ -1333,38 +1472,9 @@ test.describe("onboarding delivery flow", () => {
 
     await page.locator("main button").first().click();
     await page.waitForTimeout(1600);
-    await page.evaluate(() => {
-      const trackedWindow = window as Window & {
-        __accountLoadingObserver?: MutationObserver;
-        __accountLoadingScreenSeen?: boolean;
-      };
-      const inspect = () => {
-        if (document.querySelector('[aria-label="アカウントを確認中"]')) {
-          trackedWindow.__accountLoadingScreenSeen = true;
-        }
-      };
-
-      trackedWindow.__accountLoadingScreenSeen = false;
-      trackedWindow.__accountLoadingObserver?.disconnect();
-      trackedWindow.__accountLoadingObserver = new MutationObserver(inspect);
-      trackedWindow.__accountLoadingObserver.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-      });
-      inspect();
-    });
     await page.getByTestId("onboarding-delivered-continue").click();
-    await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
-    await expect(page).not.toHaveURL(/next=second_photo/);
-    await expect(page.getByTestId("account-create-handoff")).toBeVisible();
-    expect(
-      await page.evaluate(
-        () =>
-          (window as Window & { __accountLoadingScreenSeen?: boolean })
-            .__accountLoadingScreenSeen,
-      ),
-    ).toBe(false);
+    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect(page).not.toHaveURL(/\/account\/create/);
   });
 
   test("keeps the delivered letter focused after 8pm", async ({
@@ -1386,7 +1496,7 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
 
     await expect(
-      page.getByText("「ねこだより」に残しました"),
+      page.getByText("「ねこだより」に残りました"),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "ホームへ進む" }),
@@ -1426,10 +1536,7 @@ test.describe("onboarding delivery flow", () => {
     expect(openedSnapshot.keptAt).toBeTruthy();
     expect(openedSnapshot.deliveredPhoto?.id).not.toBe(openedSnapshot.ownPhoto?.id);
 
-    await page.goto("/collection");
-    await page
-      .getByRole("button", { name: "ねこだよりに送る写真の設定" })
-      .click();
+    await page.goto("/collection?manage=sent");
     await expect(page.getByTestId("mainichi-board-photo-sent").first()).toBeVisible();
 
     await page.getByRole("button", { name: "ねこだよりへ戻る" }).click();
@@ -1463,7 +1570,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=line");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.locator("main button").first().click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "sleeping-cat.png",
@@ -1579,6 +1686,9 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/home");
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
+    await page.goto("/settings");
+    await page.goto("/home");
     await expect(page.getByTestId("home-install-invitation")).toBeVisible();
     await page.screenshot({
       path: "artifacts/home-install-ios-invitation.png",
@@ -1609,6 +1719,9 @@ test.describe("onboarding delivery flow", () => {
       });
     });
 
+    await page.goto("/home");
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
+    await page.goto("/settings");
     await page.goto("/home");
     await expect(page.getByTestId("home-install-invitation")).toBeVisible();
     await page.getByRole("button", { name: "追加のしかたを見る" }).click();
@@ -1763,7 +1876,7 @@ test.describe("onboarding delivery flow", () => {
     await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
     await page.waitForTimeout(1600);
     await expect(
-      page.getByText("「ねこだより」に残しました"),
+      page.getByText("「ねこだより」に残りました"),
     ).toBeVisible();
 
     await page.goto("/onboarding?source=instagram_bio");
@@ -2064,14 +2177,14 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=referral&ref=LINE234");
     await expect(
-      page.getByRole("heading", { name: "SafariやChromeで つづけられます" }),
+      page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
     ).toBeVisible();
     await expect(page.getByText("紹介リンク")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
     ).toHaveCount(0);
 
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await expect(
       page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
     ).toBeVisible();
@@ -2092,9 +2205,9 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_dm");
     await expect(
-      page.getByRole("heading", { name: "SafariやChromeで つづけられます" }),
+      page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-photo.jpg",
@@ -2138,7 +2251,7 @@ test.describe("onboarding delivery flow", () => {
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_dm");
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-filereader-photo.jpg",
@@ -2188,7 +2301,7 @@ test.describe("onboarding delivery flow", () => {
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_dm");
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-large-photo.jpg",
@@ -2253,7 +2366,7 @@ test.describe("onboarding delivery flow", () => {
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_dm");
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-transient-photo.jpg",
@@ -2302,7 +2415,7 @@ test.describe("onboarding delivery flow", () => {
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_dm");
-    await page.getByRole("button", { name: "このブラウザで先に試す" }).click();
+    await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-native-decoder-fallback.jpg",
@@ -2659,6 +2772,24 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("account-create-handoff")).toBeVisible();
   });
 
+  test("explains old onboarding account URLs as optional cross-device saving", async ({
+    page,
+  }) => {
+    await page.goto("/account/create?from=onboarding&source=direct");
+
+    await expect(
+      page.getByRole("heading", {
+        name: "写真と記録をアカウントに保存",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "この端末に残した写真と記録をアカウントに保存すると、別の端末でも見られます。",
+      ),
+    ).toBeVisible();
+    await expect(page.getByText(/アルバムをつくる/)).toHaveCount(0);
+  });
+
   test("shows an external browser guide for Instagram bio links opened in an embedded browser", async ({
     page,
   }) => {
@@ -2693,7 +2824,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_bio");
     await expect(
-      page.getByRole("heading", { name: "SafariやChromeで つづけられます" }),
+      page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
     ).toBeVisible();
     await expect(page.getByText("アプリの中でひらいています")).toBeVisible();
     await expect(
@@ -2705,7 +2836,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
     ).toHaveCount(0);
     await page
-      .getByRole("button", { name: "Safari／Chromeでつづける" })
+      .getByRole("button", { name: "Safari／Chromeでひらく" })
       .click();
 
     await expect.poll(() => capturedCreateBodies.length).toBe(1);
@@ -3882,7 +4013,12 @@ test.describe("onboarding delivery flow", () => {
       }),
     ).toBeVisible();
     await expect(page.getByText("このねこの名前は？")).toHaveCount(0);
-    await expect(page.getByText("プロフィール")).toHaveCount(0);
+    await expect(page.getByRole("radio", { name: "写真" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "記録" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "プロフィール" })).toBeVisible();
+    await expect(page.getByTestId("cats-name-registration-button")).toHaveCount(
+      0,
+    );
     await expect(page.getByText("うちの背景")).toHaveCount(0);
     await expect(page.getByText("基本情報")).toHaveCount(0);
     await expect(page.getByText("アカウントと設定")).toHaveCount(0);
@@ -3901,39 +4037,42 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(page.getByText("アルバムに入りました")).toHaveCount(0);
     await expect(page.getByText("アルバムができました")).toHaveCount(0);
+    await expect(page.getByRole("radio", { name: "写真" })).toBeVisible();
   });
 
-  test("recovers an unnamed default cat before showing the regular cats tabs", async ({
+  test("opens an unnamed default cat with regular tabs and optional naming", async ({
     page,
   }) => {
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-direct-empty",
       name: "ミケ",
+      nameState: "unset",
     });
 
     await page.goto("/cats");
 
-    await expect(
-      page.getByRole("heading", { name: "この子の名前は？" }),
-    ).toBeVisible();
-    await expect(page.getByRole("tab")).toHaveCount(0);
-    await page.getByLabel("この子の名前").fill("ミケ");
-    await page.getByRole("button", { name: "登録する" }).click();
+    await expect(page.getByTestId("cats-active-cat-name")).toHaveText("この子");
+    await expect(page.getByRole("radio", { name: "写真" })).toBeVisible();
     await expect(page.getByRole("radio", { name: "記録" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "プロフィール" })).toBeVisible();
+    await expect(page.getByTestId("cats-name-registration-button")).toHaveText(
+      "名前を登録",
+    );
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await page.reload();
-    await expect(
-      page.getByRole("heading", { name: "この子の名前は？" }),
-    ).toHaveCount(0);
+    await expect(page.getByTestId("cats-active-cat-name")).toHaveText("この子");
+    await expect(page.getByTestId("cats-name-registration-button")).toBeVisible();
   });
 
-  test("treats the default cat name with profile details as an existing cat", async ({
+  test("keeps the default cat name optional even with profile details", async ({
     page,
   }) => {
     await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-default-with-details",
       name: "ミケ",
+      nameState: "unset",
       coverPhotoDataUrl: `data:image/png;base64,${testPng.toString("base64")}`,
     });
 
@@ -3941,55 +4080,76 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(page.getByText("アルバムに入りました")).toBeVisible();
     await expect(page.getByText("このねこの名前は？")).toHaveCount(0);
+    await expect(page.getByTestId("cats-active-cat-name")).toHaveText("この子");
+    await expect(page.getByRole("radio", { name: "記録" })).toBeVisible();
+    await expect(page.getByTestId("cats-name-registration-button")).toHaveText(
+      "名前を登録",
+    );
   });
 
-  test("asks for a name when the default cat has no profile details", async ({
+  test("keeps naming optional when the default cat has no profile details", async ({
     page,
   }) => {
     await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-default-empty",
       name: "ミケ",
+      nameState: "unset",
     });
 
     await page.goto("/cats?onboarding=1");
 
-    await expect(page.getByText("このねこの名前は？")).toBeVisible();
-    await expect(page.getByRole("button", { name: "アルバムをつくる" })).toBeVisible();
-    await expect(page.getByRole("tab")).toHaveCount(0);
-    await expect(page.getByTestId("cats-tab-scroll")).toHaveCount(0);
+    await expect(page.getByText("アルバムに入りました")).toBeVisible();
+    await expect(page.getByTestId("cats-active-cat-name")).toHaveText("この子");
+    await expect(page.getByTestId("cats-name-registration-button")).toHaveText(
+      "名前を登録",
+    );
+    await expect(page.getByRole("radio", { name: "写真" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "記録" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "プロフィール" })).toBeVisible();
+    await expect(page.getByTestId("cats-tab-scroll")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "アルバムをつくる" }),
+    ).toHaveCount(0);
   });
 
-  test("shows a persistent completion panel after creating an onboarding album", async ({
+  test("allows optional naming without replacing the regular album", async ({
     page,
   }) => {
     await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-default-empty",
       name: "ミケ",
+      nameState: "unset",
     });
 
     await page.goto("/cats?onboarding=1");
 
-    await page.getByLabel("この子の名前").fill("こむぎ");
-    await page.getByRole("button", { name: "アルバムをつくる" }).click();
+    await page.getByTestId("cats-name-registration-button").click();
+    const dialog = page.getByRole("dialog").first();
+    await dialog.getByLabel("この子の名前").fill("こむぎ");
+    await dialog.getByRole("button", { name: "保存する" }).click();
 
-    await expect(page.getByText("アルバムができました")).toBeVisible();
+    await expect(dialog).toBeHidden();
     await expect(
       page.getByRole("heading", {
         name: "写真と記録を、あとから見返せます。",
       }),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "ホームへ" })).toBeVisible();
-    await expect(page.getByText("このねこの名前は？")).toHaveCount(0);
-    await expect(page.getByText("プロフィール")).toHaveCount(0);
-    await expect(page.getByText("うちの背景")).toHaveCount(0);
-    await expect(page.getByText("基本情報")).toHaveCount(0);
-    await expect(page.getByText("アカウントと設定")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "アルバムをつくる" })).toHaveCount(0);
+    await expect(page.getByTestId("cats-active-cat-name")).toHaveText("こむぎ");
+    await expect(page.getByTestId("cats-name-registration-button")).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole("radio", { name: "写真" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "記録" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "プロフィール" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "アルバムをつくる" }),
+    ).toHaveCount(0);
   });
 
-  test("asks for a name when the cat name is empty", async ({ page }) => {
+  test("keeps an empty cat name optional", async ({ page }) => {
     await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-empty-name",
@@ -3998,8 +4158,14 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/cats?onboarding=1");
 
-    await expect(page.getByText("このねこの名前は？")).toBeVisible();
-    await expect(page.getByRole("button", { name: "アルバムをつくる" })).toBeVisible();
+    await expect(page.getByTestId("cats-active-cat-name")).toHaveText("この子");
+    await expect(page.getByTestId("cats-name-registration-button")).toHaveText(
+      "名前を登録",
+    );
+    await expect(page.getByRole("radio", { name: "記録" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "アルバムをつくる" }),
+    ).toHaveCount(0);
   });
   test("restores a handoff into a genuinely separate browser origin", async ({
     page,
@@ -4130,6 +4296,7 @@ async function seedOnboardingAlbumCompletionReady(page: Page) {
 async function seedCatProfileBeforeLoad(page: Page, input: {
   id: string;
   name: string;
+  nameState?: "unset" | "confirmed";
   coverPhotoDataUrl?: string;
 }) {
   await page.addInitScript((profileInput) => {
@@ -4145,6 +4312,9 @@ async function seedCatProfileBeforeLoad(page: Page, input: {
         {
           id: profileInput.id,
           name: profileInput.name,
+          ...(profileInput.nameState
+            ? { nameState: profileInput.nameState }
+            : {}),
           createdAt: now,
           updatedAt: now,
           ...(profileInput.coverPhotoDataUrl

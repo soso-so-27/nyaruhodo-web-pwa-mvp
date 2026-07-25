@@ -66,11 +66,40 @@ test.describe("nekodayori redesign", () => {
     await expect(
       page.getByRole("link", { name: "きょうの一枚を撮る" }),
     ).toHaveAttribute("href", "/home");
+    await expect(
+      page.getByRole("button", { name: "ねこだよりに送る写真の設定" }),
+    ).toHaveCount(0);
 
-    await page
-      .getByRole("button", { name: "ねこだよりに送る写真の設定" })
-      .click();
+    await page.goto("/collection?manage=sent&from=collection&keep=1");
+    await page.evaluate(() => {
+      window.history.replaceState(
+        {
+          ...window.history.state,
+          collectionCloseStateSentinel: "keep-me",
+        },
+        "",
+        window.location.href,
+      );
+    });
     await expect(page.getByTestId("mainichi-board-photo-sent")).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "ねこだよりに送る写真の設定",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "ねこだよりへ戻る" }).click();
+    await expect(page).toHaveURL(/\/collection\?keep=1$/);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => window.history.state?.collectionCloseStateSentinel ?? null,
+        ),
+      )
+      .toBe("keep-me");
+    await expect(
+      page.getByRole("heading", { name: "ねこだより", exact: true }),
+    ).toBeVisible();
   });
 
   test("shows a pending four-cat delivery without adding it to history", async ({
@@ -119,8 +148,11 @@ test.describe("nekodayori redesign", () => {
     await expect(current).toHaveAttribute("data-state", "pending");
     await expect(current).toContainText("ねこだよりが届きました");
     await expect(current).not.toContainText("4匹");
-    const pendingLink = page.getByRole("link", { name: "ねこだよりを見る" });
+    const pendingLink = page.getByRole("link", { name: "「きょう」で選ぶ" });
     await expect(pendingLink).toHaveAttribute("href", "/home");
+    await expect(current).toContainText(
+      "「きょう」で、残したい猫を選べます。",
+    );
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(
       0,
     );

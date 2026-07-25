@@ -6,17 +6,21 @@
 
 | 系統 | 入口 | 保存先 | 表示場所 | 同期対象 | 削除/管理導線 | ねこだより候補 |
 | --- | --- | --- | --- | --- | --- | --- |
-| ねがお | ホームの「ねがおをとる」、オンボーディングの「ねがおを1枚入れる」 | `nyaruhodo_exchange_own_sleeping_photos` / remote `cat_moments` | ホーム、ねこだよりの「おくった」、うちのこ写真、記念、足あと、年まとめ | 対象。`syncSleepingPhotos()` / `restoreSleepingPhotos()` | 寝顔ビューア側に削除/外す導線あり | 対象。明示的に入れた寝顔だけ |
+| ねがお | ホームの「ねがおをとる」、オンボーディングの「ねがおを1枚入れる」 | `nyaruhodo_exchange_own_sleeping_photos` / remote `cat_moments` | ホーム、うちのこ写真、記念、足あと、年まとめ | 対象。`syncSleepingPhotos()` / `restoreSleepingPhotos()` | `うちのこ > 写真` のねがお詳細で送信候補ON/OFF・削除。旧 `/collection?manage=sent` は互換用 | 対象。明示的に入れた寝顔のうち、送信候補がONの写真だけ |
 | とどいた | 夜8時便、オンボーディング即時ねこだより | `nyaruhodo_exchange_kept_photos` / remote `cat_moment_deliveries` | ねこだよりの「とどいた」、うちのこ記録/思い出 | 対象。`syncSleepingPhotos()` / `restoreSleepingPhotos()` | 非表示/通報系の導線あり | 対象外。届いた写真であり、再配布候補ではない |
 | この子の写真 | うちのこ > 写真 > 写真を残す、ホームの「この子の写真を残す」 | `neteruneko_cat_gallery_photos` / remote `collection_photos` with `slot_slug="__cat_gallery"` | うちのこ > 写真、この子/ぜんぶ、代表写真選択 | 対象。`syncCatGalleryPhotos()` / `restoreCatGalleryPhotos()` | 写真ビューアから「この写真を削除」。local/remote `__cat_gallery` row から消す | 対象外。寝顔以外も含むため交換候補にしない |
-| 代表写真 | うちのこ > 基本 > 写真を選ぶ | `catProfiles[].avatarDataUrl` / remote `cats.avatar_storage_path` | うちのこページ上部、猫切り替え、プロフィール表示 | 対象。`syncCatProfile()` / `restoreCatProfiles()` | 「自動表示に戻す」あり。代表写真に使う `catGalleryPhoto` 削除時は自動表示へ戻す | 対象外 |
+| 代表写真 | うちのこ > プロフィール > 代表写真 | `catProfiles[].coverPhotoDataUrl` / remote `cats.cover_storage_path` | ホームの猫表示、プロフィール内のコンパクトな設定 | 対象。`syncCatProfile()` / `restoreCatProfiles()` | 「自動表示に戻す」あり。代表写真に使う `catGalleryPhoto` 削除時は自動表示へ戻す | 対象外 |
 | テーマ別アルバム | `/collection` の各テーマ/カテゴリから写真追加 | `collection_photos` / remote `collection_photos` | `/collection` 側のテーマ別写真 | 対象。`syncCollectionPhotos()` / `restoreCollectionPhotos()` | 対象。写真詳細/スロット側から削除 | 対象外 |
 
 ## 現在の分離方針
 
 - `ねがお` は、ねこだより交換の主役。交換候補になるのは `ownSleepingPhotos` として保存された写真だけ。
+- `ねがお` の送信候補設定は、`うちのこ > 写真` で対象写真をひらき、写真ごとに変更する。
+- 同じ写真詳細からねがお自体も削除できる。削除後は今後の候補に使わないが、すでに届いた写真は受取側に残る。
+- 設定画面には送信写真の専用一覧を置かない。旧 `/collection?manage=sent` は既存リンクの互換用に残し、通常導線には使わない。
+- 送信候補をOFFにすると今後の候補から外れるが、すでに相手へ届いた写真は相手側の記録に残る。
 - `この子の写真` は、その子の写真置き場。寝顔以外も含むため、ねこだより交換候補には混ぜない。
-- `代表写真` は見出し用の写真。写真そのものの置き場ではなく、プロフィール表示の設定。
+- `代表写真` はホームなどで猫を見分けるための写真。写真そのものの置き場ではなく、プロフィール内の表示設定。
 - `テーマ別アルバム` は `/collection` のカテゴリ別写真。`この子の写真` とは今は統合しない。
 
 ## 画質 / localStorage 方針
@@ -79,6 +83,7 @@
 ## P1 / P2 TODO
 
 - Done: `うちのこ > 写真` の詳細ビューから「この写真を削除」を追加。
+- Done: `うちのこ > 写真` のねがお詳細へ、ねこだより送信候補のON/OFFを統合。専用一覧は通常導線から外す。
 - Done: 代表写真に使われている `catGalleryPhoto` を削除した場合、自動表示へ戻す。
 - P1: storage上の実ファイル削除方針を決める。公開前はlocal/remote rowの削除優先でよい。
 - P1: 匿名/未同期の `ownSleepingPhotos` data URL fallback を完全にStorage参照へ寄せるか検討する。

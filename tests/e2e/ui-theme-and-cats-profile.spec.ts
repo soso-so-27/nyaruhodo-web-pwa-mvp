@@ -60,7 +60,7 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({ p
   const nav = page.getByRole("navigation");
 
   await expect(page.getByTestId("cats-section-tab-photos")).toHaveAttribute("aria-checked", "true");
-  await expect(sectionTabs).toHaveText(["写真", "記録", "基本"]);
+  await expect(sectionTabs).toHaveText(["写真", "記録", "プロフィール"]);
   await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
   await expect(grid).toBeVisible();
   await expect(grid).toHaveAttribute("data-photo-decode-gate", "ready");
@@ -178,6 +178,212 @@ test("does not treat a same-day gallery photo as today's daily photo", async ({ 
   await expect(page.getByTestId("cats-photo-current-month")).toHaveText("7月のむぎ");
   await expect(page.getByTestId("cats-lens-photo-grid").locator(":scope > div")).toHaveCount(2);
   await expect(page.getByTestId("cats-photo-older")).toHaveCount(0);
+});
+
+test("changes sharing only from a sleeping photo detail", async ({ page }) => {
+  const now = Date.parse("2026-07-23T20:30:00+09:00");
+  const sleepingPhotoId = "own-sleeping-sharing-setting";
+  const galleryPhotoId = "cat-gallery-private-photo";
+
+  await page.route("**/api/sleeping-delivery/backup", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, existing: true }),
+    });
+  });
+  await seedCatsPhotoTabState(page, {
+    now,
+    sleepingPhotos: [
+      {
+        id: sleepingPhotoId,
+        createdAt: Date.parse("2026-07-23T19:00:00+09:00"),
+        shared: true,
+      },
+    ],
+    galleryPhotos: [
+      {
+        id: galleryPhotoId,
+        createdAt: Date.parse("2026-07-22T19:00:00+09:00"),
+      },
+    ],
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const grid = page.getByTestId("cats-lens-photo-grid");
+  await grid.getByRole("button", { name: "7/23のむぎ" }).click();
+
+  const viewer = page.getByTestId("cats-photo-viewer");
+  const sharingToggle = viewer.getByRole("switch", {
+    name: "この写真をほかのおうちへ送る",
+  });
+  await expect(viewer).toHaveAttribute("data-photo-id", sleepingPhotoId);
+  await expect(page.getByTestId("cats-photo-delivery-setting")).toBeVisible();
+  await expect(sharingToggle).toBeChecked();
+  await expect(page.getByTestId("cats-photo-delivery-status")).toHaveText(
+    "ねこだよりとして届く候補です",
+  );
+
+  await sharingToggle.click();
+  await expect(sharingToggle).not.toBeChecked();
+  await expect(page.getByTestId("cats-photo-delivery-status")).toHaveText(
+    "この写真は今後送られません",
+  );
+  await expect
+    .poll(() =>
+      page.evaluate((photoId) => {
+        const photos = JSON.parse(
+          window.localStorage.getItem(
+            "nyaruhodo_exchange_own_sleeping_photos",
+          ) ?? "[]",
+        ) as { id?: string; shared?: boolean; visibility?: string }[];
+        const photo = photos.find((candidate) => candidate.id === photoId);
+
+        return {
+          shared: photo?.shared,
+          visibility: photo?.visibility,
+        };
+      }, sleepingPhotoId),
+    )
+    .toEqual({ shared: false, visibility: "private" });
+
+  await sharingToggle.click();
+  await expect(sharingToggle).toBeChecked();
+  await expect(page.getByTestId("cats-photo-delivery-status")).toHaveText(
+    "ねこだよりとして届く候補です",
+  );
+  await expect
+    .poll(() =>
+      page.evaluate((photoId) => {
+        const photos = JSON.parse(
+          window.localStorage.getItem(
+            "nyaruhodo_exchange_own_sleeping_photos",
+          ) ?? "[]",
+        ) as { id?: string; shared?: boolean; visibility?: string }[];
+        const photo = photos.find((candidate) => candidate.id === photoId);
+
+        return {
+          shared: photo?.shared,
+          visibility: photo?.visibility,
+        };
+      }, sleepingPhotoId),
+    )
+    .toEqual({ shared: true, visibility: "shared" });
+
+  await viewer.getByRole("button", { name: "この写真を削除" }).click();
+  const sleepingPhotoDeleteDialog = page.getByRole("dialog", {
+    name: "この写真を削除",
+  });
+  await expect(sleepingPhotoDeleteDialog).toContainText(
+    "今後のねこだよりには使われません。",
+  );
+  await sleepingPhotoDeleteDialog.getByRole("button", { name: "やめる" }).click();
+
+  await viewer.getByRole("button", { name: "写真を閉じる" }).click();
+  await grid.getByRole("button", { name: "7/22のむぎ" }).click();
+
+  await expect(viewer).toHaveAttribute("data-photo-id", galleryPhotoId);
+  await expect(
+    viewer.getByRole("switch", {
+      name: "この写真をほかのおうちへ送る",
+    }),
+  ).toHaveCount(0);
+  await expect(page.getByTestId("cats-photo-delivery-setting")).toHaveCount(0);
+});
+
+test("deletes a sleeping photo from its うちのこ detail", async ({ page }) => {
+  const now = Date.parse("2026-07-23T20:30:00+09:00");
+  const sleepingPhotoId = "own-sleeping-delete-detail";
+  const userId = "cats-sleeping-delete-user";
+
+  await page.route("**/auth/v1/user", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: userId,
+        aud: "authenticated",
+        role: "authenticated",
+        email: "cats-sleeping-delete@example.test",
+        app_metadata: {},
+        user_metadata: {},
+      }),
+    });
+  });
+  await page.route("**/rest/v1/cat_moments**", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: "[]",
+    });
+  });
+  await seedCatsPhotoTabState(page, {
+    now,
+    sleepingPhotos: [
+      {
+        id: sleepingPhotoId,
+        createdAt: Date.parse("2026-07-23T19:00:00+09:00"),
+        shared: true,
+      },
+    ],
+    galleryPhotos: [],
+  });
+  await page.addInitScript(
+    ({ authUserId }) => {
+      window.localStorage.setItem(
+        "nyaruhodo_supabase_auth",
+        JSON.stringify({
+          access_token: "cats-sleeping-delete-token",
+          refresh_token: "cats-sleeping-delete-refresh-token",
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          expires_in: 3600,
+          token_type: "bearer",
+          user: {
+            id: authUserId,
+            aud: "authenticated",
+            role: "authenticated",
+            email: "cats-sleeping-delete@example.test",
+            app_metadata: {},
+            user_metadata: {},
+          },
+        }),
+      );
+    },
+    { authUserId: userId },
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await page
+    .getByTestId("cats-lens-photo-grid")
+    .getByRole("button", { name: "7/23のむぎ" })
+    .click();
+  await page
+    .getByTestId("cats-photo-viewer")
+    .getByRole("button", { name: "この写真を削除" })
+    .click();
+
+  const deleteDialog = page.getByRole("dialog", {
+    name: "この写真を削除",
+  });
+  await deleteDialog
+    .getByRole("button", { name: "この写真を削除" })
+    .click();
+
+  await expect(page.getByTestId("cats-photo-viewer")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate((photoId) => {
+        const photos = JSON.parse(
+          window.localStorage.getItem(
+            "nyaruhodo_exchange_own_sleeping_photos",
+          ) ?? "[]",
+        ) as { id?: string }[];
+
+        return photos.some((photo) => photo.id === photoId);
+      }, sleepingPhotoId),
+    )
+    .toBe(false);
 });
 
 test("does not offer a second household daily photo from another cat", async ({ page }) => {
@@ -337,6 +543,94 @@ test("shows a useful empty state before the first daily photo", async ({ page })
   await expect(page.getByRole("button", { name: "写真を追加" })).toBeVisible();
 });
 
+test("opens an unnamed cat album as この子 and keeps naming optional", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const createdAt = new Date("2026-07-23T12:30:00+09:00").toISOString();
+    window.localStorage.setItem("active_cat_id", "cat-unnamed");
+    window.localStorage.setItem(
+      "cat_profiles",
+      JSON.stringify([
+        {
+          id: "cat-unnamed",
+          name: "\u30df\u30b1",
+          nameState: "unset",
+          createdAt,
+          updatedAt: createdAt,
+        },
+      ]),
+    );
+    window.sessionStorage.setItem(
+      "neteruneko_onboarding_album_completion_ready",
+      "true",
+    );
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats?onboarding=1");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("この子");
+  await expect(page.getByTestId("cats-section-tab-photos")).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByTestId("cats-name-registration-button")).toHaveText(
+    "名前を登録",
+  );
+
+  await page.getByTestId("cats-name-registration-button").click();
+  let dialog = page.getByRole("dialog").first();
+  await expect(dialog).toHaveAccessibleName("この子のことを 書く");
+  await dialog.getByLabel("誕生日").fill("2022-07-11");
+  await dialog.getByRole("button", { name: "保存する" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("この子");
+  await expect(page.getByTestId("cats-name-registration-button")).toHaveText(
+    "名前を登録",
+  );
+
+  await page.getByTestId("cats-name-registration-button").click();
+  dialog = page.getByRole("dialog").first();
+  await dialog.getByLabel("この子の名前").fill("こはく");
+  await dialog.getByRole("button", { name: "保存する" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("こはく");
+  await expect(page.getByTestId("cats-name-registration-button")).toHaveCount(0);
+});
+
+test("keeps a legacy cat actually named ミケ after the name-state upgrade", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const createdAt = new Date("2026-07-23T12:30:00+09:00").toISOString();
+    window.localStorage.setItem("active_cat_id", "cat-legacy-mike");
+    window.localStorage.setItem(
+      "cat_profiles",
+      JSON.stringify([
+        {
+          id: "cat-legacy-mike",
+          name: "\u30df\u30b1",
+          createdAt,
+          updatedAt: createdAt,
+        },
+      ]),
+    );
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText(
+    "\u30df\u30b1",
+  );
+  await expect(page.getByTestId("cats-name-registration-button")).toHaveCount(0);
+});
+
 test("links an onboarding four-choice save back to nekodayori", async ({ page }) => {
   const now = Date.parse("2026-07-23T12:30:00+09:00");
   const ownPhotoId = "onboarding-own-today";
@@ -384,7 +678,7 @@ test("links an onboarding four-choice save back to nekodayori", async ({ page })
 
   const bridge = page.getByTestId("cats-photo-delivery-bridge");
   await expect(bridge).toContainText(
-    "きょうのむぎから、ねこだよりが届きました",
+    "この写真を残した日に届いたねこだより",
   );
   await expect(
     bridge.getByRole("link", { name: "ねこだよりを見る" }),
@@ -509,18 +803,35 @@ test("shows a quiet photo grid skeleton while cats photo thumbnails resolve", as
     .toBe(true);
 });
 
-test("switches to the next cat from the photo header in one tap", async ({ page }) => {
+test("keeps cat switching in the shared header on every profile tab", async ({ page }) => {
   await seedMultipleCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
+  const switchButton = page.getByRole("button", {
+    name: "次のねこに切り替える",
+  });
+
   await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
-  await page.getByRole("button", { name: "次のねこに切り替える" }).click();
+  await expect(switchButton).toBeVisible();
+
+  await page.getByTestId("cats-section-tab-record").click();
+  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
+  await expect(switchButton).toBeVisible();
+  await switchButton.click();
 
   await expect
     .poll(() => page.evaluate(() => window.localStorage.getItem("active_cat_id")))
     .toBe("cat-komugi");
+
+  await page.getByTestId("cats-section-tab-basic").click();
+  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
+  await expect(switchButton).toBeVisible();
+  await expect(page.getByTestId("cats-cover-photo-button")).toHaveAccessibleName(
+    "代表写真を変更",
+  );
+  await expect(page.getByRole("button", { name: "猫を追加・管理" })).toBeVisible();
 });
 
 test("keeps a confirmed cover crop after leaving, returning, and reloading", async ({
@@ -570,7 +881,7 @@ test("keeps a confirmed cover crop after leaving, returning, and reloading", asy
     return profile?.coverCrop?.scale ?? 0;
   });
   expect(savedScale).toBeCloseTo(initialScale, 4);
-  const coverImages = page.getByTestId("cats-profile-cover").locator("img");
+  const coverImages = page.getByTestId("cats-representative-photo").locator("img");
   await expect(coverImages).toHaveCount(2);
   expect(await readCropTransformScale(coverImages.last())).toBeCloseTo(
     savedScale,
@@ -591,7 +902,7 @@ test("keeps a confirmed cover crop after leaving, returning, and reloading", asy
   expect(reloadedScale).toBeCloseTo(savedScale, 4);
   expect(
     await readCropTransformScale(
-      page.getByTestId("cats-profile-cover").locator("img").last(),
+      page.getByTestId("cats-representative-photo").locator("img").last(),
     ),
   ).toBeCloseTo(savedScale, 4);
 
@@ -607,7 +918,7 @@ test("keeps a confirmed cover crop after leaving, returning, and reloading", asy
   expect(restartedScale).toBeCloseTo(savedScale, 4);
   expect(
     await readCropTransformScale(
-      page.getByTestId("cats-profile-cover").locator("img").last(),
+      page.getByTestId("cats-representative-photo").locator("img").last(),
     ),
   ).toBeCloseTo(savedScale, 4);
 });
@@ -782,7 +1093,7 @@ test("resets a custom cover photo back to automatic display", async ({ page }) =
     .toEqual({ coverPhotoDataUrl: null, coverCrop: null });
 });
 
-test("shows the custom top cover without over-cropping", async ({
+test("shows the representative photo as a compact profile setting", async ({
   page,
 }) => {
   const signedUrlRequests: Array<{ src?: string; variant?: string }> = [];
@@ -814,9 +1125,11 @@ test("shows the custom top cover without over-cropping", async ({
   await page.waitForLoadState("networkidle");
   await page.getByTestId("cats-section-tab-basic").click();
 
-  const coverImages = page.getByTestId("cats-profile-cover").locator("img");
+  const representativePhoto = page.getByTestId("cats-representative-photo");
+  const coverImages = representativePhoto.locator("img");
 
   await expect(coverImages).toHaveCount(1);
+  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
   await expect
     .poll(() =>
       coverImages.first().evaluate((image) => {
@@ -825,31 +1138,22 @@ test("shows the custom top cover without over-cropping", async ({
       }),
     )
     .toBe(true);
-  await expect
-    .poll(() =>
-      coverImages
-        .first()
-        .evaluate((image) => window.getComputedStyle(image).objectFit),
-    )
-    .toBe("contain");
-  await expect
-    .poll(() =>
-      coverImages
-        .first()
-        .evaluate((image) => window.getComputedStyle(image).objectPosition),
-    )
-    .toBe("50% 50%");
-  await page
-    .getByTestId("cats-profile-cover")
-    .getByRole("button", { name: "カバー写真", exact: true })
-    .click();
-  await expect(page.getByRole("dialog", { name: "カバー写真" })).toBeVisible();
-  expect(signedUrlRequests.some((request) => request.src?.includes("/cover/"))).toBe(
-    true,
-  );
+  const previewBox = await representativePhoto.boundingBox();
+  expect(previewBox?.width).toBeLessThanOrEqual(70);
+  expect(previewBox?.height).toBeLessThanOrEqual(44);
+  await page.getByTestId("cats-cover-photo-button").click();
+  await expect(
+    page.getByRole("dialog", { name: "代表写真を変える" }),
+  ).toBeVisible();
+  expect(
+    signedUrlRequests.some(
+      (request) =>
+        request.src?.includes("/cover/") && request.variant === "thumbnail",
+    ),
+  ).toBe(true);
 });
 
-test("adjusts the exact photo currently shown as the cat cover", async ({
+test("adjusts the exact photo currently used as the representative photo", async ({
   page,
 }) => {
   await page.route("**/api/photo-storage/signed-url", async (route) => {
@@ -873,46 +1177,24 @@ test("adjusts the exact photo currently shown as the cat cover", async ({
   await page.waitForLoadState("networkidle");
   await page.getByTestId("cats-section-tab-basic").click();
 
-  const coverImage = page.getByTestId("cats-profile-cover").locator("img").first();
+  const coverImage = page
+    .getByTestId("cats-representative-photo")
+    .locator("img")
+    .last();
   await expect
     .poll(() => coverImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
   const displayedSrc = await coverImage.getAttribute("src");
-  const displayedFit = await coverImage.evaluate(
-    (image) => window.getComputedStyle(image).objectFit,
-  );
-  const displayedPosition = await coverImage.evaluate(
-    (image) => window.getComputedStyle(image).objectPosition,
-  );
 
   await page.getByTestId("cats-cover-photo-button").click();
   await page.getByTestId("cover-photo-adjust-current").click();
 
-  const cropImage = page.getByTestId("cover-crop-preview").locator("img");
+  const cropImage = page.getByTestId("cover-crop-preview").locator("img").last();
   await expect(cropImage).toHaveAttribute("src", displayedSrc ?? "");
-  await expect
-    .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).objectFit))
-    .toBe(displayedFit);
-  await expect
-    .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).objectPosition))
-    .toBe(displayedPosition);
-  const displayedGeometry = await readNormalizedCropGeometry(
-    page.getByTestId("cats-profile-cover"),
-    coverImage,
-  );
-  const cropGeometry = await readNormalizedCropGeometry(
-    page.getByTestId("cover-crop-preview"),
-    cropImage,
-  );
-  expect(cropGeometry.widthRatio).toBeCloseTo(displayedGeometry.widthRatio, 2);
-  expect(cropGeometry.heightRatio).toBeCloseTo(displayedGeometry.heightRatio, 2);
-  expect(cropGeometry.centerX).toBeCloseTo(displayedGeometry.centerX, 2);
-  expect(cropGeometry.centerY).toBeCloseTo(displayedGeometry.centerY, 2);
-  expect(cropGeometry.imageRatio).toBeCloseTo(1, 2);
-  expect(cropGeometry.heightRatio).toBeGreaterThan(1);
+  await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
 });
 
-test("falls back to automatic cover framing when a custom cover has no crop", async ({
+test("keeps an uncropped representative photo inside the compact setting", async ({
   page,
 }) => {
   await page.route("**/api/photo-storage/signed-url", async (route) => {
@@ -942,8 +1224,10 @@ test("falls back to automatic cover framing when a custom cover has no crop", as
   await page.waitForLoadState("networkidle");
   await page.getByTestId("cats-section-tab-basic").click();
 
-  const coverImage = page.getByTestId("cats-profile-cover").locator("img").first();
+  const representativePhoto = page.getByTestId("cats-representative-photo");
+  const coverImage = representativePhoto.locator("img").first();
 
+  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
   await expect
     .poll(() =>
       coverImage.evaluate((image) => {
@@ -952,6 +1236,9 @@ test("falls back to automatic cover framing when a custom cover has no crop", as
       }),
     )
     .toBe(true);
+  const previewBox = await representativePhoto.boundingBox();
+  expect(previewBox?.width).toBeLessThanOrEqual(70);
+  expect(previewBox?.height).toBeLessThanOrEqual(44);
   await expect
     .poll(() =>
       coverImage.evaluate((image) => window.getComputedStyle(image).objectFit),
@@ -961,10 +1248,10 @@ test("falls back to automatic cover framing when a custom cover has no crop", as
     .poll(() =>
       coverImage.evaluate((image) => window.getComputedStyle(image).objectPosition),
     )
-    .toBe("50% 30%");
+    .toBe("50% 50%");
 });
 
-test("shows only filled basic profile fields", async ({ page }) => {
+test("keeps dates visible and folds secondary profile details", async ({ page }) => {
   await seedCatsBasicProfile(page, {
     basicInfo: {
       familySinceDate: "2022-09-22",
@@ -985,6 +1272,11 @@ test("shows only filled basic profile fields", async ({ page }) => {
 
   await expect(page.getByText("むぎのこと")).toBeVisible();
   await expect(page.getByText("たいせつな日")).toBeVisible();
+  await expect(page.getByText("2022年9月22日")).toBeVisible();
+  await expect(page.getByText("2022年7月10日")).toBeVisible();
+  await expect(page.getByText("見た目")).toBeHidden();
+  await expect(page.getByText("この子らしさ")).toBeHidden();
+  await page.getByText("その他のプロフィール", { exact: true }).click();
   await expect(page.getByText("見た目")).toBeVisible();
   await expect(page.getByText("この子らしさ")).toBeVisible();
   await expect(page.getByText("毛柄")).toBeVisible();
@@ -995,6 +1287,30 @@ test("shows only filled basic profile fields", async ({ page }) => {
   await expect(page.getByText("なでられると好きなところ")).toBeVisible();
   await expect(page.getByText("あごの下")).toBeVisible();
   await expect(page.getByText("7月10日は「むぎの日」")).toHaveCount(0);
+
+  await page.getByTestId("cats-basic-info-edit-button").click();
+  const editor = page.getByRole("dialog").first();
+  await expect(editor.getByLabel("毛柄")).toBeHidden();
+  await editor.getByLabel("誕生日").fill("2022-07-11");
+  await editor.getByRole("button", { name: "保存する" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const [profile] = JSON.parse(
+          window.localStorage.getItem("cat_profiles") ?? "[]",
+        );
+        return {
+          birthDate: profile?.basicInfo?.birthDate,
+          favoriteTouch: profile?.basicInfo?.personality?.favoriteTouch,
+          coat: profile?.appearance?.coat,
+        };
+      }),
+    )
+    .toEqual({
+      birthDate: "2022-07-11",
+      favoriteTouch: "あごの下",
+      coat: "orange_tabby",
+    });
 });
 
 test("edits weight and mixed coat without showing the old breed field", async ({
@@ -1014,7 +1330,7 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await page.waitForLoadState("networkidle");
   await page.getByTestId("cats-section-tab-basic").click();
 
-  await page.getByRole("button", { name: "基本情報を編集" }).click();
+  await page.getByRole("button", { name: "プロフィールを編集" }).click();
   const dialog = page.getByRole("dialog", { name: "むぎのことを 書く" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("あとから見返したいことだけ、少しずつ。")).toHaveCount(0);
@@ -1024,13 +1340,16 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   ).toHaveCount(0);
   await expect(dialog.getByText("猫種・タイプ")).toHaveCount(0);
   await expect(dialog.getByText("毛色")).toHaveCount(0);
-  await expect(dialog.getByLabel("毛柄")).toBeVisible();
-  await expect(dialog.getByLabel("猫種")).toBeVisible();
+  await expect(dialog.getByLabel("毛柄")).toBeHidden();
+  await expect(dialog.getByLabel("猫種")).toBeHidden();
   await expect
     .poll(() =>
       dialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     )
     .toBe(true);
+  await dialog
+    .getByText("その他のプロフィールを編集", { exact: true })
+    .click();
   await expect(dialog.getByRole("radio", { name: "男の子" })).toBeVisible();
   await expect(dialog.getByRole("radio", { name: "女の子" })).toBeVisible();
   await expect(dialog.getByRole("radio", { name: "わからない" })).toBeVisible();
@@ -1049,6 +1368,7 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await dialog.getByRole("button", { name: "保存する" }).click();
 
   await expect(dialog).toBeHidden();
+  await page.getByText("その他のプロフィール", { exact: true }).click();
   await expect(page.getByText("茶トラ")).toBeVisible();
   await expect(page.getByText("猫種")).toBeVisible();
   await expect(page.getByText("ミックス")).toBeVisible();
@@ -1384,7 +1704,11 @@ async function seedCatsPhotoTabState(
     galleryPhotos,
   }: {
     now: number;
-    sleepingPhotos: Array<{ id: string; createdAt: number }>;
+    sleepingPhotos: Array<{
+      id: string;
+      createdAt: number;
+      shared?: boolean;
+    }>;
     galleryPhotos: Array<{ id: string; createdAt: number }>;
   },
 ) {
@@ -1408,20 +1732,24 @@ async function seedCatsPhotoTabState(
       window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
         JSON.stringify(
-          sleeping.map((photo) => ({
-            ...photo,
-            ownerCatId: "cat-mugi",
-            catId: "cat-mugi",
-            src,
-            thumbnailSrc: src,
-            displaySrc: src,
-            state: "sleeping",
-            visibility: "private",
-            deliveryStatus: "available",
-            triggerLabel: "sleeping",
-            theme: "sleeping",
-            shared: false,
-          })),
+          sleeping.map((photo) => {
+            const shared = photo.shared ?? false;
+
+            return {
+              ...photo,
+              ownerCatId: "cat-mugi",
+              catId: "cat-mugi",
+              src,
+              thumbnailSrc: src,
+              displaySrc: src,
+              state: "sleeping",
+              visibility: shared ? "shared" : "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared,
+            };
+          }),
         ),
       );
       window.localStorage.setItem(
@@ -1657,25 +1985,6 @@ async function seedCatsProfileWithStoragePhotos(
     },
     { nowValue: now, count: photoCount },
   );
-}
-
-async function readNormalizedCropGeometry(frame: Locator, image: Locator) {
-  const frameBox = await frame.boundingBox();
-  const imageBox = await image.boundingBox();
-
-  if (!frameBox || !imageBox) {
-    throw new Error("Cover crop geometry is unavailable");
-  }
-
-  return {
-    widthRatio: imageBox.width / frameBox.width,
-    heightRatio: imageBox.height / frameBox.height,
-    centerX:
-      (imageBox.x + imageBox.width / 2 - frameBox.x) / frameBox.width,
-    centerY:
-      (imageBox.y + imageBox.height / 2 - frameBox.y) / frameBox.height,
-    imageRatio: imageBox.width / imageBox.height,
-  };
 }
 
 async function readCropTransformScale(image: Locator) {
