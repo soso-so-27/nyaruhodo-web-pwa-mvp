@@ -16,10 +16,11 @@
 | 一覧・小タイル | thumbnail | 480〜800px |
 | ねこだよりボード | thumbnail transform | 800px |
 | ホームの今日の写真 | hero transform | 1440px / quality 84 |
-| うちのこ代表写真（プロフィール内） | thumbnail transform | 800px |
+| プロフィール先頭の猫カード | 既存写真のthumbnail transform | 800px |
+| 旧うちのこ代表写真 | 通常UIでは読み取らない | 既存データのみ保持 |
 | 詳細ビューア・crop編集 | display | 保存済み表示画像の最大サイズ |
 
-新規取り込み時の表示画像は、寝顔・オンボが最大2048px、うちのこ写真とカバーが最大2560px、記録写真が最大1600px。小タイルには別のthumbnailを使い、大きな表示でthumbnailを引き伸ばさない。
+新規取り込み時の表示画像は、寝顔・オンボが最大2048px、うちのこ写真が最大2560px、記録写真が最大1600px。小タイルには別のthumbnailを使い、大きな表示でthumbnailを引き伸ばさない。プロフィール先頭の猫カードは既存写真を自動選択するだけで、新しい写真保存系統を作らない。旧代表写真の通常UIと新規取り込み入口は廃止し、既存の `coverPhotoDataUrl` / `coverCrop` は移行・互換性のため削除せず保持する。
 
 Storage画像のtransform取得に失敗した場合は、同じStorageオブジェクトのdisplay URLへフォールバックする。届いた写真をオフライン表示用data URLへ変換しても、履歴の正本はStorage参照のまま維持し、data URLは `neteruneko_exchange_photo_offline_cache` に分離する。
 
@@ -31,7 +32,7 @@ Storage画像のtransform取得に失敗した場合は、同じStorageオブジ
 - オンボーディング写真
 - うちのこ写真
 - 記録写真
-- 代表写真
+- 旧代表写真（通常UIからの新規受付は行わず、既存の保全キューと保存データのみ維持）
 
 原本はまずIndexedDB `neteruneko-photo-originals` の `pending-originals` に保存する。通常アカウントでログイン済みなら、次の非公開Storageパスへアップロードし、`photo_assets` に寸法・byte数・MIME type・表示画像の参照を記録する。
 

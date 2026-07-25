@@ -301,6 +301,7 @@ export function CatsPage() {
     : getCatName(activeCatProfile);
   const familyDuration = formatFamilyDuration(
     activeCatProfile?.basicInfo?.familySinceDate,
+    clientNow,
   );
   const birthdayStatus = getBirthdayStatus(
     activeCatProfile?.basicInfo?.birthDate,
@@ -415,18 +416,11 @@ export function CatsPage() {
   const activeCoverSrc =
     activeCatProfile?.coverPhotoDataUrl ??
     (activeCoverPhoto ? resolvePhotoSrc(activeCoverPhoto, "cover") : undefined);
-  const activeCoverPreviewSrc = hasCustomCoverPhoto
-    ? undefined
-    : activeCoverPhoto
-      ? getLensPhotoThumbnailSrc(activeCoverPhoto)
-      : undefined;
   const activeCoverFallbackSrcs =
     activeCoverPhoto && !hasCustomCoverPhoto
       ? getLensPhotoFallbackSrcs(activeCoverPhoto)
       : [];
-  const hasCustomCoverCrop = Boolean(activeCatProfile?.coverCrop);
   const activeCoverCrop = normalizeCoverCrop(activeCatProfile?.coverCrop);
-  const activeCoverFit = activeCoverSrc ? "cover" : "contain";
   useEffect(() => {
     tabContentScrollerRef.current?.scrollTo({ top: 0, left: 0 });
   }, [activeCatId, activeLens, activeSection]);
@@ -1902,57 +1896,12 @@ export function CatsPage() {
               >
                 <CatBasicProfilePanel
                   profile={activeCatProfile}
+                  photo={activeCoverPhoto}
+                  familyDuration={familyDuration}
+                  now={clientNow}
                   onEdit={() => openCatManageEditor("basic")}
                 />
                 <div style={styles.profileSettings}>
-                  <button
-                    type="button"
-                    data-testid="cats-cover-photo-button"
-                    style={styles.profileSettingsRow}
-                    onClick={() => setIsCoverPhotoSheetOpen(true)}
-                    aria-label="代表写真を変更"
-                  >
-                    <span
-                      data-testid="cats-representative-photo"
-                      style={styles.profileRepresentativePhoto}
-                      aria-hidden="true"
-                    >
-                      {activeCoverSrc && hasCustomCoverCrop ? (
-                        <CoverCropPhoto
-                          src={activeCoverSrc}
-                          fallbackSrcs={activeCoverFallbackSrcs}
-                          crop={activeCoverCrop}
-                          alt=""
-                          storageVariant="thumbnail"
-                          style={styles.profileRepresentativePhotoImage}
-                        />
-                      ) : activeCoverSrc ? (
-                        <PhotoTile
-                          src={activeCoverSrc}
-                          previewSrc={activeCoverPreviewSrc}
-                          alt=""
-                          variant="bare"
-                          fit={activeCoverFit}
-                          aspect="auto"
-                          storageVariant="thumbnail"
-                          fallbackSrcs={activeCoverFallbackSrcs}
-                          loading="eager"
-                          style={styles.profileRepresentativePhotoTile}
-                          frameStyle={styles.profileRepresentativePhotoFrame}
-                          imageStyle={styles.profileRepresentativePhotoImage}
-                        />
-                      ) : (
-                        <PhotoSmallIcon />
-                      )}
-                    </span>
-                    <span style={styles.profileSettingsText}>
-                      <span style={styles.profileSettingsLabel}>代表写真</span>
-                      <span style={styles.profileSettingsHint}>
-                        ホームに表示する写真
-                      </span>
-                    </span>
-                    <ChevronRightSmallIcon />
-                  </button>
                   <button
                     type="button"
                     style={styles.profileSettingsRow}
@@ -2300,11 +2249,7 @@ export function CatsPage() {
                   </div>
                 </section>
 
-                <details style={styles.catManageAdvancedDisclosure}>
-                  <summary style={styles.catManageAdvancedSummary}>
-                    その他のプロフィールを編集
-                  </summary>
-                  <div style={styles.catManageAdvancedContent}>
+                <div style={styles.catManageAdvancedContent}>
                     <section style={styles.catManageFormSection}>
                       <div style={styles.catManageFormHeading}>
                         <p style={styles.catManageFormTitle}>見た目</p>
@@ -2458,8 +2403,7 @@ export function CatsPage() {
                         fieldStyle={styles.catManageCareNoteField}
                       />
                     </section>
-                  </div>
-                </details>
+                </div>
               </div>
             ) : (
               <>
@@ -3181,29 +3125,94 @@ function CatSummaryPanel({
 
 function CatBasicProfilePanel({
   profile,
+  photo,
+  familyDuration,
+  now,
   onEdit,
 }: {
   profile: CatProfile;
+  photo: LensPhoto | null;
+  familyDuration: { primary: string; secondary: string };
+  now: number;
   onEdit?: () => void;
 }) {
+  const catName = isCatProfileNameUnset(profile)
+    ? "この子"
+    : getCatName(profile);
+  const familyDays =
+    familyDuration.primary === "未設定" ? "" : familyDuration.primary;
+  const identityFacts = [
+    formatGender(profile.basicInfo?.gender),
+    formatCatAge(profile.basicInfo?.birthDate, now),
+  ].filter(Boolean);
+
   return (
     <div style={styles.basicProfilePanel}>
-      <BasicInfoTable profile={profile} onEdit={onEdit} />
+      <section
+        data-testid="cats-profile-summary-card"
+        style={styles.profileSummaryCard}
+      >
+        <div
+          data-testid="cats-profile-summary-photo"
+          style={styles.profileSummaryPhoto}
+        >
+          {photo ? (
+            <PhotoTile
+              src={getLensPhotoThumbnailSrc(photo)}
+              alt={`${catName}の写真`}
+              variant="bare"
+              aspect="1 / 1"
+              fit="cover"
+              storageVariant={getLensPhotoStorageVariant(photo, "list")}
+              fallbackSrcs={getLensPhotoFallbackSrcs(photo)}
+              loading="eager"
+              style={styles.profileSummaryPhotoTile}
+              frameStyle={styles.profileSummaryPhotoFrame}
+              imageStyle={styles.profileSummaryPhotoImage}
+            />
+          ) : (
+            <AppIcon name="cat" size={38} />
+          )}
+        </div>
+        <div style={styles.profileSummaryText}>
+          <p style={styles.profileSummaryName}>{catName}</p>
+          <p style={styles.profileSummaryDuration}>
+            {familyDays ? (
+              <>
+                いっしょに暮らして
+                <span style={styles.profileSummaryDurationValue}>
+                  {familyDays}
+                </span>
+              </>
+            ) : (
+              "家族になった日を登録すると、日々を数えます"
+            )}
+          </p>
+          {identityFacts.length > 0 ? (
+            <p style={styles.profileSummaryFacts}>
+              {identityFacts.join("・")}
+            </p>
+          ) : null}
+        </div>
+        {onEdit ? (
+          <button
+            type="button"
+            data-testid="cats-basic-info-edit-button"
+            style={styles.profileSummaryEditButton}
+            onClick={onEdit}
+            aria-label="プロフィールを編集"
+            title="プロフィールを編集"
+          >
+            <PencilSmallIcon />
+          </button>
+        ) : null}
+      </section>
+      <BasicInfoTable profile={profile} />
     </div>
   );
 }
 
-function BasicInfoTable({
-  profile,
-  onEdit,
-}: {
-  profile: CatProfile;
-  onEdit?: () => void;
-}) {
-  const catDisplayName = getCatName(profile);
-  const catNameForTitle = isCatProfileNameUnset(profile)
-    ? "この子"
-    : catDisplayName;
+function BasicInfoTable({ profile }: { profile: CatProfile }) {
   const birthdayDate = formatBasicInfoDate(profile.basicInfo?.birthDate);
   const importantDateRows = [
     createBasicInfoRow({
@@ -3279,62 +3288,30 @@ function BasicInfoTable({
       valueTone: "numeric",
     }),
   ];
-  const advancedGroups = [
-    {
-      title: "見た目",
-      rows: appearanceRows,
-    },
+  const groups = [
     {
       title: "この子らしさ",
       rows: personalityRows,
     },
     {
-      title: "ケアのメモ",
+      title: "基本情報",
+      rows: [...importantDateRows, ...appearanceRows],
+    },
+    {
+      title: "ケア",
       rows: careRows,
     },
   ].filter((group) => group.rows.some((row) => row.value));
-  const hasImportantDates = importantDateRows.some((row) => row.value);
-  const hasAdvancedProfile = advancedGroups.length > 0;
 
   return (
     <div style={styles.basicInfoBlock}>
-      <div style={styles.basicInfoHeader}>
-        <p style={styles.basicInfoTitle}>{catNameForTitle}のこと</p>
-        {onEdit ? (
-          <button
-            type="button"
-            data-testid="cats-basic-info-edit-button"
-            style={styles.basicInfoEditButton}
-            onClick={onEdit}
-            aria-label="プロフィールを編集"
-            title="プロフィールを編集"
-          >
-            <PencilSmallIcon />
-          </button>
-        ) : null}
-      </div>
-      {hasImportantDates ? (
-        <BasicInfoSubsection title="たいせつな日" rows={importantDateRows} />
-      ) : null}
-      {hasAdvancedProfile ? (
-        <details
-          data-testid="cats-advanced-profile"
-          style={styles.basicInfoDisclosure}
-        >
-          <summary style={styles.basicInfoDisclosureSummary}>
-            その他のプロフィール
-          </summary>
-          <div style={styles.basicInfoDisclosureContent}>
-            {advancedGroups.map((group) => (
-              <BasicInfoSubsection
-                key={group.title}
-                title={group.title}
-                rows={group.rows}
-              />
-            ))}
-          </div>
-        </details>
-      ) : null}
+      {groups.map((group) => (
+        <BasicInfoSubsection
+          key={group.title}
+          title={group.title}
+          rows={group.rows}
+        />
+      ))}
     </div>
   );
 }
@@ -3380,7 +3357,18 @@ function BasicInfoSubsection({
 
   return (
     <section style={styles.basicInfoSubsection}>
-      <p style={styles.basicInfoSubsectionTitle}>{title}</p>
+      <div style={styles.basicInfoSubsectionHeading}>
+        <p style={styles.basicInfoSubsectionTitle}>{title}</p>
+        <span style={styles.basicInfoSubsectionIcon} aria-hidden="true">
+          {title === "この子らしさ" ? (
+            <AppIcon name="heart" size={17} />
+          ) : title === "ケア" ? (
+            <AppIcon name="paw" size={17} />
+          ) : (
+            <AppIcon name="book" size={17} />
+          )}
+        </span>
+      </div>
       <div style={styles.basicInfoTable}>
         {visibleRows.map((row, index) => (
           <div
@@ -6164,7 +6152,10 @@ function AddSmallIcon() {
   );
 }
 
-function formatFamilyDuration(familySinceDate?: string): {
+function formatFamilyDuration(
+  familySinceDate?: string,
+  nowValue = Date.now(),
+): {
   primary: string;
   secondary: string;
 } {
@@ -6176,7 +6167,7 @@ function formatFamilyDuration(familySinceDate?: string): {
     };
   }
 
-  const today = new Date();
+  const today = new Date(nowValue);
   const todayDate = new Date(
     today.getFullYear(),
     today.getMonth(),
@@ -6209,6 +6200,30 @@ function formatFamilyDuration(familySinceDate?: string): {
     primary: `${dayCount}日`,
     secondary,
   };
+}
+
+function formatCatAge(
+  birthDate: string | undefined,
+  nowValue = Date.now(),
+): string {
+  const birth = parseLocalDate(birthDate);
+  if (!birth) {
+    return "";
+  }
+
+  const now = new Date(nowValue);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (birth > today) {
+    return "";
+  }
+
+  let age = today.getFullYear() - birth.getFullYear();
+  const birthdayThisYear = addYearsSafe(birth, age);
+  if (birthdayThisYear > today) {
+    age -= 1;
+  }
+
+  return age > 0 ? `${age}歳` : "1歳未満";
 }
 
 function getCurrentSeasonName() {
@@ -7705,17 +7720,132 @@ const styles = {
   },
   basicInfoBlock: {
     display: "grid",
-    gap: "18px",
+    gap: "22px",
   },
   basicProfilePanel: {
     display: "grid",
-    gap: "0",
+    gap: "24px",
   },
   basicInfoPanel: {
     marginBottom: "22px",
     background: "transparent",
     boxShadow: "none",
     backdropFilter: "none",
+  },
+  profileSummaryCard: {
+    display: "grid",
+    gridTemplateColumns: "76px minmax(0, 1fr) 44px",
+    alignItems: "center",
+    gap: "12px",
+    minWidth: 0,
+    padding: "14px",
+    borderRadius: "22px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 56%, transparent)",
+    boxShadow:
+      "0 12px 28px -26px color-mix(in srgb, var(--ink) 28%, transparent)",
+  },
+  profileSummaryPhoto: {
+    width: "76px",
+    height: "76px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: "18px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 54%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 56%, transparent)",
+    color: CATS_MUTED,
+  },
+  profileSummaryPhotoTile: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+  },
+  profileSummaryPhotoFrame: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    border: "none",
+    borderRadius: 0,
+    background: "transparent",
+  },
+  profileSummaryPhotoImage: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
+    objectPosition: "center",
+    borderRadius: 0,
+  },
+  profileSummaryText: {
+    minWidth: 0,
+    display: "grid",
+    alignContent: "center",
+    gap: "5px",
+  },
+  profileSummaryName: {
+    minWidth: 0,
+    margin: 0,
+    overflow: "hidden",
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "21px",
+    fontWeight: 500,
+    lineHeight: 1.25,
+    letterSpacing: CATS_TITLE_TRACKING,
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  profileSummaryDuration: {
+    minWidth: 0,
+    margin: 0,
+    display: "flex",
+    flexWrap: "wrap" as const,
+    alignItems: "baseline",
+    gap: "1px 5px",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  profileSummaryDurationValue: {
+    color: "var(--seal)",
+    fontSize: "15px",
+    fontWeight: 500,
+    letterSpacing: CATS_BODY_TRACKING,
+    whiteSpace: "nowrap",
+  },
+  profileSummaryFacts: {
+    minWidth: 0,
+    margin: 0,
+    overflow: "hidden",
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: CATS_META_TRACKING,
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  profileSummaryEditButton: {
+    width: "44px",
+    minWidth: "44px",
+    height: "44px",
+    minHeight: "44px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 42%, transparent)",
+    color: CATS_MUTED,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   profileSettings: {
     display: "grid",
@@ -7726,7 +7856,7 @@ const styles = {
     width: "100%",
     minHeight: "64px",
     display: "grid",
-    gridTemplateColumns: "64px minmax(0, 1fr) auto",
+    gridTemplateColumns: "40px minmax(0, 1fr) auto",
     alignItems: "center",
     gap: "12px",
     padding: "11px 0",
@@ -7752,52 +7882,6 @@ const styles = {
     lineHeight: 1.5,
     letterSpacing: CATS_BODY_TRACKING,
   },
-  profileSettingsHint: {
-    color: CATS_FAINT,
-    fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.45,
-    letterSpacing: CATS_META_TRACKING,
-  },
-  profileRepresentativePhoto: {
-    position: "relative" as const,
-    width: "64px",
-    height: "40px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: "9px",
-    border: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 56%, transparent)",
-    color: CATS_FAINT,
-  },
-  profileRepresentativePhotoTile: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-  },
-  profileRepresentativePhotoFrame: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-    border: "none",
-    borderRadius: 0,
-    background: "transparent",
-  },
-  profileRepresentativePhotoImage: {
-    position: "absolute" as const,
-    inset: 0,
-    width: "100%",
-    height: "100%",
-    display: "block",
-    objectFit: "cover",
-    objectPosition: "center",
-    border: "none",
-    borderRadius: 0,
-    background: "transparent",
-  },
   profileSettingsIcon: {
     width: "40px",
     height: "40px",
@@ -7809,97 +7893,42 @@ const styles = {
     background: "color-mix(in srgb, var(--paper-card) 36%, transparent)",
     color: CATS_MUTED,
   },
-  basicInfoHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-  },
-  basicInfoHeaderActions: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: "8px",
-    minWidth: 0,
-  },
-  basicInfoTitle: {
-    margin: 0,
-    color: CATS_TEXT,
-    fontFamily: CATS_BASIC_VALUE_SERIF,
-    fontSize: CATS_TITLE_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.45,
-    letterSpacing: CATS_TITLE_TRACKING,
-  },
-  basicInfoProgress: {
-    flex: "0 0 auto",
-    color: CATS_FAINT,
-    fontFamily: CATS_SERIF,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.35,
-    letterSpacing: CATS_META_TRACKING,
-  },
-  basicInfoEditButton: {
-    width: "34px",
-    minHeight: "34px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 0,
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--line) 50%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 32%, transparent)",
-    color: CATS_MUTED,
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 500,
-    lineHeight: 1,
-    letterSpacing: "0",
-    cursor: "pointer",
-  },
   basicInfoTable: {
     display: "grid",
     gap: 0,
-    borderRadius: 0,
-    border: "none",
-    overflow: "visible",
+    borderRadius: "16px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
+    overflow: "hidden",
     background: "transparent",
   },
   basicInfoSubsection: {
     display: "grid",
-    gap: "4px",
-    paddingTop: "16px",
-    borderTop: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
+    gap: "8px",
+    minWidth: 0,
   },
-  basicInfoDisclosure: {
-    borderTop: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
-  },
-  basicInfoDisclosureSummary: {
-    minHeight: "44px",
+  basicInfoSubsectionHeading: {
     display: "flex",
     alignItems: "center",
-    color: CATS_MUTED,
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 500,
-    lineHeight: 1.4,
-    letterSpacing: CATS_META_TRACKING,
-    cursor: "pointer",
-  },
-  basicInfoDisclosureContent: {
-    display: "grid",
-    gap: "18px",
-    paddingBottom: "4px",
+    gap: "8px",
+    minWidth: 0,
   },
   basicInfoSubsectionTitle: {
     margin: 0,
-    color: CATS_FAINT,
+    color: CATS_TEXT,
     fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
+    fontSize: "15px",
     fontWeight: 500,
-    lineHeight: 1.4,
-    letterSpacing: "0.08em",
+    lineHeight: 1.45,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  basicInfoSubsectionIcon: {
+    width: "20px",
+    height: "20px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "var(--seal)",
+    opacity: 0.82,
   },
   basicInfoSubsectionEmpty: {
     margin: 0,
@@ -7916,19 +7945,15 @@ const styles = {
   },
   basicInfoRow: {
     display: "grid",
-    gridTemplateColumns: "minmax(78px, 29%) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(92px, 40%) minmax(0, 1fr)",
     alignItems: "baseline",
-    columnGap: "16px",
+    columnGap: "12px",
     rowGap: "5px",
     minHeight: "auto",
-    paddingTop: "12px",
-    paddingRight: 0,
-    paddingBottom: 0,
-    paddingLeft: 0,
+    padding: "12px 14px",
     borderTop: "1px solid color-mix(in srgb, var(--line) 42%, transparent)",
   },
   basicInfoRowFirst: {
-    paddingTop: "4px",
     borderTop: "none",
   },
   basicInfoLabel: {
@@ -7946,10 +7971,11 @@ const styles = {
   basicInfoValueStack: {
     display: "flex",
     alignItems: "baseline",
+    justifyContent: "flex-end",
     flexWrap: "wrap" as const,
     gap: "4px 9px",
     minWidth: 0,
-    textAlign: "left",
+    textAlign: "right",
   },
   basicInfoValue: {
     minWidth: 0,
@@ -8141,22 +8167,6 @@ const styles = {
     minWidth: 0,
     padding: "18px 2px 0",
     borderTop: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
-  },
-  catManageAdvancedDisclosure: {
-    minWidth: 0,
-    borderTop: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
-  },
-  catManageAdvancedSummary: {
-    minHeight: "48px",
-    display: "flex",
-    alignItems: "center",
-    color: CATS_MUTED,
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 500,
-    lineHeight: 1.45,
-    letterSpacing: CATS_META_TRACKING,
-    cursor: "pointer",
   },
   catManageAdvancedContent: {
     display: "grid",

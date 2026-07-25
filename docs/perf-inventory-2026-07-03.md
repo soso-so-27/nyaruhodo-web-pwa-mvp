@@ -46,7 +46,7 @@ Playwright の実測プロファイルで `/home` -> `/collection` -> `/cats` �
 | `ownSleepingPhotos` / ねがお | display | 長辺 2048px / quality 0.84 | WebP | canvas 再エンコードで落ちる |
 | `ownSleepingPhotos` / ねがお | exchange fallback | display が 1,900,000 chars 以下なら display、超過時は長辺 1200px / quality 0.8 | WebP | canvas 再エンコードで落ちる |
 | `catGalleryPhotos` / とっておき | display | 長辺 2560px / quality 0.88 | JPEG | canvas 再エンコードで落ちる |
-| 代表写真直接アップロード | avatar | 長辺 800px / default quality 0.85 | JPEG | canvas 再エンコードで落ちる |
+| 旧代表写真直接アップロード | avatar | 長辺 800px / default quality 0.85 | JPEG | 過去経路。現在は通常UIなし |
 
 根拠:
 
@@ -54,7 +54,7 @@ Playwright の実測プロファイルで `/home` -> `/collection` -> `/cats` �
 - ねがお canvas encode: `src/components/home/HomeInput.tsx:5182-5214`。
 - とっておき追加: `src/components/cats/CatsPage.tsx:922-933`。
 - とっておき canvas encode: `src/components/cats/CatsPage.tsx:4346-4368`。
-- 代表写真直接アップロード: `src/components/cats/CatsPage.tsx:859`。
+- 旧代表写真直接アップロード: 過去には `src/components/cats/CatsPage.tsx` に入口があった。現在は通常UIを撤去し、既存データのみ保持する。
 
 ### A-3. 各画面が使う src
 
@@ -69,7 +69,8 @@ Playwright の実測プロファイルで `/home` -> `/collection` -> `/cats` �
 | うちのこ / 文箱 viewer | `displaySrc -> originalSrc -> thumbnailSrc -> src` | `src/components/home/OmoideMemoryViewer.tsx:86-93` |
 | うちのこ / 年ごとの思い出 row | `thumbnailSrc -> displaySrc -> src` | `src/components/cats/CatsPage.tsx:3058-3062` |
 | うちのこ / 足あと | 写真 entry は lens photo `src`、思い出 entry は `thumbnailSrc -> displaySrc -> src` | `src/lib/cats/footprints.ts:30-43`, `src/lib/cats/footprints.ts:62-71` |
-| うちのこ / プロフィールの代表写真 | `coverPhotoDataUrl -> activeCoverPhoto`。プロフィール内では小さなthumbnailとして表示し、写真タブの内容を押し下げない | `src/components/cats/CatsPage.tsx` |
+| うちのこ / プロフィール先頭の猫カード | `activeCatGalleryLensPhotos[0] -> stableSleepingCoverPhoto` で既存写真を自動選択し、`thumbnailSrc -> displaySrc -> src`。ユーザー設定は持たない | `src/components/cats/CatsPage.tsx` |
+| 旧うちのこ代表写真 | 通常UIではsrcを解決・表示しない。既存の `coverPhotoDataUrl` / `coverCrop` は同期・移行用データとしてのみ保持 | `src/components/cats/CatsPage.tsx`, `src/lib/accountSync.ts` |
 | 汎用 `PhotoTile` | 渡された `src` を `StoredPhotoImage` に渡す | `src/components/ui/PhotoTile.tsx:78-88` |
 
 ### A-4. signed URL API呼出回数、キャッシュ、有効期限

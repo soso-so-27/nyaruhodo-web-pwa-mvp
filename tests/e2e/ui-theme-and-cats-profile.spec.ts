@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
@@ -828,245 +828,21 @@ test("keeps cat switching in the shared header on every profile tab", async ({ p
   await page.getByTestId("cats-section-tab-basic").click();
   await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
   await expect(switchButton).toBeVisible();
-  await expect(page.getByTestId("cats-cover-photo-button")).toHaveAccessibleName(
-    "代表写真を変更",
+  await expect(page.getByTestId("cats-cover-photo-button")).toHaveCount(0);
+  await expect(page.getByTestId("cats-representative-photo")).toHaveCount(0);
+  await expect(page.getByTestId("cats-profile-summary-card")).toContainText(
+    "こむぎ",
   );
+  await expect(page.getByTestId("cats-profile-summary-card")).toContainText(
+    "女の子",
+  );
+  await expect(page.getByText("家族と共有", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "猫を追加・管理" })).toBeVisible();
 });
 
-test("keeps a confirmed cover crop after leaving, returning, and reloading", async ({
+test("keeps stored representative photo data without showing an unused setting", async ({
   page,
 }) => {
-  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3, {
-    preserveOnReload: true,
-  });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-
-  await page.getByTestId("cats-section-tab-basic").click();
-  await page.getByTestId("cats-cover-photo-button").click();
-  await expect(page.getByTestId("cover-photo-picker-photo").first()).toBeVisible();
-  await page.getByTestId("cover-photo-picker-photo").first().click();
-
-  await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
-  const previewImages = page.getByTestId("cover-crop-preview").locator("img");
-  await expect(previewImages).toHaveCount(2);
-  const initialScale = await readCropTransformScale(previewImages.last());
-  expect(initialScale).toBeLessThan(1);
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const raw = window.localStorage.getItem("cat_profiles");
-        const [profile] = raw ? JSON.parse(raw) : [];
-        return profile?.coverPhotoDataUrl ?? "";
-      }),
-    )
-    .toBe("");
-
-  await page.getByTestId("cover-crop-save").click();
-
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const raw = window.localStorage.getItem("cat_profiles");
-        const [profile] = raw ? JSON.parse(raw) : [];
-        return profile?.coverPhotoDataUrl ?? "";
-      }),
-    )
-    .toBe(photoDataUrl);
-  const savedScale = await page.evaluate(() => {
-    const raw = window.localStorage.getItem("cat_profiles");
-    const [profile] = raw ? JSON.parse(raw) : [];
-    return profile?.coverCrop?.scale ?? 0;
-  });
-  expect(savedScale).toBeCloseTo(initialScale, 4);
-  const coverImages = page.getByTestId("cats-representative-photo").locator("img");
-  await expect(coverImages).toHaveCount(2);
-  expect(await readCropTransformScale(coverImages.last())).toBeCloseTo(
-    savedScale,
-    4,
-  );
-
-  await page.getByRole("link", { name: "きょう" }).click();
-  await expect(page.getByTestId("home-desk-model")).toBeVisible();
-  await page.getByRole("link", { name: "うちのこ" }).click();
-  await expect(page.getByTestId("cats-page")).toBeVisible();
-  await page.getByTestId("cats-section-tab-basic").click();
-
-  const reloadedScale = await page.evaluate(() => {
-    const raw = window.localStorage.getItem("cat_profiles");
-    const [profile] = raw ? JSON.parse(raw) : [];
-    return profile?.coverCrop?.scale ?? 0;
-  });
-  expect(reloadedScale).toBeCloseTo(savedScale, 4);
-  expect(
-    await readCropTransformScale(
-      page.getByTestId("cats-representative-photo").locator("img").last(),
-    ),
-  ).toBeCloseTo(savedScale, 4);
-
-  await page.reload();
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-basic").click();
-
-  const restartedScale = await page.evaluate(() => {
-    const raw = window.localStorage.getItem("cat_profiles");
-    const [profile] = raw ? JSON.parse(raw) : [];
-    return profile?.coverCrop?.scale ?? 0;
-  });
-  expect(restartedScale).toBeCloseTo(savedScale, 4);
-  expect(
-    await readCropTransformScale(
-      page.getByTestId("cats-representative-photo").locator("img").last(),
-    ),
-  ).toBeCloseTo(savedScale, 4);
-});
-
-test("keeps the previous cover photo when crop is cancelled", async ({ page }) => {
-  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-
-  await page.getByTestId("cats-section-tab-basic").click();
-  await page.getByTestId("cats-cover-photo-button").click();
-  await page.getByTestId("cover-photo-picker-photo").first().click();
-  await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
-  await expect(page.getByTestId("cover-crop-back")).toBeFocused();
-  await page.goBack();
-
-  await expect(page.getByTestId("cover-crop-sheet")).toHaveCount(0);
-  await expect(page.getByTestId("cover-photo-picker-photo").first()).toBeVisible();
-
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const raw = window.localStorage.getItem("cat_profiles");
-        const [profile] = raw ? JSON.parse(raw) : [];
-        return profile?.coverPhotoDataUrl ?? "";
-      }),
-    )
-    .toBe("");
-});
-
-test("lets the owner drag the cat cover crop directly", async ({ page }) => {
-  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-
-  await page.getByTestId("cats-section-tab-basic").click();
-  await page.getByTestId("cats-cover-photo-button").click();
-  await page.getByTestId("cover-photo-picker-photo").first().click();
-
-  await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
-  const initialScale = await readCropTransformScale(
-    page.getByTestId("cover-crop-preview").locator("img").last(),
-  );
-  await page.getByTestId("cover-crop-preview").evaluate((element) => {
-    const rect = element.getBoundingClientRect();
-    const startX = rect.left + rect.width / 2;
-    const startY = rect.top + rect.height / 2;
-    const endX = startX + rect.width * 0.1;
-    const endY = startY - rect.height * 0.1;
-    const firePointer = (type: string, clientX: number, clientY: number) => {
-      element.dispatchEvent(
-        new PointerEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          clientX,
-          clientY,
-          isPrimary: true,
-          pointerId: 1,
-          pointerType: "touch",
-        }),
-      );
-    };
-
-    firePointer("pointerdown", startX, startY);
-    firePointer("pointermove", endX, endY);
-    firePointer("pointerup", endX, endY);
-  });
-  await page.getByTestId("cover-crop-save").click();
-
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const raw = window.localStorage.getItem("cat_profiles");
-        const [profile] = raw ? JSON.parse(raw) : [];
-        return profile?.coverCrop?.scale ?? 0;
-      }),
-    )
-    .toBeGreaterThan(0);
-  const crop = await page.evaluate(() => {
-    const raw = window.localStorage.getItem("cat_profiles");
-    const [profile] = raw ? JSON.parse(raw) : [];
-    return profile?.coverCrop ?? null;
-  });
-  expect(crop?.scale).toBeCloseTo(initialScale, 4);
-  expect(crop?.offsetX).toBeCloseTo(10, 4);
-  expect(crop?.offsetY).toBeCloseTo(-10, 4);
-});
-
-test("lets the owner pinch to zoom the cat cover crop", async ({ page }) => {
-  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-
-  await page.getByTestId("cats-section-tab-basic").click();
-  await page.getByTestId("cats-cover-photo-button").click();
-  await page.getByTestId("cover-photo-picker-photo").first().click();
-
-  await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
-  const initialScale = await readCropTransformScale(
-    page.getByTestId("cover-crop-preview").locator("img").last(),
-  );
-  await page.getByTestId("cover-crop-preview").evaluate((element) => {
-    const rect = element.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const firePointer = (
-      type: string,
-      pointerId: number,
-      clientX: number,
-      clientY: number,
-    ) => {
-      element.dispatchEvent(
-        new PointerEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          clientX,
-          clientY,
-          isPrimary: pointerId === 1,
-          pointerId,
-          pointerType: "touch",
-        }),
-      );
-    };
-
-    firePointer("pointerdown", 1, centerX - 30, centerY);
-    firePointer("pointerdown", 2, centerX + 30, centerY);
-    firePointer("pointermove", 1, centerX - 60, centerY);
-    firePointer("pointermove", 2, centerX + 60, centerY);
-    firePointer("pointerup", 1, centerX - 60, centerY);
-    firePointer("pointerup", 2, centerX + 60, centerY);
-  });
-  await page.getByTestId("cover-crop-save").click();
-
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const raw = window.localStorage.getItem("cat_profiles");
-        const [profile] = raw ? JSON.parse(raw) : [];
-        return profile?.coverCrop?.scale ?? 0;
-      }),
-    )
-    .toBeCloseTo(initialScale * 2, 4);
-});
-
-test("resets a custom cover photo back to automatic display", async ({ page }) => {
   await seedCatsProfileWithCustomStorageCover(
     page,
     Date.parse("2026-06-10T12:30:00+09:00"),
@@ -1074,11 +850,13 @@ test("resets a custom cover photo back to automatic display", async ({ page }) =
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
-
   await page.getByTestId("cats-section-tab-basic").click();
-  await page.getByTestId("cats-cover-photo-button").click();
-  await page.getByTestId("cover-photo-reset").click();
 
+  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
+  await expect(page.getByTestId("cats-cover-photo-button")).toHaveCount(0);
+  await expect(page.getByTestId("cats-representative-photo")).toHaveCount(0);
+  await expect(page.getByTestId("cats-profile-summary-card")).toBeVisible();
+  await expect(page.getByRole("button", { name: "猫を追加・管理" })).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -1090,168 +868,20 @@ test("resets a custom cover photo back to automatic display", async ({ page }) =
         };
       }),
     )
-    .toEqual({ coverPhotoDataUrl: null, coverCrop: null });
+    .toEqual({
+      coverPhotoDataUrl: "storage:cat-mugi/cover/cover.webp",
+      coverCrop: { scale: 1, offsetX: 0, offsetY: 0 },
+    });
+
+  await page.reload();
+  await page.getByTestId("cats-section-tab-basic").click();
+  await expect(page.getByTestId("cats-cover-photo-button")).toHaveCount(0);
 });
 
-test("shows the representative photo as a compact profile setting", async ({
+test("shows every populated profile group without hiding saved information", async ({
   page,
 }) => {
-  const signedUrlRequests: Array<{ src?: string; variant?: string }> = [];
-
-  await page.route("**/api/photo-storage/signed-url", async (route) => {
-    const body = route.request().postDataJSON() as {
-      src?: string;
-      variant?: string;
-    };
-    signedUrlRequests.push(body);
-
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        bucket: "cat-photos",
-        expiresIn: 86_400,
-        signedUrl: photoDataUrl,
-        variant: body.variant ?? "display",
-      }),
-    });
-  });
-
-  await seedCatsProfileWithCustomStorageCover(
-    page,
-    Date.parse("2026-06-10T12:30:00+09:00"),
-  );
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-basic").click();
-
-  const representativePhoto = page.getByTestId("cats-representative-photo");
-  const coverImages = representativePhoto.locator("img");
-
-  await expect(coverImages).toHaveCount(1);
-  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
-  await expect
-    .poll(() =>
-      coverImages.first().evaluate((image) => {
-        const element = image as HTMLImageElement;
-        return element.complete && element.naturalWidth > 0;
-      }),
-    )
-    .toBe(true);
-  const previewBox = await representativePhoto.boundingBox();
-  expect(previewBox?.width).toBeLessThanOrEqual(70);
-  expect(previewBox?.height).toBeLessThanOrEqual(44);
-  await page.getByTestId("cats-cover-photo-button").click();
-  await expect(
-    page.getByRole("dialog", { name: "代表写真を変える" }),
-  ).toBeVisible();
-  expect(
-    signedUrlRequests.some(
-      (request) =>
-        request.src?.includes("/cover/") && request.variant === "thumbnail",
-    ),
-  ).toBe(true);
-});
-
-test("adjusts the exact photo currently used as the representative photo", async ({
-  page,
-}) => {
-  await page.route("**/api/photo-storage/signed-url", async (route) => {
-    const body = route.request().postDataJSON() as { variant?: string };
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        bucket: "cat-photos",
-        expiresIn: 86_400,
-        signedUrl: photoDataUrl,
-        variant: body.variant ?? "display",
-      }),
-    });
-  });
-  await seedCatsProfileWithCustomStorageCover(
-    page,
-    Date.parse("2026-06-10T12:30:00+09:00"),
-  );
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-basic").click();
-
-  const coverImage = page
-    .getByTestId("cats-representative-photo")
-    .locator("img")
-    .last();
-  await expect
-    .poll(() => coverImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
-    .toBeGreaterThan(0);
-  const displayedSrc = await coverImage.getAttribute("src");
-
-  await page.getByTestId("cats-cover-photo-button").click();
-  await page.getByTestId("cover-photo-adjust-current").click();
-
-  const cropImage = page.getByTestId("cover-crop-preview").locator("img").last();
-  await expect(cropImage).toHaveAttribute("src", displayedSrc ?? "");
-  await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
-});
-
-test("keeps an uncropped representative photo inside the compact setting", async ({
-  page,
-}) => {
-  await page.route("**/api/photo-storage/signed-url", async (route) => {
-    const body = route.request().postDataJSON() as {
-      src?: string;
-      variant?: string;
-    };
-
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        bucket: "cat-photos",
-        expiresIn: 86_400,
-        signedUrl: photoDataUrl,
-        variant: body.variant ?? "display",
-      }),
-    });
-  });
-
-  await seedCatsProfileWithCustomStorageCover(
-    page,
-    Date.parse("2026-06-10T12:30:00+09:00"),
-    { includeCrop: false },
-  );
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-basic").click();
-
-  const representativePhoto = page.getByTestId("cats-representative-photo");
-  const coverImage = representativePhoto.locator("img").first();
-
-  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
-  await expect
-    .poll(() =>
-      coverImage.evaluate((image) => {
-        const element = image as HTMLImageElement;
-        return element.complete && element.naturalWidth > 0;
-      }),
-    )
-    .toBe(true);
-  const previewBox = await representativePhoto.boundingBox();
-  expect(previewBox?.width).toBeLessThanOrEqual(70);
-  expect(previewBox?.height).toBeLessThanOrEqual(44);
-  await expect
-    .poll(() =>
-      coverImage.evaluate((image) => window.getComputedStyle(image).objectFit),
-    )
-    .toBe("cover");
-  await expect
-    .poll(() =>
-      coverImage.evaluate((image) => window.getComputedStyle(image).objectPosition),
-    )
-    .toBe("50% 50%");
-});
-
-test("keeps dates visible and folds secondary profile details", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-07-25T12:00:00+09:00"));
   await seedCatsBasicProfile(page, {
     basicInfo: {
       familySinceDate: "2022-09-22",
@@ -1265,22 +895,41 @@ test("keeps dates visible and folds secondary profile details", async ({ page })
       coat: "orange_tabby",
     },
   });
-  await page.setViewportSize({ width: 375, height: 667 });
+  await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
   await page.getByTestId("cats-section-tab-basic").click();
 
-  await expect(page.getByText("むぎのこと")).toBeVisible();
-  await expect(page.getByText("たいせつな日")).toBeVisible();
+  const summary = page.getByTestId("cats-profile-summary-card");
+  await expect(summary).toContainText("むぎ");
+  await expect(summary).toContainText("いっしょに暮らして");
+  await expect(summary).toContainText("男の子・4歳");
+  await expect(page.getByTestId("cats-profile-summary-photo")).toBeVisible();
+  await expect(
+    page.getByTestId("cats-profile-summary-photo").locator("img"),
+  ).toHaveCount(1);
+  await expect
+    .poll(() =>
+      summary.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+    )
+    .toBe(true);
+  const editButtonBox = await page
+    .getByTestId("cats-basic-info-edit-button")
+    .boundingBox();
+  expect(editButtonBox?.width).toBeGreaterThanOrEqual(44);
+  expect(editButtonBox?.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByText("家族と共有", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("基本情報", { exact: true })).toBeVisible();
   await expect(page.getByText("2022年9月22日")).toBeVisible();
   await expect(page.getByText("2022年7月10日")).toBeVisible();
-  await expect(page.getByText("見た目")).toBeHidden();
-  await expect(page.getByText("この子らしさ")).toBeHidden();
-  await page.getByText("その他のプロフィール", { exact: true }).click();
-  await expect(page.getByText("見た目")).toBeVisible();
   await expect(page.getByText("この子らしさ")).toBeVisible();
+  await expect(page.getByText("たいせつな日", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("見た目", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("その他のプロフィール", { exact: true })).toHaveCount(
+    0,
+  );
   await expect(page.getByText("毛柄")).toBeVisible();
-  await expect(page.getByText("ケアのメモ")).toHaveCount(0);
+  await expect(page.getByText("ケア", { exact: true })).toHaveCount(0);
   await expect(page.getByText("かかりつけ")).toHaveCount(0);
   await expect(page.getByText("ワクチンを打った日")).toHaveCount(0);
   await expect(page.getByText("未登録")).toHaveCount(0);
@@ -1290,7 +939,10 @@ test("keeps dates visible and folds secondary profile details", async ({ page })
 
   await page.getByTestId("cats-basic-info-edit-button").click();
   const editor = page.getByRole("dialog").first();
-  await expect(editor.getByLabel("毛柄")).toBeHidden();
+  await expect(
+    editor.getByText("その他のプロフィールを編集", { exact: true }),
+  ).toHaveCount(0);
+  await expect(editor.getByLabel("毛柄")).toBeVisible();
   await editor.getByLabel("誕生日").fill("2022-07-11");
   await editor.getByRole("button", { name: "保存する" }).click();
   await expect
@@ -1340,16 +992,16 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   ).toHaveCount(0);
   await expect(dialog.getByText("猫種・タイプ")).toHaveCount(0);
   await expect(dialog.getByText("毛色")).toHaveCount(0);
-  await expect(dialog.getByLabel("毛柄")).toBeHidden();
-  await expect(dialog.getByLabel("猫種")).toBeHidden();
+  await expect(dialog.getByLabel("毛柄")).toBeVisible();
+  await expect(dialog.getByLabel("猫種")).toBeVisible();
   await expect
     .poll(() =>
       dialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     )
     .toBe(true);
-  await dialog
-    .getByText("その他のプロフィールを編集", { exact: true })
-    .click();
+  await expect(
+    dialog.getByText("その他のプロフィールを編集", { exact: true }),
+  ).toHaveCount(0);
   await expect(dialog.getByRole("radio", { name: "男の子" })).toBeVisible();
   await expect(dialog.getByRole("radio", { name: "女の子" })).toBeVisible();
   await expect(dialog.getByRole("radio", { name: "わからない" })).toBeVisible();
@@ -1368,7 +1020,6 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await dialog.getByRole("button", { name: "保存する" }).click();
 
   await expect(dialog).toBeHidden();
-  await page.getByText("その他のプロフィール", { exact: true }).click();
   await expect(page.getByText("茶トラ")).toBeVisible();
   await expect(page.getByText("猫種")).toBeVisible();
   await expect(page.getByText("ミックス")).toBeVisible();
@@ -1985,18 +1636,6 @@ async function seedCatsProfileWithStoragePhotos(
     },
     { nowValue: now, count: photoCount },
   );
-}
-
-async function readCropTransformScale(image: Locator) {
-  await expect
-    .poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth))
-    .toBeGreaterThan(0);
-
-  return image.evaluate((element) => {
-    const transform = (element as HTMLImageElement).style.transform;
-    const scale = transform.match(/scale\(([^)]+)\)/)?.[1];
-    return scale ? Number(scale) : 1;
-  });
 }
 
 async function seedCatsProfileWithCustomStorageCover(
