@@ -774,7 +774,7 @@ test("opens an unnamed cat album as この子 and keeps naming optional", async 
 
   await page.getByTestId("cats-name-registration-button").click();
   let dialog = page.getByRole("dialog").first();
-  await expect(dialog).toHaveAccessibleName("この子のことを 書く");
+  await expect(dialog).toHaveAccessibleName("この子の基本情報");
   await dialog.getByLabel("誕生日").fill("2022-07-11");
   await dialog.getByRole("button", { name: "保存する" }).click();
 
@@ -1022,7 +1022,8 @@ test("keeps cat switching in the shared header on every profile tab", async ({ p
   await expect(switchButton).toBeVisible();
   await expect(page.getByTestId("cats-cover-photo-button")).toHaveCount(0);
   await expect(page.getByTestId("cats-representative-photo")).toHaveCount(0);
-  await expect(page.getByTestId("cats-profile-summary-card")).toContainText(
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("こむぎ");
+  await expect(page.getByTestId("cats-profile-summary-card")).not.toContainText(
     "こむぎ",
   );
   await expect(page.getByTestId("cats-profile-summary-card")).toContainText(
@@ -1082,6 +1083,11 @@ test("shows every populated profile group without hiding saved information", asy
       personality: {
         favoriteTouch: "あごの下",
       },
+      care: {
+        weightKg: 4.8,
+        weightMeasuredDate: "2026-07-20",
+        careNote: "爪切りはふたりで",
+      },
     },
     appearance: {
       coat: "orange_tabby",
@@ -1093,7 +1099,8 @@ test("shows every populated profile group without hiding saved information", asy
   await page.getByTestId("cats-section-tab-basic").click();
 
   const summary = page.getByTestId("cats-profile-summary-card");
-  await expect(summary).toContainText("むぎ");
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
+  await expect(summary).not.toContainText("むぎ");
   await expect(summary).toContainText("いっしょに暮らして");
   await expect(summary).toContainText("男の子・4歳");
   await expect(page.getByTestId("cats-profile-summary-photo")).toBeVisible();
@@ -1111,7 +1118,11 @@ test("shows every populated profile group without hiding saved information", asy
   expect(editButtonBox?.width).toBeGreaterThanOrEqual(44);
   expect(editButtonBox?.height).toBeGreaterThanOrEqual(44);
   await expect(page.getByText("家族と共有", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("基本情報", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByTestId("cats-profile-basic-section")
+      .getByText("基本情報", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("2022年9月22日")).toBeVisible();
   await expect(page.getByText("2022年7月10日")).toBeVisible();
   await expect(page.getByText("この子らしさ")).toBeVisible();
@@ -1121,20 +1132,23 @@ test("shows every populated profile group without hiding saved information", asy
     0,
   );
   await expect(page.getByText("毛柄")).toBeVisible();
-  await expect(page.getByText("ケア", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("かかりつけ")).toHaveCount(0);
+  await expect(page.getByText("ケアのメモ", { exact: true })).toBeVisible();
+  await expect(page.getByText("4.8 kg")).toBeVisible();
+  await expect(page.getByText("爪切りはふたりで")).toBeVisible();
   await expect(page.getByText("ワクチンを打った日")).toHaveCount(0);
   await expect(page.getByText("未登録")).toHaveCount(0);
-  await expect(page.getByText("なでられると好きなところ")).toBeVisible();
+  await expect(page.getByText("なでると喜ぶ場所")).toBeVisible();
   await expect(page.getByText("あごの下")).toBeVisible();
   await expect(page.getByText("7月10日は「むぎの日」")).toHaveCount(0);
 
   await page.getByTestId("cats-basic-info-edit-button").click();
-  const editor = page.getByRole("dialog").first();
+  const editor = page.getByRole("dialog", { name: "むぎの基本情報" });
   await expect(
     editor.getByText("その他のプロフィールを編集", { exact: true }),
   ).toHaveCount(0);
   await expect(editor.getByLabel("毛柄")).toBeVisible();
+  await expect(editor.getByLabel("好きな場所")).toHaveCount(0);
+  await expect(editor.getByLabel("体重（kg）")).toHaveCount(0);
   await editor.getByLabel("誕生日").fill("2022-07-11");
   await editor.getByRole("button", { name: "保存する" }).click();
   await expect
@@ -1146,6 +1160,8 @@ test("shows every populated profile group without hiding saved information", asy
         return {
           birthDate: profile?.basicInfo?.birthDate,
           favoriteTouch: profile?.basicInfo?.personality?.favoriteTouch,
+          careNote: profile?.basicInfo?.care?.careNote,
+          weightKg: profile?.basicInfo?.care?.weightKg,
           coat: profile?.appearance?.coat,
         };
       }),
@@ -1153,7 +1169,151 @@ test("shows every populated profile group without hiding saved information", asy
     .toEqual({
       birthDate: "2022-07-11",
       favoriteTouch: "あごの下",
+      careNote: "爪切りはふたりで",
+      weightKg: 4.8,
       coat: "orange_tabby",
+    });
+});
+
+test("starts an empty profile with one optional question instead of an empty form", async ({
+  page,
+}) => {
+  await seedCatsBasicProfile(page, {
+    basicInfo: {},
+    appearance: {},
+  });
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
+
+  const profile = page.getByTestId("cats-profile-panel");
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
+  await expect(profile.getByText("むぎ", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("未登録")).toHaveCount(0);
+  await expect(page.getByTestId("cats-profile-basic-section")).toHaveCount(0);
+  await expect(page.getByTestId("cats-profile-care-section")).toBeVisible();
+
+  const question = page.getByTestId("cats-profile-optional-question");
+  await expect(question).toContainText("好きな場所は？");
+  await expect(question).toContainText("思い出したときに、ひとつだけ。");
+  await expect
+    .poll(() =>
+      profile.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ),
+    )
+    .toBe(true);
+
+  await question.click();
+  const quickDialog = page.getByRole("dialog", { name: "好きな場所を書く" });
+  await expect(quickDialog.getByLabel("好きな場所")).toBeVisible();
+  await expect(quickDialog.getByLabel("好きな遊び")).toHaveCount(0);
+  await expect(quickDialog.getByLabel("この子の名前")).toHaveCount(0);
+  await expect(quickDialog.getByLabel("体重（kg）")).toHaveCount(0);
+  await quickDialog.getByLabel("好きな場所").fill("窓辺");
+  await quickDialog.getByRole("button", { name: "保存する" }).click();
+
+  await expect(quickDialog).toBeHidden();
+  await expect(page.getByTestId("cats-profile-personality-card")).toContainText(
+    "窓辺",
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const [profile] = JSON.parse(
+          window.localStorage.getItem("cat_profiles") ?? "[]",
+        );
+        return profile?.basicInfo?.personality?.favoritePlace ?? "";
+      }),
+    )
+    .toBe("窓辺");
+});
+
+test("quick personality edit preserves newer basic and care information", async ({
+  page,
+}) => {
+  await seedCatsBasicProfile(page, {
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+      birthDate: "2022-07-10",
+      gender: "male",
+      breed: "ミックス",
+      care: {
+        weightKg: 4.8,
+        vetClinic: "いつもの病院",
+      },
+    },
+    appearance: {
+      coat: "orange_tabby",
+    },
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
+  await page.getByTestId("cats-profile-optional-question").click();
+
+  await page.evaluate(() => {
+    const profiles = JSON.parse(
+      window.localStorage.getItem("cat_profiles") ?? "[]",
+    );
+    profiles[0] = {
+      ...profiles[0],
+      name: "むぎ改",
+      basicInfo: {
+        ...profiles[0].basicInfo,
+        familySinceDate: "2023-01-02",
+        personality: {
+          callName: "むぎちゃんむぎちゃんむぎちゃんむぎちゃんむぎちゃん",
+          favoritePlay: "新しい羽のおもちゃ",
+        },
+        care: {
+          ...profiles[0].basicInfo?.care,
+          vetClinic: "新しい病院",
+        },
+      },
+      appearance: {
+        ...profiles[0].appearance,
+        coat: "calico",
+      },
+    };
+    window.localStorage.setItem("cat_profiles", JSON.stringify(profiles));
+  });
+
+  const quickDialog = page.getByRole("dialog", { name: "好きな場所を書く" });
+  await quickDialog.getByLabel("好きな場所").fill("窓辺");
+  await quickDialog.getByRole("button", { name: "保存する" }).click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const [profile] = JSON.parse(
+          window.localStorage.getItem("cat_profiles") ?? "[]",
+        );
+        return {
+          name: profile?.name,
+          familySinceDate: profile?.basicInfo?.familySinceDate,
+          birthDate: profile?.basicInfo?.birthDate,
+          callName: profile?.basicInfo?.personality?.callName,
+          favoritePlace: profile?.basicInfo?.personality?.favoritePlace,
+          favoritePlay: profile?.basicInfo?.personality?.favoritePlay,
+          weightKg: profile?.basicInfo?.care?.weightKg,
+          vetClinic: profile?.basicInfo?.care?.vetClinic,
+          coat: profile?.appearance?.coat,
+        };
+      }),
+    )
+    .toEqual({
+      name: "むぎ改",
+      familySinceDate: "2023-01-02",
+      birthDate: "2022-07-10",
+      callName: "むぎちゃんむぎちゃんむぎちゃんむぎちゃんむぎちゃん",
+      favoritePlace: "窓辺",
+      favoritePlay: "新しい羽のおもちゃ",
+      weightKg: 4.8,
+      vetClinic: "新しい病院",
+      coat: "calico",
     });
 });
 
@@ -1174,44 +1334,57 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await page.waitForLoadState("networkidle");
   await page.getByTestId("cats-section-tab-basic").click();
 
-  await page.getByRole("button", { name: "プロフィールを編集" }).click();
-  const dialog = page.getByRole("dialog", { name: "むぎのことを 書く" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("あとから見返したいことだけ、少しずつ。")).toHaveCount(0);
-  await expect(dialog.getByLabel("この子の名前")).toBeVisible();
+  await page.getByRole("button", { name: "基本情報を編集" }).click();
+  const basicDialog = page.getByRole("dialog", { name: "むぎの基本情報" });
+  await expect(basicDialog).toBeVisible();
   await expect(
-    dialog.getByText("この日から、いっしょの日々をかぞえます。"),
+    basicDialog.getByText("あとから見返したいことだけ、少しずつ。"),
   ).toHaveCount(0);
-  await expect(dialog.getByText("猫種・タイプ")).toHaveCount(0);
-  await expect(dialog.getByText("毛色")).toHaveCount(0);
-  await expect(dialog.getByLabel("毛柄")).toBeVisible();
-  await expect(dialog.getByLabel("猫種")).toBeVisible();
+  await expect(basicDialog.getByLabel("この子の名前")).toBeVisible();
+  await expect(
+    basicDialog.getByText("この日から、いっしょの日々をかぞえます。"),
+  ).toHaveCount(0);
+  await expect(basicDialog.getByText("猫種・タイプ")).toHaveCount(0);
+  await expect(basicDialog.getByText("毛色")).toHaveCount(0);
+  await expect(basicDialog.getByLabel("毛柄")).toBeVisible();
+  await expect(basicDialog.getByLabel("猫種")).toBeVisible();
+  await expect(basicDialog.getByLabel("体重（kg）")).toHaveCount(0);
   await expect
     .poll(() =>
-      dialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+      basicDialog.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ),
     )
     .toBe(true);
   await expect(
-    dialog.getByText("その他のプロフィールを編集", { exact: true }),
+    basicDialog.getByText("その他のプロフィールを編集", { exact: true }),
   ).toHaveCount(0);
-  await expect(dialog.getByRole("radio", { name: "男の子" })).toBeVisible();
-  await expect(dialog.getByRole("radio", { name: "女の子" })).toBeVisible();
-  await expect(dialog.getByRole("radio", { name: "わからない" })).toBeVisible();
-  await expect(dialog.getByLabel("猫種")).toHaveValue("ミックス");
-  await expect(dialog.getByRole("button", { name: "保存する" })).toBeInViewport();
-
-  await dialog.getByLabel("毛柄").fill("茶トラ");
-  await dialog.getByLabel("体重（kg）").fill("21");
-  await dialog.getByRole("button", { name: "保存する" }).click();
+  await expect(basicDialog.getByRole("radio", { name: "男の子" })).toBeVisible();
+  await expect(basicDialog.getByRole("radio", { name: "女の子" })).toBeVisible();
+  await expect(basicDialog.getByRole("radio", { name: "わからない" })).toBeVisible();
+  await expect(basicDialog.getByLabel("猫種")).toHaveValue("ミックス");
   await expect(
-    dialog.getByText("体重は0.5〜20kgの範囲で入力してください。"),
-  ).toBeVisible();
-  await dialog.getByLabel("体重（kg）").fill("5.5");
-  await dialog.getByLabel("ワクチンを打った日").fill("2026-06-01");
-  await dialog.getByLabel("ワクチンのメモ").fill("3種混合");
-  await dialog.getByRole("button", { name: "保存する" }).click();
+    basicDialog.getByRole("button", { name: "保存する" }),
+  ).toBeInViewport();
 
-  await expect(dialog).toBeHidden();
+  await basicDialog.getByLabel("毛柄").fill("茶トラ");
+  await basicDialog.getByRole("button", { name: "保存する" }).click();
+  await expect(basicDialog).toBeHidden();
+
+  await page.getByRole("button", { name: "ケアのメモを編集" }).click();
+  const careDialog = page.getByRole("dialog", { name: "むぎのケアのメモ" });
+  await expect(careDialog.getByLabel("毛柄")).toHaveCount(0);
+  await careDialog.getByLabel("体重（kg）").fill("21");
+  await careDialog.getByRole("button", { name: "保存する" }).click();
+  await expect(
+    careDialog.getByText("体重は0.5〜20kgの範囲で入力してください。"),
+  ).toBeVisible();
+  await careDialog.getByLabel("体重（kg）").fill("5.5");
+  await careDialog.getByLabel("ワクチンを打った日").fill("2026-06-01");
+  await careDialog.getByLabel("ワクチンのメモ").fill("3種混合");
+  await careDialog.getByRole("button", { name: "保存する" }).click();
+
+  await expect(careDialog).toBeHidden();
   await expect(page.getByText("茶トラ")).toBeVisible();
   await expect(page.getByText("猫種")).toBeVisible();
   await expect(page.getByText("ミックス")).toBeVisible();

@@ -201,6 +201,8 @@ const DEFAULT_COVER_CROP: CatCoverCrop = {
   offsetY: 0,
 };
 type CatManageEditSource = "basic" | "manage";
+type CatProfileEditSection = "basic" | "personality" | "care";
+type CatProfileQuickEditField = "favoritePlace";
 
 export function CatsPage() {
   const catIllustrations = useCatIllustrationAssets();
@@ -218,6 +220,10 @@ export function CatsPage() {
   const [isCatManageEditing, setIsCatManageEditing] = useState(false);
   const [catManageEditSource, setCatManageEditSource] =
     useState<CatManageEditSource | null>(null);
+  const [catProfileEditSection, setCatProfileEditSection] =
+    useState<CatProfileEditSection>("basic");
+  const [catProfileQuickEditField, setCatProfileQuickEditField] =
+    useState<CatProfileQuickEditField | null>(null);
   const [isCoverPhotoSheetOpen, setIsCoverPhotoSheetOpen] = useState(false);
   const [coverCropDraft, setCoverCropDraft] = useState<{
     src: string;
@@ -732,6 +738,8 @@ export function CatsPage() {
     setIsAddingCat(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
+    setCatProfileEditSection("basic");
+    setCatProfileQuickEditField(null);
     setIsOnboardingAlbumCreated(false);
     setMessage("");
     setSaveMessage("");
@@ -759,6 +767,8 @@ export function CatsPage() {
     setIsCatManageOpen(true);
     setIsCatManageEditing(false);
     setCatManageEditSource(null);
+    setCatProfileEditSection("basic");
+    setCatProfileQuickEditField(null);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
   }
@@ -859,9 +869,15 @@ export function CatsPage() {
     setIsEditingProfile(true);
   }
 
-  function openCatManageEditor(source: CatManageEditSource) {
+  function openCatManageEditor(
+    source: CatManageEditSource,
+    section: CatProfileEditSection = "basic",
+    quickField: CatProfileQuickEditField | null = null,
+  ) {
     handleStartEdit();
     setCatManageEditSource(source);
+    setCatProfileEditSection(section);
+    setCatProfileQuickEditField(quickField);
     setIsCatManageEditing(true);
     setIsCatManageOpen(true);
   }
@@ -873,6 +889,7 @@ export function CatsPage() {
     setIsEditingCatName(false);
     setIsEditingProfile(false);
     setIsCatManageEditing(false);
+    setCatProfileQuickEditField(null);
     if (catManageEditSource === "basic") {
       setIsCatManageOpen(false);
     }
@@ -901,69 +918,120 @@ export function CatsPage() {
         return;
       }
 
-      const parsedWeightKg = parseEditableWeightKg(editWeightKg);
-      if (parsedWeightKg === "invalid") {
-        setSaveMessage("体重は0.5〜20kgの範囲で入力してください。");
-        return;
-      }
+      const previousProfile = profiles[index];
+      const isSectionalEdit = isCatManageEditing;
+      const shouldSaveBasic =
+        !isSectionalEdit || catProfileEditSection === "basic";
+      const shouldSavePersonality =
+        !isSectionalEdit || catProfileEditSection === "personality";
+      const shouldSaveCare =
+        !isSectionalEdit || catProfileEditSection === "care";
+      let nextBasicInfo = previousProfile.basicInfo ?? {};
+      let nextAppearance = previousProfile.appearance ?? {};
 
-      const previousWeightKg = profiles[index].basicInfo?.care?.weightKg;
-      const previousMeasuredDate =
-        profiles[index].basicInfo?.care?.weightMeasuredDate ?? "";
-      const didChangeWeight =
-        parsedWeightKg !== undefined && parsedWeightKg !== previousWeightKg;
-      const measuredDateWasUntouched =
-        editWeightMeasuredDate === previousMeasuredDate;
-      const nextWeightMeasuredDate =
-        didChangeWeight && measuredDateWasUntouched
-          ? getTodayDateInputValue()
-          : editWeightMeasuredDate;
-      const nextPersonality = buildCatPersonalityInfo({
-        callName: editCallName,
-        favoritePlace: editFavoritePlace,
-        favoritePlay: editFavoritePlay,
-        favoriteTouch: editFavoriteTouch,
-        dislikes: editDislikes,
-      });
-      const nextCare = buildCatCareInfo({
-        weightKg: parsedWeightKg,
-        weightMeasuredDate: nextWeightMeasuredDate,
-        vetClinic: editVetClinic,
-        careNote: editCareNote,
-        vaccineDate: editVaccineDate,
-        vaccineNote: editVaccineNote,
-      });
-      const savedAt = new Date().toISOString();
-      const confirmedName = catNameInput.trim();
-      const nextProfile = {
-        ...profiles[index],
-        name: confirmedName || profiles[index].name,
-        nameState: confirmedName
-          ? ("confirmed" as const)
-          : profiles[index].nameState,
-        nameConfirmedAt: confirmedName
-          ? (profiles[index].nameConfirmedAt ?? savedAt)
-          : profiles[index].nameConfirmedAt,
-        basicInfo: {
+      if (shouldSaveBasic) {
+        nextBasicInfo = {
+          ...nextBasicInfo,
           familySinceDate: editFamilySinceDate || undefined,
           birthDate: editBirthDate || undefined,
           gender: editGender || undefined,
           breed: editBreed.trim() || undefined,
-          personality: nextPersonality,
-          care: nextCare,
-        },
-        appearance: {
-          ...(profiles[index].appearance ?? {}),
+        };
+        nextAppearance = {
+          ...nextAppearance,
           coat: editCoat.trim() || undefined,
-        },
+        };
+      }
+
+      if (shouldSavePersonality) {
+        const previousPersonality = previousProfile.basicInfo?.personality;
+        const normalizedFavoritePlace = trimToMax(editFavoritePlace, 40);
+        const hasOtherPersonalityValue = Boolean(
+          previousPersonality &&
+            Object.entries(previousPersonality).some(
+              ([key, value]) =>
+                key !== "favoritePlace" &&
+                typeof value === "string" &&
+                value.length > 0,
+            ),
+        );
+        const nextPersonality =
+          catProfileQuickEditField === "favoritePlace"
+            ? normalizedFavoritePlace || hasOtherPersonalityValue
+              ? {
+                  ...(previousPersonality ?? {}),
+                  favoritePlace: normalizedFavoritePlace || undefined,
+                }
+              : undefined
+            : buildCatPersonalityInfo({
+                callName: editCallName,
+                favoritePlace: editFavoritePlace,
+                favoritePlay: editFavoritePlay,
+                favoriteTouch: editFavoriteTouch,
+                dislikes: editDislikes,
+              });
+        nextBasicInfo = {
+          ...nextBasicInfo,
+          personality: nextPersonality,
+        };
+      }
+
+      if (shouldSaveCare) {
+        const parsedWeightKg = parseEditableWeightKg(editWeightKg);
+        if (parsedWeightKg === "invalid") {
+          setSaveMessage("体重は0.5〜20kgの範囲で入力してください。");
+          return;
+        }
+
+        const previousWeightKg = previousProfile.basicInfo?.care?.weightKg;
+        const previousMeasuredDate =
+          previousProfile.basicInfo?.care?.weightMeasuredDate ?? "";
+        const didChangeWeight =
+          parsedWeightKg !== undefined && parsedWeightKg !== previousWeightKg;
+        const measuredDateWasUntouched =
+          editWeightMeasuredDate === previousMeasuredDate;
+        const nextWeightMeasuredDate =
+          didChangeWeight && measuredDateWasUntouched
+            ? getTodayDateInputValue()
+            : editWeightMeasuredDate;
+        nextBasicInfo = {
+          ...nextBasicInfo,
+          care: buildCatCareInfo({
+            weightKg: parsedWeightKg,
+            weightMeasuredDate: nextWeightMeasuredDate,
+            vetClinic: editVetClinic,
+            careNote: editCareNote,
+            vaccineDate: editVaccineDate,
+            vaccineNote: editVaccineNote,
+          }),
+        };
+      }
+
+      const savedAt = new Date().toISOString();
+      const confirmedName = catNameInput.trim();
+      const nextName = shouldSaveBasic
+        ? confirmedName || previousProfile.name
+        : previousProfile.name;
+      const nextProfile = {
+        ...previousProfile,
+        name: nextName,
+        nameState: shouldSaveBasic && confirmedName
+          ? ("confirmed" as const)
+          : previousProfile.nameState,
+        nameConfirmedAt:
+          shouldSaveBasic && confirmedName
+            ? (previousProfile.nameConfirmedAt ?? savedAt)
+            : previousProfile.nameConfirmedAt,
+        basicInfo: nextBasicInfo,
+        appearance: nextAppearance,
         updatedAt: savedAt,
       } satisfies CatProfile;
       const nextProfiles = profiles.map((profile, profileIndex) =>
         profileIndex === index ? nextProfile : profile,
       );
       const didSaveName =
-        nextProfile.name !== profiles[index].name ||
-        (profiles[index].nameState !== "confirmed" &&
+        nextProfile.name !== previousProfile.name ||
+        (previousProfile.nameState !== "confirmed" &&
           Boolean(confirmedName));
 
       window.localStorage.setItem(
@@ -987,6 +1055,7 @@ export function CatsPage() {
       setIsEditingCatName(false);
       setIsEditingProfile(false);
       setIsCatManageEditing(false);
+      setCatProfileQuickEditField(null);
       if (isDirectProfileRecovery) {
         setIsDirectProfileRecovery(false);
       }
@@ -1899,7 +1968,20 @@ export function CatsPage() {
                   photo={activeCoverPhoto}
                   familyDuration={familyDuration}
                   now={clientNow}
-                  onEdit={() => openCatManageEditor("basic")}
+                  onEditBasic={() =>
+                    openCatManageEditor("basic", "basic")
+                  }
+                  onEditPersonality={() =>
+                    openCatManageEditor("basic", "personality")
+                  }
+                  onEditCare={() => openCatManageEditor("basic", "care")}
+                  onAnswerFavoritePlace={() =>
+                    openCatManageEditor(
+                      "basic",
+                      "personality",
+                      "favoritePlace",
+                    )
+                  }
                 />
                 <div style={styles.profileSettings}>
                   <button
@@ -2103,12 +2185,28 @@ export function CatsPage() {
         <AppBottomSheet
           title={
             isCatManageEditing
-              ? `${
-                  catNameInput.trim() ||
-                  (isCatProfileNameUnset(activeCatProfile)
-                    ? "この子"
-                    : activeCatProfile.name)
-                }のことを 書く`
+              ? catProfileQuickEditField === "favoritePlace"
+                ? "好きな場所を書く"
+                : catProfileEditSection === "personality"
+                  ? `${
+                      catNameInput.trim() ||
+                      (isCatProfileNameUnset(activeCatProfile)
+                        ? "この子"
+                        : activeCatProfile.name)
+                    }らしさ`
+                  : catProfileEditSection === "care"
+                    ? `${
+                        catNameInput.trim() ||
+                        (isCatProfileNameUnset(activeCatProfile)
+                          ? "この子"
+                          : activeCatProfile.name)
+                      }のケアのメモ`
+                    : `${
+                        catNameInput.trim() ||
+                        (isCatProfileNameUnset(activeCatProfile)
+                          ? "この子"
+                          : activeCatProfile.name)
+                      }の基本情報`
               : isAddingCat
                 ? "ねこをふやす"
                 : "うちのこを管理"
@@ -2122,6 +2220,8 @@ export function CatsPage() {
             } else {
               setIsCatManageEditing(false);
               setCatManageEditSource(null);
+              setCatProfileEditSection("basic");
+              setCatProfileQuickEditField(null);
             }
           }}
           closeOnOverlay={!isCatManageEditing}
@@ -2212,47 +2312,76 @@ export function CatsPage() {
               </div>
             ) : isCatManageEditing ? (
               <div style={styles.catManageEditor}>
-                <section style={styles.catManageNameBlock}>
-                  <AppTextField
-                    id="cat-manage-name"
-                    type="text"
-                    label="この子の名前"
-                    value={catNameInput}
-                    onChange={(event) => setCatNameInput(event.target.value)}
-                    placeholder="例：むぎ"
-                  />
-                </section>
+                {catProfileQuickEditField === "favoritePlace" ? (
+                  <>
+                    <section
+                      data-testid="cats-profile-quick-edit"
+                      style={styles.catManageNameBlock}
+                    >
+                      <AppTextField
+                        type="text"
+                        label="好きな場所"
+                        value={editFavoritePlace}
+                        maxLength={40}
+                        onChange={(event) =>
+                          setEditFavoritePlace(event.target.value)
+                        }
+                        placeholder="例：ソファの右端"
+                        autoFocus
+                      />
+                    </section>
+                    <button
+                      type="button"
+                      style={styles.profileQuickEditExpandButton}
+                      onClick={() => setCatProfileQuickEditField(null)}
+                    >
+                      ほかのことも書く
+                    </button>
+                  </>
+                ) : catProfileEditSection === "basic" ? (
+                  <>
+                    <section style={styles.catManageNameBlock}>
+                      <AppTextField
+                        id="cat-manage-name"
+                        type="text"
+                        label="この子の名前"
+                        value={catNameInput}
+                        onChange={(event) => setCatNameInput(event.target.value)}
+                        placeholder="例：むぎ"
+                      />
+                    </section>
 
-                <section style={styles.catManageFormSection}>
-                  <div style={styles.catManageFormHeading}>
-                    <p style={styles.catManageFormTitle}>たいせつな日</p>
-                  </div>
-                  <div style={styles.catManageDateGrid}>
-                    <AppTextField
-                      type="date"
-                      className="cat-basic-date-field"
-                      label="家族になった日"
-                      value={editFamilySinceDate}
-                      onChange={(event) =>
-                        setEditFamilySinceDate(event.target.value)
-                      }
-                      max={new Date().toISOString().split("T")[0]}
-                    />
-                    <AppTextField
-                      type="date"
-                      className="cat-basic-date-field"
-                      label="誕生日"
-                      value={editBirthDate}
-                      onChange={(event) => setEditBirthDate(event.target.value)}
-                      max={new Date().toISOString().split("T")[0]}
-                    />
-                  </div>
-                </section>
-
-                <div style={styles.catManageAdvancedContent}>
                     <section style={styles.catManageFormSection}>
                       <div style={styles.catManageFormHeading}>
-                        <p style={styles.catManageFormTitle}>見た目</p>
+                        <p style={styles.catManageFormTitle}>たいせつな日</p>
+                      </div>
+                      <div style={styles.catManageDateGrid}>
+                        <AppTextField
+                          type="date"
+                          className="cat-basic-date-field"
+                          label="家族になった日"
+                          value={editFamilySinceDate}
+                          onChange={(event) =>
+                            setEditFamilySinceDate(event.target.value)
+                          }
+                          max={new Date().toISOString().split("T")[0]}
+                        />
+                        <AppTextField
+                          type="date"
+                          className="cat-basic-date-field"
+                          label="誕生日"
+                          value={editBirthDate}
+                          onChange={(event) =>
+                            setEditBirthDate(event.target.value)
+                          }
+                          max={new Date().toISOString().split("T")[0]}
+                        />
+                      </div>
+                    </section>
+
+                    <section style={styles.catManageFormSection}>
+                      <div style={styles.catManageFormHeading}>
+                        <p style={styles.catManageFormTitle}>性別と見た目</p>
                       </div>
                       <AppSegmented<EditableGender>
                         value={editGender}
@@ -2283,127 +2412,122 @@ export function CatsPage() {
                         placeholder="例：ミックス"
                       />
                     </section>
-
-                    <section style={styles.catManageFormSection}>
-                      <div style={styles.catManageFormHeading}>
-                        <p style={styles.catManageFormTitle}>この子らしさ</p>
-                      </div>
+                  </>
+                ) : catProfileEditSection === "personality" ? (
+                  <section style={styles.catManageNameBlock}>
+                    <AppTextField
+                      type="text"
+                      label="好きな場所"
+                      value={editFavoritePlace}
+                      maxLength={40}
+                      onChange={(event) =>
+                        setEditFavoritePlace(event.target.value)
+                      }
+                      placeholder="例：ソファの右端"
+                    />
+                    <AppTextField
+                      type="text"
+                      label="好きな遊び"
+                      value={editFavoritePlay}
+                      maxLength={40}
+                      onChange={(event) =>
+                        setEditFavoritePlay(event.target.value)
+                      }
+                      placeholder="例：ひも、追いかけっこ"
+                    />
+                    <AppTextField
+                      type="text"
+                      label="なでると喜ぶ場所"
+                      value={editFavoriteTouch}
+                      maxLength={40}
+                      onChange={(event) =>
+                        setEditFavoriteTouch(event.target.value)
+                      }
+                      placeholder="例：あごの下"
+                    />
+                    <AppTextField
+                      type="text"
+                      label="苦手なこと"
+                      value={editDislikes}
+                      maxLength={40}
+                      onChange={(event) => setEditDislikes(event.target.value)}
+                      placeholder="例：掃除機、大きな音"
+                    />
+                    <AppTextField
+                      type="text"
+                      label="よく呼ぶ名前"
+                      value={editCallName}
+                      maxLength={40}
+                      onChange={(event) => setEditCallName(event.target.value)}
+                      placeholder="例：むぎちゃん"
+                    />
+                  </section>
+                ) : (
+                  <section style={styles.catManageNameBlock}>
+                    <div style={styles.catManageCareGrid}>
                       <AppTextField
-                        type="text"
-                        label="よく呼ぶ名前"
-                        value={editCallName}
-                        maxLength={40}
-                        onChange={(event) => setEditCallName(event.target.value)}
-                        placeholder="例：むぎちゃん"
-                      />
-                      <AppTextField
-                        type="text"
-                        label="好きな場所"
-                        value={editFavoritePlace}
-                        maxLength={40}
+                        type="number"
+                        label="体重（kg）"
+                        value={editWeightKg}
+                        min="0.5"
+                        max="20"
+                        step="0.1"
+                        inputMode="decimal"
                         onChange={(event) =>
-                          setEditFavoritePlace(event.target.value)
+                          setEditWeightKg(event.target.value)
                         }
-                        placeholder="例：ソファの右端"
-                      />
-                      <AppTextField
-                        type="text"
-                        label="好きな遊び"
-                        value={editFavoritePlay}
-                        maxLength={40}
-                        onChange={(event) =>
-                          setEditFavoritePlay(event.target.value)
-                        }
-                        placeholder="例：ひも、追いかけっこ"
-                      />
-                      <AppTextField
-                        type="text"
-                        label="なでられると好きなところ"
-                        value={editFavoriteTouch}
-                        maxLength={40}
-                        onChange={(event) =>
-                          setEditFavoriteTouch(event.target.value)
-                        }
-                        placeholder="例：あごの下"
-                      />
-                      <AppTextField
-                        type="text"
-                        label="苦手なこと"
-                        value={editDislikes}
-                        maxLength={40}
-                        onChange={(event) => setEditDislikes(event.target.value)}
-                        placeholder="例：掃除機、大きな音"
-                      />
-                    </section>
-
-                    <section style={styles.catManageFormSection}>
-                      <div style={styles.catManageFormHeading}>
-                        <p style={styles.catManageFormTitle}>ケアのメモ</p>
-                      </div>
-                      <div style={styles.catManageCareGrid}>
-                        <AppTextField
-                          type="number"
-                          label="体重（kg）"
-                          value={editWeightKg}
-                          min="0.5"
-                          max="20"
-                          step="0.1"
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            setEditWeightKg(event.target.value)
-                          }
-                          placeholder="例：4.8"
-                        />
-                        <AppTextField
-                          type="date"
-                          className="cat-basic-date-field"
-                          label="はかった日"
-                          value={editWeightMeasuredDate}
-                          onChange={(event) =>
-                            setEditWeightMeasuredDate(event.target.value)
-                          }
-                          max={new Date().toISOString().split("T")[0]}
-                        />
-                      </div>
-                      <AppTextField
-                        type="text"
-                        label="かかりつけ"
-                        value={editVetClinic}
-                        maxLength={80}
-                        onChange={(event) => setEditVetClinic(event.target.value)}
-                        placeholder="例：○○動物病院"
+                        placeholder="例：4.8"
                       />
                       <AppTextField
                         type="date"
                         className="cat-basic-date-field"
-                        label="ワクチンを打った日"
-                        value={editVaccineDate}
+                        label="はかった日"
+                        value={editWeightMeasuredDate}
                         onChange={(event) =>
-                          setEditVaccineDate(event.target.value)
+                          setEditWeightMeasuredDate(event.target.value)
                         }
                         max={new Date().toISOString().split("T")[0]}
                       />
-                      <AppTextField
-                        type="text"
-                        label="ワクチンのメモ"
-                        value={editVaccineNote}
-                        maxLength={80}
-                        onChange={(event) =>
-                          setEditVaccineNote(event.target.value)
-                        }
-                        placeholder="例：3種混合"
-                      />
-                      <AppTextField
-                        as="textarea"
-                        label="気をつけること"
-                        value={editCareNote}
-                        maxLength={180}
-                        onChange={(event) => setEditCareNote(event.target.value)}
-                        placeholder="例：爪切りが苦手"
-                        fieldStyle={styles.catManageCareNoteField}
-                      />
-                    </section>
-                </div>
+                    </div>
+                    <AppTextField
+                      type="text"
+                      label="かかりつけ"
+                      value={editVetClinic}
+                      maxLength={80}
+                      onChange={(event) => setEditVetClinic(event.target.value)}
+                      placeholder="例：○○動物病院"
+                    />
+                    <AppTextField
+                      type="date"
+                      className="cat-basic-date-field"
+                      label="ワクチンを打った日"
+                      value={editVaccineDate}
+                      onChange={(event) =>
+                        setEditVaccineDate(event.target.value)
+                      }
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                    <AppTextField
+                      type="text"
+                      label="ワクチンのメモ"
+                      value={editVaccineNote}
+                      maxLength={80}
+                      onChange={(event) =>
+                        setEditVaccineNote(event.target.value)
+                      }
+                      placeholder="例：3種混合"
+                    />
+                    <AppTextField
+                      as="textarea"
+                      label="気をつけること"
+                      value={editCareNote}
+                      maxLength={180}
+                      onChange={(event) => setEditCareNote(event.target.value)}
+                      placeholder="例：爪切りが苦手"
+                      fieldStyle={styles.catManageCareNoteField}
+                    />
+                  </section>
+                )}
               </div>
             ) : (
               <>
@@ -3128,13 +3252,19 @@ function CatBasicProfilePanel({
   photo,
   familyDuration,
   now,
-  onEdit,
+  onEditBasic,
+  onEditPersonality,
+  onEditCare,
+  onAnswerFavoritePlace,
 }: {
   profile: CatProfile;
   photo: LensPhoto | null;
   familyDuration: { primary: string; secondary: string };
   now: number;
-  onEdit?: () => void;
+  onEditBasic: () => void;
+  onEditPersonality: () => void;
+  onEditCare: () => void;
+  onAnswerFavoritePlace: () => void;
 }) {
   const catName = isCatProfileNameUnset(profile)
     ? "この子"
@@ -3147,10 +3277,11 @@ function CatBasicProfilePanel({
   ].filter(Boolean);
 
   return (
-    <div style={styles.basicProfilePanel}>
+    <div data-testid="cats-profile-panel" style={styles.basicProfilePanel}>
       <section
         data-testid="cats-profile-summary-card"
         style={styles.profileSummaryCard}
+        aria-label={`${catName}のプロフィール概要`}
       >
         <div
           data-testid="cats-profile-summary-photo"
@@ -3175,44 +3306,51 @@ function CatBasicProfilePanel({
           )}
         </div>
         <div style={styles.profileSummaryText}>
-          <p style={styles.profileSummaryName}>{catName}</p>
-          <p style={styles.profileSummaryDuration}>
-            {familyDays ? (
-              <>
-                いっしょに暮らして
-                <span style={styles.profileSummaryDurationValue}>
-                  {familyDays}
-                </span>
-              </>
-            ) : (
-              "家族になった日を登録すると、日々を数えます"
-            )}
-          </p>
+          <p style={styles.profileSummaryKicker}>いっしょに暮らして</p>
+          {familyDays ? (
+            <p style={styles.profileSummaryDurationValue}>{familyDays}</p>
+          ) : (
+            <p style={styles.profileSummaryDurationMissing}>
+              家族になった日を登録できます
+            </p>
+          )}
           {identityFacts.length > 0 ? (
             <p style={styles.profileSummaryFacts}>
               {identityFacts.join("・")}
             </p>
           ) : null}
         </div>
-        {onEdit ? (
-          <button
-            type="button"
-            data-testid="cats-basic-info-edit-button"
-            style={styles.profileSummaryEditButton}
-            onClick={onEdit}
-            aria-label="プロフィールを編集"
-            title="プロフィールを編集"
-          >
-            <PencilSmallIcon />
-          </button>
-        ) : null}
+        <button
+          type="button"
+          data-testid="cats-basic-info-edit-button"
+          style={styles.profileSummaryEditButton}
+          onClick={onEditBasic}
+          aria-label="基本情報を編集"
+        >
+          基本情報
+        </button>
       </section>
-      <BasicInfoTable profile={profile} />
+      <BasicInfoTable
+        profile={profile}
+        onEditPersonality={onEditPersonality}
+        onEditCare={onEditCare}
+        onAnswerFavoritePlace={onAnswerFavoritePlace}
+      />
     </div>
   );
 }
 
-function BasicInfoTable({ profile }: { profile: CatProfile }) {
+function BasicInfoTable({
+  profile,
+  onEditPersonality,
+  onEditCare,
+  onAnswerFavoritePlace,
+}: {
+  profile: CatProfile;
+  onEditPersonality: () => void;
+  onEditCare: () => void;
+  onAnswerFavoritePlace: () => void;
+}) {
   const birthdayDate = formatBasicInfoDate(profile.basicInfo?.birthDate);
   const importantDateRows = [
     createBasicInfoRow({
@@ -3244,7 +3382,7 @@ function BasicInfoTable({ profile }: { profile: CatProfile }) {
   ];
   const personalityRows = [
     createBasicInfoRow({
-      label: "よく呼ぶ名前",
+      label: "呼び名",
       value: profile.basicInfo?.personality?.callName,
     }),
     createBasicInfoRow({
@@ -3256,7 +3394,7 @@ function BasicInfoTable({ profile }: { profile: CatProfile }) {
       value: profile.basicInfo?.personality?.favoritePlay,
     }),
     createBasicInfoRow({
-      label: "なでられると好きなところ",
+      label: "なでると喜ぶ場所",
       value: profile.basicInfo?.personality?.favoriteTouch,
     }),
     createBasicInfoRow({
@@ -3288,30 +3426,29 @@ function BasicInfoTable({ profile }: { profile: CatProfile }) {
       valueTone: "numeric",
     }),
   ];
-  const groups = [
-    {
-      title: "この子らしさ",
-      rows: personalityRows,
-    },
-    {
-      title: "基本情報",
-      rows: [...importantDateRows, ...appearanceRows],
-    },
-    {
-      title: "ケア",
-      rows: careRows,
-    },
-  ].filter((group) => group.rows.some((row) => row.value));
+  const basicRows = [...importantDateRows, ...appearanceRows];
 
   return (
     <div style={styles.basicInfoBlock}>
-      {groups.map((group) => (
+      <ProfilePersonalitySection
+        rows={personalityRows}
+        onEdit={onEditPersonality}
+        onAnswerFavoritePlace={onAnswerFavoritePlace}
+      />
+      {basicRows.some((row) => row.value) ? (
         <BasicInfoSubsection
-          key={group.title}
-          title={group.title}
-          rows={group.rows}
+          title="基本情報"
+          rows={basicRows}
+          testId="cats-profile-basic-section"
         />
-      ))}
+      ) : null}
+      <BasicInfoSubsection
+        title="ケアのメモ"
+        rows={careRows}
+        onEdit={onEditCare}
+        emptyActionLabel="追加"
+        testId="cats-profile-care-section"
+      />
     </div>
   );
 }
@@ -3342,64 +3479,148 @@ function createBasicInfoRow({
   };
 }
 
-function BasicInfoSubsection({
-  title,
+function ProfilePersonalitySection({
   rows,
+  onEdit,
+  onAnswerFavoritePlace,
 }: {
-  title: string;
   rows: BasicInfoDisplayRow[];
+  onEdit: () => void;
+  onAnswerFavoritePlace: () => void;
 }) {
   const visibleRows = rows.filter((row) => row.value);
 
-  if (visibleRows.length === 0) {
+  return (
+    <section
+      data-testid="cats-profile-personality-section"
+      style={styles.basicInfoSubsection}
+    >
+      <div style={styles.basicInfoSubsectionHeading}>
+        <p style={styles.basicInfoSubsectionTitle}>この子らしさ</p>
+        {visibleRows.length > 0 ? (
+          <button
+            type="button"
+            style={styles.basicInfoSubsectionEditButton}
+            onClick={onEdit}
+            aria-label="この子らしさを編集"
+          >
+            編集
+          </button>
+        ) : null}
+      </div>
+      {visibleRows.length > 0 ? (
+        <div
+          data-testid="cats-profile-personality-card"
+          style={styles.profilePersonalityTable}
+        >
+          {visibleRows.map((row, index) => (
+            <div
+              key={row.label}
+              style={
+                index === 0
+                  ? {
+                      ...styles.profilePersonalityRow,
+                      ...styles.profilePersonalityRowFirst,
+                    }
+                  : styles.profilePersonalityRow
+              }
+            >
+              <span style={styles.basicInfoLabel}>{row.label}</span>
+              <span style={styles.basicInfoValue}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <button
+          type="button"
+          data-testid="cats-profile-optional-question"
+          style={styles.profileOptionalQuestion}
+          onClick={onAnswerFavoritePlace}
+          aria-label="好きな場所を書く"
+        >
+          <span style={styles.profileOptionalQuestionText}>
+            <span style={styles.profileOptionalQuestionLabel}>
+              好きな場所は？
+            </span>
+            <span style={styles.profileOptionalQuestionHint}>
+              思い出したときに、ひとつだけ。
+            </span>
+          </span>
+          <span style={styles.profileOptionalQuestionAction}>書く</span>
+          <ChevronRightSmallIcon />
+        </button>
+      )}
+    </section>
+  );
+}
+
+function BasicInfoSubsection({
+  title,
+  rows,
+  onEdit,
+  emptyActionLabel = "編集",
+  testId,
+}: {
+  title: string;
+  rows: BasicInfoDisplayRow[];
+  onEdit?: () => void;
+  emptyActionLabel?: string;
+  testId?: string;
+}) {
+  const visibleRows = rows.filter((row) => row.value);
+
+  if (visibleRows.length === 0 && !onEdit) {
     return null;
   }
 
   return (
-    <section style={styles.basicInfoSubsection}>
+    <section data-testid={testId} style={styles.basicInfoSubsection}>
       <div style={styles.basicInfoSubsectionHeading}>
         <p style={styles.basicInfoSubsectionTitle}>{title}</p>
-        <span style={styles.basicInfoSubsectionIcon} aria-hidden="true">
-          {title === "この子らしさ" ? (
-            <AppIcon name="heart" size={17} />
-          ) : title === "ケア" ? (
-            <AppIcon name="paw" size={17} />
-          ) : (
-            <AppIcon name="book" size={17} />
-          )}
-        </span>
-      </div>
-      <div style={styles.basicInfoTable}>
-        {visibleRows.map((row, index) => (
-          <div
-            key={row.label}
-            style={
-              index === 0
-                ? { ...styles.basicInfoRow, ...styles.basicInfoRowFirst }
-                : styles.basicInfoRow
-            }
+        {onEdit ? (
+          <button
+            type="button"
+            style={styles.basicInfoSubsectionEditButton}
+            onClick={onEdit}
+            aria-label={`${title}を編集`}
           >
-            <span style={styles.basicInfoLabel}>{row.label}</span>
-            <span style={styles.basicInfoValueStack}>
-              <span
-                style={
-                  row.valueTone === "numeric"
-                    ? {
-                        ...styles.basicInfoValue,
-                        ...styles.basicInfoValueNumeric,
-                      }
-                    : styles.basicInfoValue
-                }
-              >
-                {row.value}
-              </span>
-              {row.note ? (
-                <span style={styles.basicInfoValueNote}>{row.note}</span>
-              ) : null}
-            </span>
-          </div>
-        ))}
+            {visibleRows.length > 0 ? "編集" : emptyActionLabel}
+          </button>
+        ) : null}
       </div>
+      {visibleRows.length > 0 ? (
+        <div style={styles.basicInfoTable}>
+          {visibleRows.map((row, index) => (
+            <div
+              key={row.label}
+              style={
+                index === 0
+                  ? { ...styles.basicInfoRow, ...styles.basicInfoRowFirst }
+                  : styles.basicInfoRow
+              }
+            >
+              <span style={styles.basicInfoLabel}>{row.label}</span>
+              <span style={styles.basicInfoValueStack}>
+                <span
+                  style={
+                    row.valueTone === "numeric"
+                      ? {
+                          ...styles.basicInfoValue,
+                          ...styles.basicInfoValueNumeric,
+                        }
+                      : styles.basicInfoValue
+                  }
+                >
+                  {row.value}
+                </span>
+                {row.note ? (
+                  <span style={styles.basicInfoValueNote}>{row.note}</span>
+                ) : null}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -7898,11 +8119,11 @@ const styles = {
   },
   basicInfoBlock: {
     display: "grid",
-    gap: "22px",
+    gap: "30px",
   },
   basicProfilePanel: {
     display: "grid",
-    gap: "24px",
+    gap: "30px",
   },
   basicInfoPanel: {
     marginBottom: "22px",
@@ -7912,7 +8133,7 @@ const styles = {
   },
   profileSummaryCard: {
     display: "grid",
-    gridTemplateColumns: "76px minmax(0, 1fr) 44px",
+    gridTemplateColumns: "72px minmax(0, 1fr) auto",
     alignItems: "center",
     gap: "12px",
     minWidth: 0,
@@ -7924,8 +8145,8 @@ const styles = {
       "0 12px 28px -26px color-mix(in srgb, var(--ink) 28%, transparent)",
   },
   profileSummaryPhoto: {
-    width: "76px",
-    height: "76px",
+    width: "72px",
+    height: "72px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -7960,45 +8181,42 @@ const styles = {
     minWidth: 0,
     display: "grid",
     alignContent: "center",
-    gap: "5px",
+    gap: "2px",
   },
-  profileSummaryName: {
+  profileSummaryKicker: {
     minWidth: 0,
     margin: 0,
-    overflow: "hidden",
-    color: CATS_TEXT_STRONG,
-    fontFamily: CATS_UI,
-    fontSize: "21px",
-    fontWeight: 500,
-    lineHeight: 1.25,
-    letterSpacing: CATS_TITLE_TRACKING,
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  profileSummaryDuration: {
-    minWidth: 0,
-    margin: 0,
-    display: "flex",
-    flexWrap: "wrap" as const,
-    alignItems: "baseline",
-    gap: "1px 5px",
     color: CATS_MUTED,
     fontFamily: CATS_UI,
     fontSize: CATS_TINY_SIZE,
     fontWeight: 400,
-    lineHeight: 1.5,
+    lineHeight: 1.45,
     letterSpacing: CATS_META_TRACKING,
   },
   profileSummaryDurationValue: {
-    color: "var(--seal)",
-    fontSize: "15px",
+    minWidth: 0,
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "20px",
     fontWeight: 500,
-    letterSpacing: CATS_BODY_TRACKING,
+    lineHeight: 1.35,
+    letterSpacing: CATS_TITLE_TRACKING,
     whiteSpace: "nowrap",
+  },
+  profileSummaryDurationMissing: {
+    minWidth: 0,
+    margin: 0,
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.55,
+    letterSpacing: CATS_META_TRACKING,
   },
   profileSummaryFacts: {
     minWidth: 0,
-    margin: 0,
+    margin: "3px 0 0",
     overflow: "hidden",
     color: CATS_TEXT,
     fontFamily: CATS_UI,
@@ -8010,7 +8228,6 @@ const styles = {
     whiteSpace: "nowrap",
   },
   profileSummaryEditButton: {
-    width: "44px",
     minWidth: "44px",
     height: "44px",
     minHeight: "44px",
@@ -8018,10 +8235,14 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     padding: 0,
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 42%, transparent)",
-    color: CATS_MUTED,
+    border: "none",
+    background: "transparent",
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: CATS_META_TRACKING,
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
@@ -8074,20 +8295,19 @@ const styles = {
   basicInfoTable: {
     display: "grid",
     gap: 0,
-    borderRadius: "16px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
-    overflow: "hidden",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
     background: "transparent",
   },
   basicInfoSubsection: {
     display: "grid",
-    gap: "8px",
+    gap: "10px",
     minWidth: 0,
   },
   basicInfoSubsectionHeading: {
     display: "flex",
     alignItems: "center",
-    gap: "8px",
+    justifyContent: "space-between",
+    gap: "12px",
     minWidth: 0,
   },
   basicInfoSubsectionTitle: {
@@ -8099,27 +8319,24 @@ const styles = {
     lineHeight: 1.45,
     letterSpacing: CATS_BODY_TRACKING,
   },
-  basicInfoSubsectionIcon: {
-    width: "20px",
-    height: "20px",
+  basicInfoSubsectionEditButton: {
+    minWidth: "44px",
+    minHeight: "44px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+    padding: "0 2px",
+    border: "none",
+    background: "transparent",
     color: "var(--seal)",
-    opacity: 0.82,
-  },
-  basicInfoSubsectionEmpty: {
-    margin: 0,
-    padding: "11px 12px",
-    borderRadius: "var(--radius-lg)",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 25%, transparent)",
-    color: CATS_FAINT,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.45,
+    fontWeight: 500,
+    lineHeight: 1,
     letterSpacing: CATS_META_TRACKING,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   basicInfoRow: {
     display: "grid",
@@ -8128,8 +8345,8 @@ const styles = {
     columnGap: "12px",
     rowGap: "5px",
     minHeight: "auto",
-    padding: "12px 14px",
-    borderTop: "1px solid color-mix(in srgb, var(--line) 42%, transparent)",
+    padding: "13px 2px",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
   },
   basicInfoRowFirst: {
     borderTop: "none",
@@ -8204,6 +8421,71 @@ const styles = {
     lineHeight: 1.9,
     letterSpacing: CATS_BODY_TRACKING,
     whiteSpace: "pre-wrap",
+  },
+  profilePersonalityTable: {
+    display: "grid",
+    gap: 0,
+    borderTop: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
+  },
+  profilePersonalityRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(92px, 40%) minmax(0, 1fr)",
+    alignItems: "baseline",
+    columnGap: "12px",
+    rowGap: "5px",
+    minWidth: 0,
+    padding: "13px 2px",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
+  },
+  profilePersonalityRowFirst: {
+    borderTop: "none",
+  },
+  profileOptionalQuestion: {
+    width: "100%",
+    minHeight: "64px",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto auto",
+    alignItems: "center",
+    gap: "10px",
+    padding: "10px 2px",
+    border: "none",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
+    background: "transparent",
+    color: CATS_TEXT,
+    textAlign: "left" as const,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  profileOptionalQuestionText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "2px",
+  },
+  profileOptionalQuestionLabel: {
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  profileOptionalQuestionHint: {
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  profileOptionalQuestionAction: {
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: CATS_META_TRACKING,
+    whiteSpace: "nowrap",
   },
   basicInfoMissing: {
     color: CATS_FAINT,
@@ -8333,11 +8615,28 @@ const styles = {
   },
   catManageNameBlock: {
     display: "grid",
+    gap: "12px",
     minWidth: 0,
     padding: "12px",
     borderRadius: "var(--radius-lg)",
     border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
     background: "color-mix(in srgb, var(--paper) 42%, transparent)",
+  },
+  profileQuickEditExpandButton: {
+    width: "fit-content",
+    minHeight: "44px",
+    justifySelf: "start",
+    padding: "0 2px",
+    border: "none",
+    background: "transparent",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: CATS_META_TRACKING,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   catManageFormSection: {
     display: "grid",
