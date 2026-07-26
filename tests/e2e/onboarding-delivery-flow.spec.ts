@@ -492,7 +492,7 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
-    await page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }).click();
+    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
@@ -699,7 +699,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }).click();
+    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
@@ -1071,7 +1071,7 @@ test.describe("onboarding delivery flow", () => {
     await routeDelayedOnboardingDelivery(page);
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }).click();
+    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
@@ -1849,10 +1849,10 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_story");
     await expect(
-      page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
+      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }).click();
+    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
@@ -2137,10 +2137,10 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_reels");
     await expect(
-      page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
+      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }).click();
+    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "unknown-source-sleeping.png",
       mimeType: "image/png",
@@ -2165,7 +2165,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=referral&ref=ABC234");
     await expect(
-      page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
+      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
     ).toBeVisible();
     await expect
       .poll(() =>
@@ -2197,12 +2197,12 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
     await expect(page.getByText("紹介リンク")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
+      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
     ).toHaveCount(0);
 
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await expect(
-      page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
+      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
     ).toBeVisible();
     await expect(page.getByText("アプリでつづける")).toHaveCount(0);
   });
@@ -2849,7 +2849,7 @@ test.describe("onboarding delivery flow", () => {
       ),
     ).toHaveCount(1);
     await expect(
-      page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
+      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
     ).toHaveCount(0);
     await page
       .getByRole("button", { name: "Safari／Chromeでひらく" })
@@ -3763,7 +3763,7 @@ test.describe("onboarding delivery flow", () => {
       /\/onboarding\?source=instagram_bio&handoff=restored/,
     );
     await expect(
-      page.getByRole("button", { name: "ねがおの写真を1枚選ぶ" }),
+      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
     ).toBeVisible();
     await expect
       .poll(() =>

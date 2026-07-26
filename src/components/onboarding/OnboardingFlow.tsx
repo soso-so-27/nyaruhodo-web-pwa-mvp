@@ -1841,7 +1841,7 @@ export function OnboardingFlow() {
                   style={styles.onboardingCta}
                   data-onboarding-cta="true"
                 >
-                  ねがおの写真を1枚選ぶ
+                  最初の1枚をえらぶ
                 </AppButton>
               </>
             ) : null}
