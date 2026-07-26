@@ -1687,8 +1687,16 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/home");
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
-    await page.goto("/settings");
-    await page.goto("/home");
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem(
+            "neteruneko_home_install_home_visit_count",
+          ),
+        ),
+      )
+      .toBe("1");
+    await page.reload();
     await expect(page.getByTestId("home-install-invitation")).toBeVisible();
     await page.screenshot({
       path: "artifacts/home-install-ios-invitation.png",
@@ -1721,8 +1729,16 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/home");
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
-    await page.goto("/settings");
-    await page.goto("/home");
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem(
+            "neteruneko_home_install_home_visit_count",
+          ),
+        ),
+      )
+      .toBe("1");
+    await page.reload();
     await expect(page.getByTestId("home-install-invitation")).toBeVisible();
     await page.getByRole("button", { name: "追加のしかたを見る" }).click();
 
