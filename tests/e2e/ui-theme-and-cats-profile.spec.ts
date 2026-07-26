@@ -1117,6 +1117,9 @@ test("shows every populated profile group without hiding saved information", asy
     .boundingBox();
   expect(editButtonBox?.width).toBeGreaterThanOrEqual(44);
   expect(editButtonBox?.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByTestId("cats-basic-info-edit-button")).toHaveText(
+    "基本情報を編集",
+  );
   await expect(page.getByText("家族と共有", { exact: true })).toHaveCount(0);
   await expect(
     page
@@ -1125,7 +1128,13 @@ test("shows every populated profile group without hiding saved information", asy
   ).toBeVisible();
   await expect(page.getByText("2022年9月22日")).toBeVisible();
   await expect(page.getByText("2022年7月10日")).toBeVisible();
-  await expect(page.getByText("この子らしさ")).toBeVisible();
+  const personalitySection = page.getByTestId(
+    "cats-profile-personality-section",
+  );
+  await expect(
+    personalitySection.getByText("この子らしさ", { exact: true }),
+  ).toHaveCSS("font-size", "17px");
+  await expect(personalitySection).toHaveCSS("border-left-width", "2px");
   await expect(page.getByText("たいせつな日", { exact: true })).toHaveCount(0);
   await expect(page.getByText("見た目", { exact: true })).toHaveCount(0);
   await expect(page.getByText("その他のプロフィール", { exact: true })).toHaveCount(
@@ -1438,7 +1447,7 @@ test("closes the basic profile editor instead of returning to cat management", a
   const dialog = page.getByRole("dialog").first();
   await expect(dialog).toBeVisible();
 
-  await dialog.getByRole("button", { name: "もどる" }).click();
+  await dialog.getByRole("button", { name: "キャンセル" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("うちのこを管理")).toHaveCount(0);

@@ -2241,7 +2241,7 @@ export function CatsPage() {
                     onClick={cancelEditingCatName}
                     disabled={isSavingProfile}
                   >
-                    もどる
+                    キャンセル
                   </button>
                   <button
                     type="button"
@@ -3327,7 +3327,7 @@ function CatBasicProfilePanel({
           onClick={onEditBasic}
           aria-label="基本情報を編集"
         >
-          基本情報
+          基本情報を編集
         </button>
       </section>
       <BasicInfoTable
@@ -3493,10 +3493,10 @@ function ProfilePersonalitySection({
   return (
     <section
       data-testid="cats-profile-personality-section"
-      style={styles.basicInfoSubsection}
+      style={styles.profilePersonalitySection}
     >
       <div style={styles.basicInfoSubsectionHeading}>
-        <p style={styles.basicInfoSubsectionTitle}>この子らしさ</p>
+        <p style={styles.profilePersonalityTitle}>この子らしさ</p>
         {visibleRows.length > 0 ? (
           <button
             type="button"
@@ -3526,7 +3526,7 @@ function ProfilePersonalitySection({
               }
             >
               <span style={styles.basicInfoLabel}>{row.label}</span>
-              <span style={styles.basicInfoValue}>{row.value}</span>
+              <span style={styles.profilePersonalityValue}>{row.value}</span>
             </div>
           ))}
         </div>
@@ -8133,9 +8133,11 @@ const styles = {
   },
   profileSummaryCard: {
     display: "grid",
-    gridTemplateColumns: "72px minmax(0, 1fr) auto",
+    gridTemplateColumns: "72px minmax(0, 1fr)",
+    gridTemplateRows: "auto auto",
     alignItems: "center",
-    gap: "12px",
+    columnGap: "12px",
+    rowGap: "2px",
     minWidth: 0,
     padding: "14px",
     borderRadius: "22px",
@@ -8145,6 +8147,7 @@ const styles = {
       "0 12px 28px -26px color-mix(in srgb, var(--ink) 28%, transparent)",
   },
   profileSummaryPhoto: {
+    gridRow: "1 / span 2",
     width: "72px",
     height: "72px",
     display: "flex",
@@ -8228,13 +8231,15 @@ const styles = {
     whiteSpace: "nowrap",
   },
   profileSummaryEditButton: {
+    gridColumn: 2,
+    justifySelf: "start",
     minWidth: "44px",
     height: "44px",
     minHeight: "44px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: 0,
+    padding: "0 2px",
     border: "none",
     background: "transparent",
     color: "var(--seal)",
@@ -8303,6 +8308,14 @@ const styles = {
     gap: "10px",
     minWidth: 0,
   },
+  profilePersonalitySection: {
+    display: "grid",
+    gap: "10px",
+    minWidth: 0,
+    padding: "2px 0 2px 14px",
+    borderLeft:
+      "2px solid color-mix(in srgb, var(--seal) 30%, var(--line))",
+  },
   basicInfoSubsectionHeading: {
     display: "flex",
     alignItems: "center",
@@ -8318,6 +8331,15 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.45,
     letterSpacing: CATS_BODY_TRACKING,
+  },
+  profilePersonalityTitle: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "17px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: CATS_TITLE_TRACKING,
   },
   basicInfoSubsectionEditButton: {
     minWidth: "44px",
@@ -8426,6 +8448,17 @@ const styles = {
     display: "grid",
     gap: 0,
     borderTop: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
+  },
+  profilePersonalityValue: {
+    minWidth: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "16px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+    letterSpacing: CATS_BODY_TRACKING,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
   },
   profilePersonalityRow: {
     display: "grid",
