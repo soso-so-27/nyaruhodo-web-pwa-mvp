@@ -127,6 +127,59 @@ const LAUNCH_FUNNEL_STEPS: readonly EventDefinition[] = [
   },
 ];
 
+const PREVIEW_ONBOARDING_FUNNEL_STEPS: readonly EventDefinition[] = [
+  {
+    key: "preview_intro",
+    label: "オンボを見た",
+    eventNames: ["onboarding_intro_view"],
+  },
+  {
+    key: "preview_started",
+    label: "4匹を用意し始めた",
+    eventNames: ["onboarding_preview_started"],
+  },
+  {
+    key: "preview_shown",
+    label: "4匹を表示した",
+    eventNames: ["onboarding_preview_shown"],
+  },
+  {
+    key: "preview_selected",
+    label: "気になる1匹を選んだ",
+    eventNames: ["onboarding_preview_selected"],
+  },
+  {
+    key: "photo_invite",
+    label: "自分の写真へ進んだ",
+    eventNames: ["onboarding_photo_invite_click"],
+  },
+  {
+    key: "preview_photo_submitted",
+    label: "自分の写真を保存した",
+    eventNames: ["onboarding_photo_submitted"],
+  },
+  {
+    key: "preview_committed",
+    label: "選んだ1匹を確定した",
+    eventNames: ["onboarding_preview_committed"],
+  },
+];
+
+const PREVIEW_ONBOARDING_SKIPPED_METRIC: EventDefinition = {
+  key: "preview_skipped",
+  label: "プレビューを見送った",
+  eventNames: ["onboarding_preview_skipped"],
+};
+
+const PREVIEW_ONBOARDING_COHORT_EVENTS = new Set([
+  "onboarding_preview_started",
+  "onboarding_preview_shown",
+  "onboarding_preview_selected",
+  "onboarding_photo_invite_click",
+  "onboarding_preview_committed",
+  "onboarding_preview_skipped",
+]);
+
 const ONBOARDING_EVENING_RESERVED_METRIC: EventDefinition = {
   key: "evening_reserved",
   label: "次の20時便を予約した",
@@ -319,6 +372,7 @@ export function buildAdminAnalytics(
     ],
     funnel: buildOrderedFunnel(events),
     newOnboardingFunnel: buildOrderedFunnel(events, LAUNCH_FUNNEL_STEPS),
+    previewOnboarding: buildPreviewOnboarding(events),
     returningFunnel: buildReturningFunnel(events),
     handoffFunnel: buildHandoffFunnel(events),
     fourChoiceHealth: buildFourChoiceHealth(events),
@@ -814,6 +868,65 @@ function buildOrderedFunnel(
         startUsers > 0 ? Math.round((users / startUsers) * 1000) / 10 : null,
     };
   });
+}
+
+function buildPreviewOnboarding(events: AdminAnalyticsEvent[]) {
+  const previewActorIds = new Set(
+    events
+      .filter((event) =>
+        PREVIEW_ONBOARDING_COHORT_EVENTS.has(event.event_name),
+      )
+      .map(getActorId)
+      .filter((actorId): actorId is string => Boolean(actorId)),
+  );
+  const previewEvents = events.filter((event) => {
+    const actorId = getActorId(event);
+    return Boolean(actorId && previewActorIds.has(actorId));
+  });
+  const funnel = buildOrderedFunnel(
+    previewEvents,
+    PREVIEW_ONBOARDING_FUNNEL_STEPS,
+  );
+  const selectedDefinition = PREVIEW_ONBOARDING_FUNNEL_STEPS[3]!;
+  const submittedDefinition = PREVIEW_ONBOARDING_FUNNEL_STEPS[5]!;
+  const committedDefinition = PREVIEW_ONBOARDING_FUNNEL_STEPS[6]!;
+  const selectedToSubmitted = buildOrderedFunnel(previewEvents, [
+    selectedDefinition,
+    submittedDefinition,
+  ], getPreviewSubmissionId);
+  const selectedToCommitted = buildOrderedFunnel(previewEvents, [
+    selectedDefinition,
+    committedDefinition,
+  ], getPreviewSubmissionId);
+  const selectedUsers = selectedToSubmitted[0]?.users ?? 0;
+  const photoSubmittedUsers = selectedToSubmitted[1]?.users ?? 0;
+  const committedUsers = selectedToCommitted[1]?.users ?? 0;
+
+  return {
+    funnel,
+    skipped: buildMetric(
+      previewEvents,
+      PREVIEW_ONBOARDING_SKIPPED_METRIC,
+    ),
+    conversion: {
+      selectedUsers,
+      photoSubmittedUsers,
+      committedUsers,
+      selectedToPhotoSubmittedRate: calculateCohortRate(
+        photoSubmittedUsers,
+        selectedUsers,
+      ),
+      selectedToCommittedRate: calculateCohortRate(
+        committedUsers,
+        selectedUsers,
+      ),
+    },
+  };
+}
+
+function getPreviewSubmissionId(event: AdminAnalyticsEvent) {
+  const submissionId = event.submission_id?.trim();
+  return submissionId ? `submission:${submissionId}` : null;
 }
 
 function buildReturningFunnel(events: AdminAnalyticsEvent[]) {

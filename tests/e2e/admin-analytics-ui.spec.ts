@@ -35,6 +35,25 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
     "true",
   );
   await expect(page.getByRole("heading", { name: "新規オンボ" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "選択先行オンボ" }),
+  ).toBeVisible();
+  const previewOnboardingSection = page.getByLabel("選択先行オンボ");
+  await expect(
+    previewOnboardingSection.getByText("気になる1匹を選んだ"),
+  ).toBeVisible();
+  await expect(
+    previewOnboardingSection.getByText("1匹選択 → 自分の写真を保存"),
+  ).toBeVisible();
+  await expect(
+    previewOnboardingSection.getByText("2/3 ID", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    previewOnboardingSection.getByText("66.7%", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    previewOnboardingSection.getByText("プレビューを見送った"),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "初回夜便" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "引き継ぎ・復元" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "今夜のねこだより" })).toBeVisible();
@@ -93,6 +112,15 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
           cohorts: 2,
         }),
       ]),
+    },
+    previewOnboarding: {
+      conversion: {
+        selectedUsers: 3,
+        photoSubmittedUsers: 2,
+        committedUsers: 1,
+        selectedToPhotoSubmittedRate: 66.7,
+        selectedToCommittedRate: 33.3,
+      },
     },
     journeyCases: [
       expect.objectContaining({
@@ -221,6 +249,64 @@ const mockAnalyticsResponse = {
       fromStartRate: 90,
     },
   ],
+  previewOnboarding: {
+    funnel: [
+      {
+        ...metric("preview_intro", "オンボを見た", 5),
+        previousUsers: null,
+        fromPreviousRate: null,
+        fromStartRate: 100,
+      },
+      {
+        ...metric("preview_started", "4匹を用意し始めた", 5),
+        previousUsers: 5,
+        fromPreviousRate: 100,
+        fromStartRate: 100,
+      },
+      {
+        ...metric("preview_shown", "4匹を表示した", 4),
+        previousUsers: 5,
+        fromPreviousRate: 80,
+        fromStartRate: 80,
+      },
+      {
+        ...metric("preview_selected", "気になる1匹を選んだ", 3),
+        previousUsers: 4,
+        fromPreviousRate: 75,
+        fromStartRate: 60,
+      },
+      {
+        ...metric("photo_invite", "自分の写真へ進んだ", 3),
+        previousUsers: 3,
+        fromPreviousRate: 100,
+        fromStartRate: 60,
+      },
+      {
+        ...metric(
+          "preview_photo_submitted",
+          "自分の写真を保存した",
+          2,
+        ),
+        previousUsers: 3,
+        fromPreviousRate: 66.7,
+        fromStartRate: 40,
+      },
+      {
+        ...metric("preview_committed", "選んだ1匹を確定した", 1),
+        previousUsers: 2,
+        fromPreviousRate: 50,
+        fromStartRate: 20,
+      },
+    ],
+    skipped: metric("preview_skipped", "プレビューを見送った", 1),
+    conversion: {
+      selectedUsers: 3,
+      photoSubmittedUsers: 2,
+      committedUsers: 1,
+      selectedToPhotoSubmittedRate: 66.7,
+      selectedToCommittedRate: 33.3,
+    },
+  },
   sourceBreakdown: [
     {
       source: "instagram_bio",

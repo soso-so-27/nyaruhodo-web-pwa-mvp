@@ -126,7 +126,7 @@ test.describe("settings page organization", () => {
     await expect(page.getByText("古い画面が残るとき")).toBeHidden();
     await expect(page.getByText("アプリのバージョン", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /ねこだよりに送る写真/ }),
+      page.getByRole("link", { name: /ほかのおうちへ送る写真/ }),
     ).toHaveCount(0);
 
     const accountLabel = page.getByText("アカウント", { exact: true });

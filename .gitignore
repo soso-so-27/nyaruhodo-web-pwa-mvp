@@ -6,6 +6,7 @@ tsconfig.tsbuildinfo
 supabase/.temp/
 playwright-report/
 test-results/
+artifacts/
 scripts/fonts/src/
 scripts/fonts/.build/
 .vercel

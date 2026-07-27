@@ -1043,7 +1043,7 @@ export function SettingsPage() {
                   </AppButton>
                   <div style={styles.divider} />
                   <p style={styles.storageNote}>
-                    本番前の確認用です。ここで追加した写真は、ねこだよりの候補になります。
+                    本番前の確認用です。ここで追加した写真は、ほかのおうちへ届く候補になります。
                   </p>
                 </>
               ) : null}

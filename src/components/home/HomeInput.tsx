@@ -148,6 +148,7 @@ import {
   type AppIconName,
 } from "../ui/AppIcons";
 import { AppButton } from "../ui/AppButton";
+import { CatChoicePreview } from "../ui/CatChoicePreview";
 import {
   getStoragePhotoSignedUrl,
   StoredPhotoImage,
@@ -4097,6 +4098,8 @@ export function EveningDeliveryFourChoice({
   const [skipError, setSkipError] = useState(false);
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
   const [reportingPhoto, setReportingPhoto] = useState<ExchangePhoto | null>(null);
+  const [previewPhotoId, setPreviewPhotoId] = useState<string | null>(null);
+  const previewPhotoIdRef = useRef<string | null>(null);
   const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(
     () => readBlockedExchangePhotoIds(),
   );
@@ -4106,6 +4109,8 @@ export function EveningDeliveryFourChoice({
   const [isClosing, setIsClosing] = useState(false);
   const selectedPhoto =
     photos.find((photo) => photo.id === selectedPhotoId) ?? null;
+  const previewPhoto =
+    photos.find((photo) => photo.id === previewPhotoId) ?? null;
   const targetOwnCatId =
     state.targetPhoto?.ownerCatId ??
     state.targetPhoto?.catId ??
@@ -4134,6 +4139,16 @@ export function EveningDeliveryFourChoice({
         photo.sourcePhotoId && reportedPhotoIds.has(photo.sourcePhotoId),
       )
     );
+  }
+
+  function showPhotoPreview(photoId: string) {
+    previewPhotoIdRef.current = photoId;
+    setPreviewPhotoId(photoId);
+  }
+
+  function closePhotoPreview() {
+    previewPhotoIdRef.current = null;
+    setPreviewPhotoId(null);
   }
 
   function prepareTargetOwnCatRecord() {
@@ -4222,6 +4237,44 @@ export function EveningDeliveryFourChoice({
     }
   }
 
+  function openPhotoPreview(
+    photo: ExchangePhoto,
+    position: number,
+    source: "grid" | "preview_navigation" = "grid",
+  ) {
+    if (isUnavailablePhoto(photo) || isSaving || savedPhoto) {
+      return;
+    }
+
+    setSaveError(false);
+    setSkipError(false);
+    showPhotoPreview(photo.id);
+    if (analyticsEnabled) {
+      trackProductEvent("evening_delivery_choice_previewed", {
+        delivery_date_key: state.dateKey,
+        ...choiceEventProperties,
+        previewed_position: position,
+        photo_id: photo.id,
+        preview_source: source,
+      });
+    }
+  }
+
+  function handleChoicePhotoError(photo: ExchangePhoto) {
+    if (selectedPhotoId === photo.id) {
+      setSelectedPhotoId(null);
+      onDraftChange(null);
+    }
+    if (previewPhotoId === photo.id) {
+      closePhotoPreview();
+    }
+    setFailedPhotoIds((current) => {
+      const next = new Set(current);
+      next.add(photo.id);
+      return next;
+    });
+  }
+
   function moveChoiceFocus(currentIndex: number, direction: -1 | 1) {
     for (let offset = 1; offset <= photos.length; offset += 1) {
       const nextIndex =
@@ -4230,27 +4283,28 @@ export function EveningDeliveryFourChoice({
       if (!nextPhoto || isUnavailablePhoto(nextPhoto)) {
         continue;
       }
-      choosePhoto(nextPhoto, nextIndex + 1);
       optionRefs.current[nextIndex]?.focus();
       return;
     }
   }
 
-  async function saveChoice() {
-    if (!selectedPhoto || isUnavailablePhoto(selectedPhoto) || isSaving) {
+  async function saveChoice(photoOverride?: ExchangePhoto) {
+    const photoToSave = photoOverride ?? selectedPhoto;
+    if (!photoToSave || isUnavailablePhoto(photoToSave) || isSaving) {
       return;
     }
 
     setIsSaving(true);
     setSaveError(false);
     try {
-      const result = await onChoose(selectedPhoto);
+      const result = await onChoose(photoToSave);
       if (!result) {
         setSaveError(true);
         return;
       }
       if (result.kind === "kept") {
         resolutionRef.current = "saved";
+        closePhotoPreview();
         setSavedPhoto(result.photo);
       } else {
         resolutionRef.current = "skipped";
@@ -4261,6 +4315,17 @@ export function EveningDeliveryFourChoice({
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function confirmPreviewChoice() {
+    if (!previewPhoto || isUnavailablePhoto(previewPhoto)) {
+      return;
+    }
+
+    const position =
+      photos.findIndex((photo) => photo.id === previewPhoto.id) + 1;
+    choosePhoto(previewPhoto, position);
+    void saveChoice(previewPhoto);
   }
 
   async function skipChoice() {
@@ -4365,6 +4430,16 @@ export function EveningDeliveryFourChoice({
         ignoreNextPopRef.current = false;
         return;
       }
+      if (previewPhotoIdRef.current) {
+        closePhotoPreview();
+        window.history.pushState(
+          { neterunekoEveningFourChoice: true },
+          "",
+          window.location.href,
+        );
+        pushedHistoryRef.current = true;
+        return;
+      }
       pushedHistoryRef.current = false;
       requestCloseRef.current(false);
     }
@@ -4385,6 +4460,8 @@ export function EveningDeliveryFourChoice({
       style={styles.eveningOpeningOverlay}
       role="dialog"
       aria-modal="true"
+      aria-hidden={previewPhoto ? true : undefined}
+      inert={previewPhoto ? true : undefined}
       aria-labelledby="evening-four-choice-title"
       onClick={() => requestClose()}
       onKeyDown={(event) => {
@@ -4452,7 +4529,7 @@ export function EveningDeliveryFourChoice({
                 />
               </div>
               <p style={styles.eveningFourSavedCopy}>
-                この写真を「ねこだより」に残しました
+                この猫を「ねこだより」に保存しました
               </p>
               <p
                 data-testid="evening-four-choice-day-bridge"
@@ -4480,11 +4557,11 @@ export function EveningDeliveryFourChoice({
                 data-testid="evening-four-choice-lead"
                 style={styles.eveningFourChoiceLead}
               >
-                「ねこだより」に残す1枚をえらんでください
+                「ねこだより」に保存する猫を選んでください
               </p>
               <div
-                role="radiogroup"
-                aria-label="「ねこだより」に残す写真をえらぶ"
+                role="group"
+                aria-label="届いた猫を大きく見る"
                 style={styles.eveningFourChoiceGrid}
               >
                 {photos.map((photo, index) => {
@@ -4504,13 +4581,8 @@ export function EveningDeliveryFourChoice({
                         optionRefs.current[index] = element;
                       }}
                       type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      aria-label={`${index + 1}枚目の写真をえらぶ`}
+                      aria-label={`${index + 1}匹目の猫を大きく見る`}
                       disabled={isUnavailable || isSaving || isSkipping}
-                      tabIndex={
-                        isSelected || (!selectedPhotoId && index === 0) ? 0 : -1
-                      }
                       data-testid="evening-four-choice-option"
                       data-photo-id={photo.id}
                       data-position={index + 1}
@@ -4519,7 +4591,7 @@ export function EveningDeliveryFourChoice({
                         ...styles.eveningFourChoiceOption,
                         ...(isSelected ? styles.eveningFourChoiceOptionSelected : {}),
                       }}
-                      onClick={() => choosePhoto(photo, index + 1)}
+                      onClick={() => openPhotoPreview(photo, index + 1)}
                       onKeyDown={(event) => {
                         if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
                           event.preventDefault();
@@ -4539,17 +4611,7 @@ export function EveningDeliveryFourChoice({
                         alt=""
                         storageVariant={getPhotoStorageVariant(photo, "list")}
                         loading="eager"
-                        onError={() => {
-                          if (selectedPhotoId === photo.id) {
-                            setSelectedPhotoId(null);
-                            onDraftChange(null);
-                          }
-                          setFailedPhotoIds((current) => {
-                            const next = new Set(current);
-                            next.add(photo.id);
-                            return next;
-                          });
-                        }}
+                        onError={() => handleChoicePhotoError(photo)}
                         style={styles.eveningFourChoicePhoto}
                       />
                       {isUnavailable || isSelected ? (
@@ -4573,7 +4635,77 @@ export function EveningDeliveryFourChoice({
                   );
                 })}
               </div>
-              {selectedPhoto ? (
+              {previewPhoto && !savedPhoto ? (
+                <CatChoicePreview
+                  items={photos.map((photo) => ({
+                    id: photo.id,
+                    disabled: isUnavailablePhoto(photo),
+                  }))}
+                  activeId={previewPhoto.id}
+                  onActiveChange={(photoId, index) => {
+                    const photo = photos[index];
+                    if (!photo || photo.id !== photoId) {
+                      return;
+                    }
+                    openPhotoPreview(
+                      photo,
+                      index + 1,
+                      "preview_navigation",
+                    );
+                  }}
+                  onBack={closePhotoPreview}
+                  onConfirm={confirmPreviewChoice}
+                  renderPhoto={(item, index, variant) => {
+                    const photo = photos[index];
+                    if (!photo || photo.id !== item.id) {
+                      return null;
+                    }
+                    return (
+                      <StoredPhotoImage
+                        src={getPhotoDetailSrc(photo)}
+                        fallbackSrcs={getPhotoFallbackSrcs(photo)}
+                        alt={`${index + 1}匹目の猫`}
+                        storageVariant={getPhotoStorageVariant(
+                          photo,
+                          variant === "main" ? "detail" : "list",
+                        )}
+                        loading="eager"
+                        onStorageDataUrl={(dataUrl) =>
+                          onStorageDataUrl(photo, dataUrl)
+                        }
+                        onError={() => handleChoicePhotoError(photo)}
+                        style={
+                          variant === "main"
+                            ? styles.eveningFourChoicePreviewPhoto
+                            : styles.eveningFourChoicePreviewThumbnail
+                        }
+                      />
+                    );
+                  }}
+                  confirmLabel="この猫を保存"
+                  confirmBusyLabel="保存しています…"
+                  confirmDisabled={
+                    !previewPhoto ||
+                    isUnavailablePhoto(previewPhoto) ||
+                    isSaving ||
+                    isSkipping
+                  }
+                  isConfirming={isSaving}
+                  errorMessage={
+                    saveError
+                      ? "選んだ猫を「ねこだより」に保存できませんでした。もう一度お試しください。"
+                      : ""
+                  }
+                  onSecondaryAction={() => {
+                    closePhotoPreview();
+                    setReportingPhoto(previewPhoto);
+                  }}
+                  secondaryActionLabel="運営に報告"
+                  testId="evening-four-choice-preview"
+                  confirmTestId="evening-four-choice-save"
+                />
+              ) : null}
+              {selectedPhoto && !previewPhoto ? (
                 <button
                   type="button"
                   data-testid="evening-four-choice-report"
@@ -4585,7 +4717,7 @@ export function EveningDeliveryFourChoice({
               ) : null}
               {saveError ? (
                 <p role="alert" style={styles.eveningFourChoiceError}>
-                  選んだ写真を「ねこだより」に残せませんでした。もう一度お試しください。
+                  選んだ猫を「ねこだより」に保存できませんでした。もう一度お試しください。
                 </p>
               ) : null}
               {skipError ? (
@@ -4593,28 +4725,30 @@ export function EveningDeliveryFourChoice({
                   保存しない処理に失敗しました。もう一度お試しください。
                 </p>
               ) : null}
-              <button
-                type="button"
-                data-testid="evening-four-choice-save"
-                disabled={
-                  !selectedPhoto ||
-                  isUnavailablePhoto(selectedPhoto) ||
-                  isSaving ||
-                  isSkipping
-                }
-                onClick={() => void saveChoice()}
-                style={{
-                  ...styles.eveningFourChoiceSave,
-                  ...(!selectedPhoto ||
-                  isUnavailablePhoto(selectedPhoto) ||
-                  isSaving ||
-                  isSkipping
-                    ? styles.eveningFourChoiceSaveDisabled
-                    : {}),
-                }}
-              >
-                {isSaving ? "保存しています…" : "この1枚を保存"}
-              </button>
+              {!previewPhoto ? (
+                <button
+                  type="button"
+                  data-testid="evening-four-choice-save"
+                  disabled={
+                    !selectedPhoto ||
+                    isUnavailablePhoto(selectedPhoto) ||
+                    isSaving ||
+                    isSkipping
+                  }
+                  onClick={() => void saveChoice()}
+                  style={{
+                    ...styles.eveningFourChoiceSave,
+                    ...(!selectedPhoto ||
+                    isUnavailablePhoto(selectedPhoto) ||
+                    isSaving ||
+                    isSkipping
+                      ? styles.eveningFourChoiceSaveDisabled
+                      : {}),
+                  }}
+                >
+                  {isSaving ? "保存しています…" : "この猫を保存"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 data-testid="evening-four-choice-skip"
@@ -4624,7 +4758,7 @@ export function EveningDeliveryFourChoice({
               >
                 {isSkipping
                   ? "処理しています…"
-                  : "今回はどの写真も保存しない"}
+                  : "今回はどの猫も保存しない"}
               </button>
             </>
           )}
@@ -4919,7 +5053,7 @@ function SleepingSafetySheet({
       <div style={styles.sleepingSafetyBody}>
         <div style={styles.sleepingSafetyList}>
           <p style={styles.sleepingSafetyItem}>
-            <span style={styles.sleepingSafetyLine}>ねこだよりにする写真は、運営確認後</span>
+            <span style={styles.sleepingSafetyLine}>ほかのおうちへ送る写真は、運営確認後</span>
             <span style={styles.sleepingSafetyLine}>ほかの利用者へとどくことがあります。</span>
           </p>
           <p style={styles.sleepingSafetyItem}>
@@ -5219,13 +5353,13 @@ function ExchangeSharePermissionSheet({
         {isExchangeTargetAvailable ? (
           <div style={styles.exchangeDecisionBlock}>
             <p style={styles.exchangeDecisionLabel}>
-              ねこだよりに送りますか？
+              この写真をほかのおうちへ送りますか？
             </p>
             <div
               data-exchange-share-mode-group=""
               style={styles.exchangeModeGroup}
               role="group"
-              aria-label="ねこだより"
+              aria-label="写真を送る範囲"
             >
               <button
                 type="button"
@@ -9104,6 +9238,19 @@ const styles = {
       "0 0 0 2px color-mix(in srgb, var(--seal) 18%, transparent), 0 8px 20px rgba(70, 50, 30, 0.18)",
   },
   eveningFourChoicePhoto: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
+  },
+  eveningFourChoicePreviewPhoto: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "contain",
+    background: "transparent",
+  },
+  eveningFourChoicePreviewThumbnail: {
     width: "100%",
     height: "100%",
     display: "block",

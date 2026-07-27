@@ -8,6 +8,7 @@ import {
 } from "../../../../lib/onboarding/journeyContract";
 import { isOnboardingResumeToken } from "../../../../lib/onboarding/submissionContract";
 import { buildOnboardingJourneyDeliveryId } from "../../../../lib/server/onboardingDeliveryBundle";
+import { readOnboardingSubmission } from "../../../../lib/server/onboardingSubmissionLedger";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +83,45 @@ export async function POST(request: Request) {
     return choiceError("server_unavailable", 503);
   }
 
+  const submission = await readOnboardingSubmission({
+    resumeToken,
+    submissionId,
+    supabase,
+  });
+  if (!submission.ok) {
+    return choiceError(
+      submission.error === "store_failed"
+        ? "choice_unavailable"
+        : "onboarding_submission_forbidden",
+      submission.error === "store_failed" ? 503 : 403,
+    );
+  }
+
+  if (
+    !submission.status.ownPhotoId ||
+    !["submitted", "delivered", "opened", "completed"].includes(
+      submission.status.stage,
+    )
+  ) {
+    return choiceError("onboarding_photo_required", 409);
+  }
+
+  const { data: ownMoment, error: ownMomentError } = await supabase
+    .from("cat_moments")
+    .select("id")
+    .eq("local_moment_id", submission.status.ownPhotoId)
+    .eq("visibility", "shared")
+    .eq("delivery_status", "available")
+    .contains("metadata", { onboarding_submission_id: submissionId })
+    .limit(1)
+    .maybeSingle();
+  if (ownMomentError) {
+    return choiceError("choice_unavailable", 503);
+  }
+  if (!ownMoment) {
+    return choiceError("onboarding_photo_required", 409);
+  }
+
   const { data, error } = await supabase.rpc(
     "finalize_onboarding_delivery_choice",
     {
@@ -96,6 +136,12 @@ export async function POST(request: Request) {
 
   if (error) {
     const message = error.message ?? "";
+    if (
+      error.code === "23514" &&
+      /onboarding_choice_requires_(?:own|shared)_photo/i.test(message)
+    ) {
+      return choiceError("onboarding_photo_required", 409);
+    }
     if (/onboarding_submission_forbidden/i.test(message)) {
       return choiceError("onboarding_submission_forbidden", 403);
     }

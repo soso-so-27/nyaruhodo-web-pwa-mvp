@@ -19,7 +19,11 @@ export function hasOnboardingCompletionMarker() {
 export function hasCompletedOnboardingEvidence() {
   const progress = readOnboardingProgress();
 
-  if (progress?.stage === "album_created" || progress?.stage === "opened") {
+  if (
+    progress?.stage === "album_created" ||
+    progress?.stage === "opened" ||
+    progress?.stage === "skipped"
+  ) {
     return true;
   }
 

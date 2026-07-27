@@ -294,6 +294,72 @@ test("changes sharing only from a sleeping photo detail", async ({ page }) => {
   await expect(page.getByTestId("cats-photo-delivery-setting")).toHaveCount(0);
 });
 
+test("shows private non-numeric feedback on an owner's sleeping photo", async ({
+  page,
+}) => {
+  const now = Date.parse("2026-07-23T20:30:00+09:00");
+  const selectedMomentId = "11111111-1111-4111-8111-111111111111";
+  const deliveredMomentId = "22222222-2222-4222-8222-222222222222";
+
+  await page.route("**/api/cat-moment-feedback", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        feedback: [
+          {
+            sourceMomentId: selectedMomentId,
+            localPhotoId: "owner-selected-photo",
+            state: "selected",
+          },
+          {
+            sourceMomentId: deliveredMomentId,
+            localPhotoId: "owner-delivered-photo",
+            state: "delivered",
+          },
+        ],
+      }),
+    });
+  });
+  await seedCatsPhotoTabState(page, {
+    now,
+    sleepingPhotos: [
+      {
+        id: "owner-selected-photo",
+        sourceMomentId: selectedMomentId,
+        createdAt: Date.parse("2026-07-23T19:00:00+09:00"),
+        shared: true,
+      },
+      {
+        id: "owner-delivered-photo",
+        sourceMomentId: deliveredMomentId,
+        createdAt: Date.parse("2026-07-22T19:00:00+09:00"),
+        shared: true,
+      },
+    ],
+    galleryPhotos: [],
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const grid = page.getByTestId("cats-lens-photo-grid");
+  await expect(grid.getByTestId("cats-photo-selected-mark")).toHaveCount(1);
+  await grid.getByRole("button", { name: "7/23のむぎ" }).click();
+  await expect(page.getByTestId("cats-photo-owner-feedback")).toHaveText(
+    "どこかのおうちの ねこだよりに残りました。",
+  );
+  await expect(page.getByTestId("cats-photo-owner-feedback")).not.toContainText(
+    /\d/,
+  );
+
+  await page.getByTestId("cats-photo-viewer-close").click();
+  await grid.getByRole("button", { name: "7/22のむぎ" }).click();
+  await expect(page.getByTestId("cats-photo-owner-feedback")).toHaveText(
+    "運営確認後、ほかのおうちへ届く候補です。",
+  );
+});
+
 for (const viewport of [
   { width: 320, height: 568, label: "small mobile" },
   { width: 390, height: 844, label: "standard mobile" },
@@ -1734,6 +1800,7 @@ async function seedCatsPhotoTabState(
       id: string;
       createdAt: number;
       shared?: boolean;
+      sourceMomentId?: string;
     }>;
     galleryPhotos: Array<{ id: string; createdAt: number }>;
     src?: string;

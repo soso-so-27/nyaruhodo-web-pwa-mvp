@@ -1396,7 +1396,7 @@ function DeskPhotoViewer({
               <p style={deskStyles.viewerOwnKicker}>きょうの ねがお</p>
               <p style={deskStyles.viewerOwnNote}>
                 {viewerPhoto.kind === "own" && viewerPhoto.photo.shared
-                  ? "「うちのこ」に保存しています。運営確認後、ねこだよりの候補になります"
+                  ? "「うちのこ」に保存しています。運営確認後、ほかのおうちへ届く候補になります"
                   : "「うちのこ」に自分だけで保存しています"}
               </p>
             </div>

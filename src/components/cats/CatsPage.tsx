@@ -64,7 +64,14 @@ import {
   getJstDateKey,
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
-import { readTodayOnboardingProgress } from "../../lib/onboarding/progress";
+import {
+  readOnboardingProgress,
+  readTodayOnboardingProgress,
+} from "../../lib/onboarding/progress";
+import {
+  readSourceOwnerFeedback,
+  type SourceOwnerFeedbackState,
+} from "../../lib/sourceOwnerFeedback";
 import {
   readCatMomentsForCat,
   type CatMomentForCat,
@@ -135,6 +142,7 @@ type LensPhoto = {
   ownerCatId?: string;
   sourceMomentId?: string;
   shareManageable?: boolean;
+  ownerFeedback?: SourceOwnerFeedbackState;
 };
 type DeleteCatTarget = {
   profile: CatProfile;
@@ -157,6 +165,7 @@ type RecordPhotoPreview = {
   ownerCatId?: string;
   sourceMomentId?: string;
   shareManageable?: boolean;
+  ownerFeedback?: SourceOwnerFeedbackState;
 };
 
 const CATS_TEXT = "var(--ink)";
@@ -277,6 +286,9 @@ export function CatsPage() {
   >({});
   const [hasRemoteLensPhotosLoaded, setHasRemoteLensPhotosLoaded] =
     useState(false);
+  const [sourceOwnerFeedbackByKey, setSourceOwnerFeedbackByKey] = useState<
+    Record<string, SourceOwnerFeedbackState>
+  >({});
   const [selectedRecordPhoto, setSelectedRecordPhoto] =
     useState<RecordPhotoPreview | null>(null);
   const [pendingPhotoSharingId, setPendingPhotoSharingId] = useState<
@@ -343,10 +355,25 @@ export function CatsPage() {
     () => createLocalLensPhotos(catProfiles),
     [catProfiles, galleryRefreshTick],
   );
-  const lensPhotosByCat = mergeLensPhotoSources(
-    localLensPhotos.byCat,
-    remoteLensPhotosByCat,
-    hasRemoteLensPhotosLoaded,
+  const feedbackSourceMomentIds = useMemo(
+    () =>
+      uniqueStrings(
+        [
+          ...localLensPhotos.all,
+          ...Object.values(remoteLensPhotosByCat).flat(),
+        ]
+          .map((photo) => photo.sourceMomentId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    [localLensPhotos.all, remoteLensPhotosByCat],
+  );
+  const lensPhotosByCat = applySourceOwnerFeedback(
+    mergeLensPhotoSources(
+      localLensPhotos.byCat,
+      remoteLensPhotosByCat,
+      hasRemoteLensPhotosLoaded,
+    ),
+    sourceOwnerFeedbackByKey,
   );
   const activeCatLensPhotos = activeCatId
     ? (lensPhotosByCat[activeCatId] ?? [])
@@ -432,13 +459,21 @@ export function CatsPage() {
   }, [activeCatId, activeLens, activeSection]);
   const allLensPhotos = useMemo(
     () =>
-      mergeAllLensPhotos(
-        hasRemoteLensPhotosLoaded
-          ? Object.values(remoteLensPhotosByCat).flat()
-          : [],
-        localLensPhotos.all,
+      applySourceOwnerFeedbackToPhotos(
+        mergeAllLensPhotos(
+          hasRemoteLensPhotosLoaded
+            ? Object.values(remoteLensPhotosByCat).flat()
+            : [],
+          localLensPhotos.all,
+        ),
+        sourceOwnerFeedbackByKey,
       ),
-    [hasRemoteLensPhotosLoaded, localLensPhotos.all, remoteLensPhotosByCat],
+    [
+      hasRemoteLensPhotosLoaded,
+      localLensPhotos.all,
+      remoteLensPhotosByCat,
+      sourceOwnerFeedbackByKey,
+    ],
   );
   const photoSheetPhotos =
     photoSheetLens === "all" ? allLensPhotos : activeCatLensPhotos;
@@ -628,6 +663,67 @@ export function CatsPage() {
       isCancelled = true;
     };
   }, [catProfiles]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const progress = readOnboardingProgress();
+    const onboarding =
+      progress?.resumeToken && progress.submissionId
+        ? {
+            submissionId: progress.submissionId,
+            resumeToken: progress.resumeToken,
+          }
+        : null;
+
+    if (feedbackSourceMomentIds.length === 0 && !onboarding) {
+      setSourceOwnerFeedbackByKey({});
+      return;
+    }
+
+    void readSourceOwnerFeedback({
+      sourceMomentIds: feedbackSourceMomentIds,
+      onboarding,
+    }).then((feedback) => {
+      if (isCancelled) {
+        return;
+      }
+
+      const nextFeedback: Record<string, SourceOwnerFeedbackState> = {};
+      for (const item of feedback) {
+        mergeSourceOwnerFeedback(
+          nextFeedback,
+          sourceOwnerFeedbackMomentKey(item.sourceMomentId),
+          item.state,
+        );
+        mergeSourceOwnerFeedback(
+          nextFeedback,
+          sourceOwnerFeedbackLocalKey(item.localPhotoId),
+          item.state,
+        );
+      }
+      setSourceOwnerFeedbackByKey(nextFeedback);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [clientNow, feedbackSourceMomentIds]);
+
+  useEffect(() => {
+    setSelectedRecordPhoto((current) => {
+      if (!current?.id) {
+        return current;
+      }
+
+      const ownerFeedback = resolveSourceOwnerFeedback(
+        current,
+        sourceOwnerFeedbackByKey,
+      );
+      return ownerFeedback === current.ownerFeedback
+        ? current
+        : { ...current, ownerFeedback };
+    });
+  }, [sourceOwnerFeedbackByKey]);
 
   useEffect(() => {
     if (
@@ -4125,6 +4221,17 @@ function LensPhotoGrid({
               frameStyle={styles.lensPhotoTileFrame}
               imageStyle={styles.lensPhotoTile}
             />
+            {photo.ownerFeedback === "selected" ? (
+              <span
+                role="img"
+                aria-label="どこかのおうちの ねこだよりに残った写真"
+                title="どこかのおうちの ねこだよりに残りました"
+                data-testid="cats-photo-selected-mark"
+                style={styles.lensPhotoSelectedMark}
+              >
+                <AppIcon name="mail" size={13} />
+              </span>
+            ) : null}
           </div>
           <span style={styles.lensPhotoDate}>
             {formatLensPhotoGridDate(photo.createdAt)}
@@ -5166,6 +5273,16 @@ function PhotoFullscreenViewer({
                     }}
                   />
                 </div>
+                {photo.ownerFeedback ? (
+                  <p
+                    style={styles.photoViewerOwnerFeedback}
+                    data-testid="cats-photo-owner-feedback"
+                  >
+                    {photo.ownerFeedback === "selected"
+                      ? "どこかのおうちの ねこだよりに残りました。"
+                      : "運営確認後、ほかのおうちへ届く候補です。"}
+                  </p>
+                ) : null}
                 <p style={styles.photoViewerSharingNote}>
                   変更はこれから届く分に反映されます。すでに届いた写真は、相手の記録に残ります。
                 </p>
@@ -5529,6 +5646,68 @@ function mergeAllLensPhotos(
   return dedupeLensPhotos([...remotePhotos, ...localPhotos]);
 }
 
+function applySourceOwnerFeedback(
+  photosByCat: Record<string, LensPhoto[]>,
+  feedbackByKey: Record<string, SourceOwnerFeedbackState>,
+) {
+  return Object.fromEntries(
+    Object.entries(photosByCat).map(([catId, photos]) => [
+      catId,
+      applySourceOwnerFeedbackToPhotos(photos, feedbackByKey),
+    ]),
+  );
+}
+
+function applySourceOwnerFeedbackToPhotos(
+  photos: LensPhoto[],
+  feedbackByKey: Record<string, SourceOwnerFeedbackState>,
+) {
+  return photos.map((photo) => {
+    const ownerFeedback = resolveSourceOwnerFeedback(photo, feedbackByKey);
+    return ownerFeedback === photo.ownerFeedback
+      ? photo
+      : { ...photo, ownerFeedback };
+  });
+}
+
+function resolveSourceOwnerFeedback(
+  photo: {
+    id?: string;
+    sourceMomentId?: string;
+    ownerFeedback?: SourceOwnerFeedbackState;
+  },
+  feedbackByKey: Record<string, SourceOwnerFeedbackState>,
+) {
+  return preferSourceOwnerFeedback(
+    photo.sourceMomentId
+      ? feedbackByKey[sourceOwnerFeedbackMomentKey(photo.sourceMomentId)]
+      : undefined,
+    (photo.id
+      ? feedbackByKey[sourceOwnerFeedbackLocalKey(photo.id)]
+      : undefined) ??
+      photo.ownerFeedback,
+  );
+}
+
+function sourceOwnerFeedbackMomentKey(sourceMomentId: string) {
+  return `moment:${sourceMomentId}`;
+}
+
+function sourceOwnerFeedbackLocalKey(localPhotoId: string) {
+  return `local:${localPhotoId}`;
+}
+
+function mergeSourceOwnerFeedback(
+  feedbackByKey: Record<string, SourceOwnerFeedbackState>,
+  key: string,
+  state: SourceOwnerFeedbackState,
+) {
+  feedbackByKey[key] = preferSourceOwnerFeedback(
+    feedbackByKey[key],
+    state,
+  ) as SourceOwnerFeedbackState;
+}
+
 function dedupeLensPhotos(photos: LensPhoto[]) {
   const photoMap = new Map<string, LensPhoto>();
 
@@ -5564,6 +5743,10 @@ function dedupeLensPhotos(photos: LensPhoto[]) {
       sourceMomentId: existing.sourceMomentId ?? photo.sourceMomentId,
       shareManageable:
         existing.shareManageable === true || photo.shareManageable === true,
+      ownerFeedback: preferSourceOwnerFeedback(
+        existing.ownerFeedback,
+        photo.ownerFeedback,
+      ),
     });
   }
 
@@ -5581,6 +5764,15 @@ function preferPhotoVariant(
   incoming: string | undefined,
 ) {
   return existing || incoming;
+}
+
+function preferSourceOwnerFeedback(
+  existing: SourceOwnerFeedbackState | undefined,
+  incoming: SourceOwnerFeedbackState | undefined,
+): SourceOwnerFeedbackState | undefined {
+  return existing === "selected" || incoming === "selected"
+    ? "selected"
+    : existing ?? incoming;
 }
 
 function parseRemoteLensPhotoDate(dateValue: string | null) {
@@ -5816,6 +6008,7 @@ function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
     ownerCatId: photo.ownerCatId,
     sourceMomentId: photo.sourceMomentId,
     shareManageable: photo.shareManageable,
+    ownerFeedback: photo.ownerFeedback,
   };
 }
 
@@ -7893,6 +8086,16 @@ const styles = {
     boxShadow:
       "inset 0 0 0 1px color-mix(in srgb, var(--app-night-ink, #1d1a18) 22%, transparent)",
   },
+  photoViewerOwnerFeedback: {
+    gridColumn: "1 / -1",
+    margin: 0,
+    padding: "2px 0",
+    color: "color-mix(in srgb, var(--paper) 82%, transparent)",
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.6,
+  },
   photoViewerSharingNote: {
     gridColumn: "1 / -1",
     margin: 0,
@@ -9060,6 +9263,24 @@ const styles = {
     border: "0",
     borderRadius: "1px",
     boxShadow: "none",
+  },
+  lensPhotoSelectedMark: {
+    position: "absolute",
+    top: "6px",
+    right: "6px",
+    zIndex: 1,
+    display: "inline-grid",
+    placeItems: "center",
+    width: "24px",
+    height: "24px",
+    border:
+      "1px solid color-mix(in srgb, var(--paper) 72%, transparent)",
+    borderRadius: "var(--radius-full)",
+    background:
+      "color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    color: "var(--seal)",
+    boxShadow: "0 3px 10px rgba(45, 34, 26, 0.14)",
+    pointerEvents: "none",
   },
   lensPhotoDate: {
     display: "block",

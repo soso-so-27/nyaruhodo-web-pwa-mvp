@@ -92,6 +92,7 @@ export async function createSleepingExchange({
   requestedCandidateCount,
   capability,
   mode,
+  onboardingPhase,
   onboardingSubmission,
 }: DeliverableSleepingPhotoInput & {
   ownPhoto: OwnSleepingPhoto;
@@ -99,6 +100,7 @@ export async function createSleepingExchange({
   requestedCandidateCount?: number;
   capability?: "evening_choice_v1" | "onboarding_choice_v1";
   mode?: "onboarding";
+  onboardingPhase?: "commit";
   onboardingSubmission?: {
     dateKey: string;
     journeyId?: string | null;
@@ -157,6 +159,7 @@ export async function createSleepingExchange({
         requestedCandidateCount,
         capability,
         mode,
+        onboardingPhase,
         onboardingSubmission,
       }),
     });
@@ -180,6 +183,95 @@ export async function createSleepingExchange({
       httpStatus: null,
       error: abortController.signal.aborted
         ? "exchange_timeout"
+        : formatFetchFailure(error),
+    };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+export async function createOnboardingPreviewExchange({
+  deliveryDateKey,
+  recipientCatId,
+  seed,
+  onboardingSubmission,
+}: {
+  deliveryDateKey: string;
+  recipientCatId: string;
+  seed: string;
+  onboardingSubmission: {
+    dateKey: string;
+    journeyId: string;
+    resumeToken: string;
+    source: string;
+    submissionId: string;
+  };
+}): Promise<SleepingExchangeResponse | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const abortController = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => abortController.abort("onboarding_preview_timeout"),
+    SLEEPING_EXCHANGE_TIMEOUT_MS,
+  );
+
+  try {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const supabase = createBrowserSupabaseClient();
+
+    if (supabase) {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+
+      if (accessToken) {
+        headers.set("Authorization", `Bearer ${accessToken}`);
+      }
+    }
+
+    const response = await fetch("/api/sleeping-delivery/exchange", {
+      method: "POST",
+      headers,
+      signal: abortController.signal,
+      body: JSON.stringify({
+        triggerLabel: "ねがお",
+        theme: "sleeping",
+        category: "sleeping",
+        seed,
+        deliveryDateKey,
+        recipientCatId,
+        anonymousId: getOrCreateAnonymousId(),
+        blockedPhotoIds: readBlockedExchangePhotoIdList(),
+        requestedCandidateCount: 4,
+        capability: "onboarding_choice_v1",
+        mode: "onboarding",
+        onboardingPhase: "preview",
+        onboardingSubmission,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await readExchangeError(response);
+      return {
+        photo: null,
+        photos: [],
+        source: "none",
+        httpStatus: response.status,
+        error,
+      };
+    }
+
+    const body = (await response.json()) as SleepingExchangeResponse;
+    return { ...body, httpStatus: response.status };
+  } catch (error) {
+    return {
+      photo: null,
+      photos: [],
+      source: "none",
+      httpStatus: null,
+      error: abortController.signal.aborted
+        ? "onboarding_preview_timeout"
         : formatFetchFailure(error),
     };
   } finally {

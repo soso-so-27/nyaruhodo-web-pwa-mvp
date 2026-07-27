@@ -12,7 +12,7 @@ import styles from "./about.module.css";
 
 const title = "ねてるねこ｜よる8時に、ねこだよりがとどく";
 const description =
-  "猫のねがおを1枚選ぶと、ほかのおうちのねこだよりがとどき、残したい1枚を保存できます。次からは、ねがおを選ぶと、次のよる8時ごろにねこだよりがとどく、静かなWebアプリです。";
+  "まず4匹のねこから気になる1匹を選び、あなたの猫のねがお1枚と交換します。そのあとは、ねがおを残すと次のよる8時ごろに4匹のねこがとどく、静かなWebアプリです。";
 
 export const metadata: Metadata = {
   title,
@@ -58,7 +58,7 @@ const dailySteps = [
     number: "02",
     label: "よる8時",
     title: "ねこだよりが、とどきます。",
-    copy: "ねがおを選ぶと、次のよる8時ごろに、どこかのおうちのねこだよりがとどきます。",
+    copy: "ねがおを残すと、次のよる8時ごろに、4匹のねこがとどきます。",
     image: "/illustrations/onboarding-envelope.webp",
     imageAlt: "ねてるねこのねこだよりのイラスト",
     kind: "envelope",
@@ -67,7 +67,7 @@ const dailySteps = [
     number: "03",
     label: "ひらく",
     title: "きょうも、どこかでよく寝ています。",
-    copy: "ねこだよりが複数あるときは、保存する1枚をえらびます。",
+    copy: "4匹から、残したい1匹をえらびます。",
     image: "/sample-cats/mugi-portrait.webp",
     imageAlt: "寝具の上でくつろぐ猫",
     kind: "photo",
@@ -98,18 +98,18 @@ export default function AboutPage() {
         </header>
 
         <div className={styles.heroContent}>
-          <p className={styles.eyebrow}>一枚のねがおから始まる、ねこだより</p>
+          <p className={styles.eyebrow}>4匹のねこから始まる、ねこだより</p>
           <h1 id="about-title">ねてるねこ</h1>
           <p className={styles.heroLead}>
-            じぶんの猫のねがおを一枚選ぶと、
+            まずは、4匹のねこに会ってみる。
             <br />
-            どこかのおうちのねこだよりがとどき、気になる一枚を残せます。
+            気になる1匹を見つけたら、あなたの猫のねがおと交換できます。
           </p>
           <ServiceSiteCta className={styles.heroCta} placement="hero">
-            ねがおを選んではじめる
+            4匹に会ってみる
           </ServiceSiteCta>
           <p className={styles.heroNote}>
-            最初はその場で。次からは、写真を選ぶと、次のよる8時ごろに。
+            最初の4匹はその場で。次からは、ねがおを残すと次のよる8時ごろに。
           </p>
         </div>
 
@@ -121,12 +121,12 @@ export default function AboutPage() {
 
       <section id="day" className={styles.daySection}>
         <div className={styles.sectionIntro}>
-          <p className={styles.sectionLabel}>ねてるねこの一日</p>
+          <p className={styles.sectionLabel}>そのあとの一日</p>
           <h2>一日は、こんなふうに。</h2>
           <p>
             たくさん見るための場所ではありません。
             <br />
-            ねがおを一枚選んで、ねこだよりを待つための場所です。
+            ねがおを一枚残して、よる8時のねこだよりを待つための場所です。
           </p>
         </div>
 
@@ -170,7 +170,7 @@ export default function AboutPage() {
             <h2>ねがおは、静かに残っていきます。</h2>
             <p>
               とった写真は「うちのこ」へ。選んだ猫は「ねこだより」へ。
-              この子の写真や記録といっしょに、日々が少しずつ積もります。
+              あなたの猫の写真や記録といっしょに、日々が少しずつ積もります。
             </p>
             <p>
               前に とったねがおが、ときどきホームにとどく「思い出便」もあります。
@@ -303,7 +303,7 @@ export default function AboutPage() {
           </div>
           <div className={styles.betaColumns}>
             <p>
-              いまはβ版です。最初はあめやむぎのねこだよりがとどくこともあります。
+              いまはβ版です。最初に会う4匹には、あめやむぎがいることもあります。
               とどくねこだよりはひとつずつ確認しながら、少人数で運営しています。
               通知はまだありません。ねこだよりは、よる8時を過ぎるとホームでひらけます。
             </p>
@@ -323,9 +323,9 @@ export default function AboutPage() {
           height={302}
           className={styles.finalEnvelope}
         />
-        <p className={styles.sectionLabel}>最初にとどいたねこだよりから</p>
-        <h2>どこかのねこだよりを、1枚保存してみませんか。</h2>
-        <p>登録せずに始められます。必要なのは、猫のねがお一枚だけです。</p>
+        <p className={styles.sectionLabel}>最初の4匹から</p>
+        <h2>気になる1匹を、見つけてみませんか。</h2>
+        <p>登録せずに、まず4匹に会えます。あなたの猫の写真を選ぶのは、そのあとです。</p>
         <ServiceSiteCta className={styles.finalCta} placement="footer">
           ねてるねこをはじめる
         </ServiceSiteCta>

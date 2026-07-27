@@ -10,6 +10,7 @@ import {
 } from "../../lib/assets/catIllustrationAssets";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
+  createOnboardingPreviewExchange,
   createSleepingExchange,
   saveRemoteDeliveryStockPhoto,
 } from "../../lib/home/deliveryCandidates";
@@ -33,6 +34,7 @@ import {
   createOnboardingSubmissionId,
   getOrCreateOnboardingAnonymousId,
   markOnboardingAlbumCreated,
+  markOnboardingSkipped,
   patchOnboardingProgress,
   patchOnboardingProgressDurably,
   readCurrentOnboardingProgress,
@@ -81,7 +83,8 @@ import {
   saveActiveCatId,
 } from "../home/homeInputHelpers";
 import { AppButton } from "../ui/AppButton";
-import { CameraIcon, LockIcon, MailIcon } from "../ui/AppIcons";
+import { CatChoicePreview } from "../ui/CatChoicePreview";
+import { LockIcon } from "../ui/AppIcons";
 import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { WordmarkHeader } from "../ui/AppHeader";
@@ -90,14 +93,21 @@ import { useNaturalPhotoFrame } from "../ui/useNaturalPhotoFrame";
 
 type OnboardingState =
   | "intro"
+  | "choice_loading"
+  | "choice"
+  | "photo_prompt"
   | "saving"
   | "envelope"
   | "delivered"
   | "empty"
-  | "kept";
+  | "kept"
+  | "joined";
 
 type OnboardingDeliveryIssue = "no_candidate" | "temporary_error";
-type OnboardingSavingStage = "saving_photo" | "receiving_letter";
+type OnboardingSavingStage =
+  | "loading_choices"
+  | "saving_photo"
+  | "receiving_letter";
 
 type OnboardingPhotoDebugInfo = {
   stage: string;
@@ -127,8 +137,15 @@ export function OnboardingFlow() {
   const [selectedDeliveryPhotoId, setSelectedDeliveryPhotoId] = useState<
     string | null
   >(null);
+  const [previewDeliveryPhotoId, setPreviewDeliveryPhotoId] = useState<
+    string | null
+  >(null);
+  const [failedDeliveryPhotoIds, setFailedDeliveryPhotoIds] = useState<
+    Set<string>
+  >(() => new Set());
   const [isFinalizingDeliveryChoice, setIsFinalizingDeliveryChoice] =
     useState(false);
+  const isFinalizingDeliveryChoiceRef = useRef(false);
   const [deliveryChoiceError, setDeliveryChoiceError] = useState("");
   const [localizedDeliveredPhoto, setLocalizedDeliveredPhoto] = useState<{
     photoId: string;
@@ -158,6 +175,7 @@ export function OnboardingFlow() {
   const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
   const [isRetryingDelivery, setIsRetryingDelivery] = useState(false);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
   const [hasRevealPhotoError, setHasRevealPhotoError] = useState(false);
   const [isRevealPhotoReady, setIsRevealPhotoReady] = useState(false);
@@ -197,6 +215,9 @@ export function OnboardingFlow() {
   );
   const selectedDeliveryPhoto =
     deliveredPhotos.find((photo) => photo.id === selectedDeliveryPhotoId) ??
+    null;
+  const previewDeliveryPhoto =
+    deliveredPhotos.find((photo) => photo.id === previewDeliveryPhotoId) ??
     null;
 
   useEffect(() => {
@@ -539,6 +560,33 @@ export function OnboardingFlow() {
 
     const resumedProgress = decision.progress;
 
+    if (decision.kind === "preview" || decision.kind === "photo_prompt") {
+      const photos =
+        resumedProgress.deliveredPhotos ??
+        (resumedProgress.deliveredPhoto
+          ? [resumedProgress.deliveredPhoto]
+          : []);
+      const selectedPhotoId =
+        decision.kind === "photo_prompt"
+          ? resumedProgress.pendingDeliveryPhotoId ?? null
+          : null;
+      const selectedPhoto =
+        photos.find((photo) => photo.id === selectedPhotoId) ??
+        resumedProgress.deliveredPhoto ??
+        photos[0] ??
+        null;
+
+      setSelectedPhotoSrc(resumedProgress.selectedPhotoSrc ?? "");
+      setPendingOwnPhoto(resumedProgress.ownPhoto ?? null);
+      setDeliveredPhoto(selectedPhoto);
+      setDeliveredPhotos(photos);
+      setDeliveryBundleId(resumedProgress.deliveryBundleId ?? null);
+      setSelectedDeliveryPhotoId(selectedPhotoId);
+      setIsDeliveredPhotoKept(false);
+      setState(decision.kind === "photo_prompt" ? "photo_prompt" : "choice");
+      return true;
+    }
+
     if (decision.kind === "envelope") {
       setSelectedPhotoSrc(resumedProgress.selectedPhotoSrc ?? "");
       setPendingOwnPhoto(resumedProgress.ownPhoto ?? null);
@@ -581,7 +629,28 @@ export function OnboardingFlow() {
       setIsDeliveredPhotoKept(false);
       setState("saving");
       setSavingStage("receiving_letter");
-      void resumeSubmittedProgress(resumedProgress);
+      if (
+        resumedProgress.deliveryBundleId &&
+        resumedProgress.pendingDeliveryPhotoId &&
+        resumedProgress.deliveredPhotos?.some(
+          (photo) => photo.id === resumedProgress.pendingDeliveryPhotoId,
+        )
+      ) {
+        setDeliveredPhotos(resumedProgress.deliveredPhotos);
+        setDeliveryBundleId(resumedProgress.deliveryBundleId);
+        setSelectedDeliveryPhotoId(
+          resumedProgress.pendingDeliveryPhotoId,
+        );
+        setDeliveredPhoto(
+          resumedProgress.deliveredPhotos.find(
+            (photo) =>
+              photo.id === resumedProgress.pendingDeliveryPhotoId,
+          ) ?? resumedProgress.deliveredPhoto ?? null,
+        );
+        void resumePreviewCommit(resumedProgress);
+      } else {
+        void resumeSubmittedProgress(resumedProgress);
+      }
       return true;
     }
 
@@ -635,6 +704,273 @@ export function OnboardingFlow() {
     trackProductEvent("onboarding_intro_view", {
       source,
     });
+  }
+
+  function selectDeliveryPhoto(photo: ExchangePhoto, index: number) {
+    setSelectedDeliveryPhotoId(photo.id);
+    setDeliveryChoiceError("");
+    trackProductEvent(
+      state === "choice"
+        ? "onboarding_preview_option_selected"
+        : "onboarding_delivery_choice_selected",
+      {
+        source: getEffectiveEntrySource(),
+        delivery_bundle_id: deliveryBundleId,
+        photo_id: photo.id,
+        selected_position: index + 1,
+        candidate_count: deliveredPhotos.length,
+      },
+    );
+  }
+
+  function openDeliveryPhotoPreview(
+    photo: ExchangePhoto,
+    index: number,
+    previewSource: "grid" | "preview_navigation" = "grid",
+  ) {
+    if (failedDeliveryPhotoIds.has(photo.id)) {
+      return;
+    }
+    setDeliveryChoiceError("");
+    setPreviewDeliveryPhotoId(photo.id);
+    trackProductEvent(
+      state === "choice"
+        ? "onboarding_preview_option_opened"
+        : "onboarding_delivery_choice_previewed",
+      {
+        source: getEffectiveEntrySource(),
+        delivery_bundle_id: deliveryBundleId,
+        photo_id: photo.id,
+        previewed_position: index + 1,
+        preview_source: previewSource,
+        candidate_count: deliveredPhotos.length,
+      },
+    );
+  }
+
+  function confirmDeliveryPhotoPreview() {
+    if (
+      !previewDeliveryPhoto ||
+      failedDeliveryPhotoIds.has(previewDeliveryPhoto.id) ||
+      isFinalizingDeliveryChoiceRef.current
+    ) {
+      return;
+    }
+
+    const index = deliveredPhotos.findIndex(
+      (photo) => photo.id === previewDeliveryPhoto.id,
+    );
+    if (index < 0) {
+      return;
+    }
+
+    selectDeliveryPhoto(previewDeliveryPhoto, index);
+    void (state === "choice"
+      ? handleConfirmPreviewChoice(previewDeliveryPhoto)
+      : handleSaveOnboardingDeliveryChoice(previewDeliveryPhoto));
+  }
+
+  function handleDeliveryPhotoError(photo: ExchangePhoto) {
+    setFailedDeliveryPhotoIds((current) => {
+      const next = new Set(current);
+      next.add(photo.id);
+      return next;
+    });
+    if (selectedDeliveryPhotoId === photo.id) {
+      setSelectedDeliveryPhotoId(null);
+    }
+    if (previewDeliveryPhotoId === photo.id) {
+      setPreviewDeliveryPhotoId(null);
+    }
+  }
+
+  async function handleStartOnboardingPreview() {
+    if (isLoadingPreview || isSubmittingRef.current) {
+      return;
+    }
+
+    const source = getEffectiveEntrySource();
+    if (redirectCompletedOnboarding(source)) {
+      return;
+    }
+
+    const restored = restoreExistingProgress(
+      readCurrentOnboardingProgress(),
+      source,
+    );
+    if (restored) {
+      return;
+    }
+
+    const dateKey = getJstDateKey();
+    const anonymousId = getOrCreateOnboardingAnonymousId();
+    const journey = getOrCreateOnboardingJourney({
+      dateKey,
+      source,
+    });
+    const submissionId = createOnboardingSubmissionId(
+      anonymousId,
+      dateKey,
+      journey.id,
+    );
+    const activeProfile = getActiveCatProfile(
+      readCatProfiles(),
+      readActiveCatId(),
+    );
+
+    isSubmittingRef.current = true;
+    setFailedDeliveryPhotoIds(new Set());
+    setIsLoadingPreview(true);
+    setSavingStage("loading_choices");
+    setState("choice_loading");
+    setMessage("");
+    setDeliveryIssue(null);
+    trackProductEvent("onboarding_preview_started", {
+      source,
+      submission_id: submissionId,
+    });
+
+    try {
+      const result = await createOnboardingPreviewExchange({
+        deliveryDateKey: dateKey,
+        recipientCatId: activeProfile.id,
+        seed: `${submissionId}:preview`,
+        onboardingSubmission: {
+          dateKey,
+          journeyId: journey.id,
+          resumeToken: journey.resumeToken,
+          source,
+          submissionId,
+        },
+      });
+      const photos = (result?.photos ?? []).filter(
+        (photo) => photo && isUsablePhotoSrc(photo.src),
+      );
+      const isValidPreview = Boolean(
+        result?.bundleId &&
+          result.experienceVersion === "onboarding_choice_v1" &&
+          result.servedVariant === "four_choice_v1" &&
+          photos.length === 4 &&
+          photos.every((photo) =>
+            photo.id.startsWith(`${result.bundleId}-choice-`),
+          ),
+      );
+
+      if (!isValidPreview || !result?.bundleId) {
+        setDeliveryIssue(
+          result?.error || result?.httpStatus
+            ? "temporary_error"
+            : "no_candidate",
+        );
+        setState("empty");
+        trackProductEvent("onboarding_preview_failed", {
+          source,
+          error_code: result?.error ?? "preview_unavailable",
+          http_status: result?.httpStatus ?? null,
+          candidate_count: photos.length,
+        });
+        return;
+      }
+
+      const firstPhoto = photos[0];
+      setDeliveredPhoto(firstPhoto);
+      setDeliveredPhotos(photos);
+      setDeliveryBundleId(result.bundleId);
+      setSelectedDeliveryPhotoId(null);
+      setIsDeliveredPhotoKept(false);
+      await writeOnboardingProgressDurably({
+        version: 1,
+        anonymousId,
+        dateKey,
+        stage: "preview_ready",
+        source,
+        journeyId: journey.id,
+        submissionId,
+        resumeToken: journey.resumeToken,
+        deliveredPhoto: firstPhoto,
+        deliveredPhotos: photos,
+        deliveryBundleId: result.bundleId,
+        isDeliveredPhotoKept: false,
+        updatedAt: Date.now(),
+      });
+      trackProductEvent("onboarding_preview_shown", {
+        source,
+        submission_id: submissionId,
+        delivery_bundle_id: result.bundleId,
+        candidate_count: photos.length,
+      });
+      setState("choice");
+    } catch (error) {
+      setDeliveryIssue("temporary_error");
+      setMessage(
+        canShowTestTools && error instanceof Error
+          ? `候補の確認で止まりました: ${error.message}`
+          : "",
+      );
+      setState("empty");
+      trackProductEvent("onboarding_preview_failed", {
+        source,
+        error_code:
+          error instanceof Error
+            ? error.message.slice(0, 120)
+            : "preview_failed",
+      });
+    } finally {
+      isSubmittingRef.current = false;
+      setIsLoadingPreview(false);
+    }
+  }
+
+  async function handleConfirmPreviewChoice(photoOverride?: ExchangePhoto) {
+    const photoToConfirm = photoOverride ?? selectedDeliveryPhoto;
+    if (
+      !deliveryBundleId ||
+      !photoToConfirm ||
+      deliveredPhotos.length !== 4 ||
+      isFinalizingDeliveryChoiceRef.current
+    ) {
+      return;
+    }
+
+    isFinalizingDeliveryChoiceRef.current = true;
+    setIsFinalizingDeliveryChoice(true);
+    setDeliveryChoiceError("");
+    try {
+      const currentProgress = readCurrentOnboardingProgress();
+      await patchOnboardingProgressDurably({
+        stage: "photo_pending",
+        source: getEffectiveEntrySource(),
+        deliveredPhoto: photoToConfirm,
+        deliveredPhotos,
+        deliveryBundleId,
+        pendingDeliveryPhotoId: photoToConfirm.id,
+        isDeliveredPhotoKept: false,
+      });
+      trackProductEvent("onboarding_preview_selected", {
+        source: getEffectiveEntrySource(),
+        submission_id: currentProgress?.submissionId ?? null,
+        delivery_bundle_id: deliveryBundleId,
+        photo_id: photoToConfirm.id,
+        selected_position:
+          deliveredPhotos.findIndex(
+            (photo) => photo.id === photoToConfirm.id,
+          ) + 1,
+        candidate_count: deliveredPhotos.length,
+      });
+      trackProductEvent("onboarding_photo_prompt_view", {
+        source: getEffectiveEntrySource(),
+        delivery_bundle_id: deliveryBundleId,
+      });
+      setDeliveredPhoto(photoToConfirm);
+      setState("photo_prompt");
+    } catch {
+      setDeliveryChoiceError(
+        "選択を完了できませんでした。もう一度お試しください。",
+      );
+    } finally {
+      isFinalizingDeliveryChoiceRef.current = false;
+      setIsFinalizingDeliveryChoice(false);
+    }
   }
 
   async function handleContinueInExternalBrowser() {
@@ -700,15 +1036,33 @@ export function OnboardingFlow() {
       return;
     }
 
-    const restored = restoreExistingProgress(
-      readCurrentOnboardingProgress(),
-      source,
-    );
+    const currentProgress = readCurrentOnboardingProgress();
+    const isPreviewPhotoPrompt =
+      state === "photo_prompt" &&
+      currentProgress?.stage === "photo_pending" &&
+      Boolean(
+        currentProgress.deliveryBundleId &&
+          currentProgress.pendingDeliveryPhotoId &&
+          currentProgress.deliveredPhotos?.some(
+            (photo) =>
+              photo.id === currentProgress.pendingDeliveryPhotoId,
+          ),
+      );
+    const restored = isPreviewPhotoPrompt
+      ? false
+      : restoreExistingProgress(currentProgress, source);
 
     if (restored) {
       return;
     }
 
+    if (isPreviewPhotoPrompt) {
+      trackProductEvent("onboarding_photo_invite_click", {
+        source,
+        submission_id: currentProgress?.submissionId ?? null,
+        delivery_bundle_id: currentProgress?.deliveryBundleId ?? null,
+      });
+    }
     trackProductEvent("onboarding_submit_photo_click", {
       source: getEffectiveEntrySource(),
     });
@@ -790,17 +1144,24 @@ export function OnboardingFlow() {
 
       let savedResult: Awaited<ReturnType<typeof saveSleepingPhotoWithFallback>> | null = null;
       let catId = "";
-      const onboardingDateKey = getJstDateKey();
+      const previewProgress = isPreviewPhotoPrompt
+        ? readCurrentOnboardingProgress()
+        : null;
+      const onboardingDateKey = previewProgress?.dateKey ?? getJstDateKey();
       const anonymousId = getOrCreateOnboardingAnonymousId();
       const onboardingJourney = getOrCreateOnboardingJourney({
         dateKey: onboardingDateKey,
         source: getEffectiveEntrySource(),
+        journeyId: previewProgress?.journeyId,
+        resumeToken: previewProgress?.resumeToken,
       });
-      const submissionId = createOnboardingSubmissionId(
-        anonymousId,
-        onboardingDateKey,
-        onboardingJourney.id,
-      );
+      const submissionId =
+        previewProgress?.submissionId ??
+        createOnboardingSubmissionId(
+          anonymousId,
+          onboardingDateKey,
+          onboardingJourney.id,
+        );
       const ownPhotoId = createOnboardingOwnPhotoId(submissionId);
 
       try {
@@ -830,7 +1191,7 @@ export function OnboardingFlow() {
           }
           setMessage("写真を保存できませんでした。少し時間をおいて、もう一度試してください。");
           setSelectedPhotoSrc("");
-          setState("intro");
+          setState(isPreviewPhotoPrompt ? "photo_prompt" : "intro");
           releasePhotoSelection();
           return;
         }
@@ -859,7 +1220,7 @@ export function OnboardingFlow() {
             : "写真を保存できませんでした。少し時間をおいて、もう一度試してください。",
         );
         setSelectedPhotoSrc("");
-        setState("intro");
+        setState(isPreviewPhotoPrompt ? "photo_prompt" : "intro");
         releasePhotoSelection();
         return;
       }
@@ -871,13 +1232,39 @@ export function OnboardingFlow() {
 
       try {
         const { dataUrl, ownPhoto } = savedResult;
+        const isPreviewCommit = Boolean(
+          previewProgress?.stage === "photo_pending" &&
+            previewProgress.deliveryBundleId &&
+            previewProgress.pendingDeliveryPhotoId &&
+            previewProgress.deliveredPhotos?.some(
+              (photo) =>
+                photo.id === previewProgress.pendingDeliveryPhotoId,
+            ),
+        );
+        const previewPhotos = isPreviewCommit
+          ? (previewProgress?.deliveredPhotos ?? [])
+          : [];
+        const previewSelectedPhoto = isPreviewCommit
+          ? previewPhotos.find(
+              (photo) =>
+                photo.id === previewProgress?.pendingDeliveryPhotoId,
+            ) ?? null
+          : null;
         setSelectedPhotoSrc(dataUrl);
         setSavingStage("receiving_letter");
         setPendingOwnPhoto(ownPhoto);
-        setDeliveredPhoto(null);
-        setDeliveredPhotos([]);
-        setDeliveryBundleId(null);
-        setSelectedDeliveryPhotoId(null);
+        setDeliveredPhoto(previewSelectedPhoto);
+        setDeliveredPhotos(previewPhotos);
+        setDeliveryBundleId(
+          isPreviewCommit
+            ? (previewProgress?.deliveryBundleId ?? null)
+            : null,
+        );
+        setSelectedDeliveryPhotoId(
+          isPreviewCommit
+            ? (previewProgress?.pendingDeliveryPhotoId ?? null)
+            : null,
+        );
         setDeliveryChoiceError("");
         setIsDeliveredPhotoKept(false);
         autoKeptDeliveredPhotoIdRef.current = "";
@@ -892,6 +1279,17 @@ export function OnboardingFlow() {
           resumeToken: onboardingJourney.resumeToken,
           ownPhoto,
           selectedPhotoSrc: dataUrl,
+          ...(isPreviewCommit
+            ? {
+                deliveredPhoto: previewSelectedPhoto ?? undefined,
+                deliveredPhotos: previewPhotos,
+                deliveryBundleId:
+                  previewProgress?.deliveryBundleId ?? undefined,
+                pendingDeliveryPhotoId:
+                  previewProgress?.pendingDeliveryPhotoId ?? undefined,
+                isDeliveredPhotoKept: false,
+              }
+            : {}),
           updatedAt: Date.now(),
         });
         ensureOnboardingEveningDeliveryReservation({
@@ -925,13 +1323,25 @@ export function OnboardingFlow() {
           delivery_date_key: onboardingDateKey,
         });
 
-        const delivered = await deliverOwnSleepingPhoto({
-          ownPhoto,
-          recipientCatId: catId,
-          deliveryDateKey: onboardingDateKey,
-          submissionId,
-          selectedPhotoSrc: dataUrl,
-        });
+        const delivered = isPreviewCommit
+          ? await commitOnboardingPreview({
+              ownPhoto,
+              progress:
+                readCurrentOnboardingProgress() ?? {
+                  ...previewProgress!,
+                  stage: "submitted",
+                  ownPhoto,
+                  selectedPhotoSrc: dataUrl,
+                  updatedAt: Date.now(),
+                },
+            })
+          : await deliverOwnSleepingPhoto({
+              ownPhoto,
+              recipientCatId: catId,
+              deliveryDateKey: onboardingDateKey,
+              submissionId,
+              selectedPhotoSrc: dataUrl,
+            });
 
         if (!delivered) {
           setState("empty");
@@ -1007,6 +1417,48 @@ export function OnboardingFlow() {
     window.location.assign("/home");
   }
 
+  function continueToOwnCatAfterJoining() {
+    if (isContinuingRef.current) {
+      return;
+    }
+
+    isContinuingRef.current = true;
+    setIsContinuing(true);
+    markOnboardingAlbumCompletionReady();
+    markOnboardingAlbumCreated(getEffectiveEntrySource());
+    window.location.assign("/cats?onboarding=1");
+  }
+
+  async function resumePreviewCommit(progress: OnboardingProgress) {
+    if (isSubmittingRef.current || !progress.ownPhoto) {
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    setMessage("");
+    setDeliveryIssue(null);
+
+    try {
+      const committed = await commitOnboardingPreview({
+        ownPhoto: progress.ownPhoto,
+        progress,
+      });
+      if (!committed) {
+        setState("empty");
+      }
+    } catch (error) {
+      setDeliveryIssue("temporary_error");
+      setMessage(
+        canShowTestTools && error instanceof Error
+          ? `交換の確定で止まりました: ${error.message}`
+          : "",
+      );
+      setState("empty");
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
   function handleContinueAfterDeliveredPhoto() {
     if (!isDeliveredPhotoKept || isContinuingRef.current) {
       return;
@@ -1060,21 +1512,28 @@ export function OnboardingFlow() {
     }
   }
 
-  async function handleSaveOnboardingDeliveryChoice() {
-    await finalizeOnboardingPhotoChoice("keep");
+  async function handleSaveOnboardingDeliveryChoice(
+    photoOverride?: ExchangePhoto,
+  ) {
+    await finalizeOnboardingPhotoChoice("keep", photoOverride?.id);
   }
 
   async function handleSkipOnboardingDeliveryChoice() {
     await finalizeOnboardingPhotoChoice("skip");
   }
 
-  async function finalizeOnboardingPhotoChoice(operation: "keep" | "skip") {
+  async function finalizeOnboardingPhotoChoice(
+    operation: "keep" | "skip",
+    selectedPhotoIdOverride?: string,
+  ) {
+    const photoIdToKeep =
+      selectedPhotoIdOverride ?? selectedDeliveryPhotoId;
     if (
       !deliveryBundleId ||
       deliveredPhotos.length === 0 ||
       deliveredPhotos.length > 4 ||
-      (operation === "keep" && !selectedDeliveryPhotoId) ||
-      isFinalizingDeliveryChoice
+      (operation === "keep" && !photoIdToKeep) ||
+      isFinalizingDeliveryChoiceRef.current
     ) {
       return;
     }
@@ -1088,6 +1547,7 @@ export function OnboardingFlow() {
       return;
     }
 
+    isFinalizingDeliveryChoiceRef.current = true;
     setIsFinalizingDeliveryChoice(true);
     setDeliveryChoiceError("");
     try {
@@ -1103,8 +1563,7 @@ export function OnboardingFlow() {
         journeyId: progress.journeyId,
         operation,
         resumeToken: progress.resumeToken,
-        selectedPhotoId:
-          operation === "keep" ? selectedDeliveryPhotoId : null,
+        selectedPhotoId: operation === "keep" ? photoIdToKeep : null,
         submissionId: progress.submissionId,
       });
 
@@ -1151,6 +1610,7 @@ export function OnboardingFlow() {
         "選択を完了できませんでした。もう一度お試しください。",
       );
     } finally {
+      isFinalizingDeliveryChoiceRef.current = false;
       setIsFinalizingDeliveryChoice(false);
     }
   }
@@ -1344,6 +1804,130 @@ export function OnboardingFlow() {
     });
   }
 
+  async function commitOnboardingPreview({
+    ownPhoto,
+    progress,
+  }: {
+    ownPhoto: OwnSleepingPhoto;
+    progress: OnboardingProgress;
+  }) {
+    const bundleId = progress.deliveryBundleId;
+    const selectedPhotoId = progress.pendingDeliveryPhotoId;
+    const previewPhotos = progress.deliveredPhotos ?? [];
+    const selectedPhoto = previewPhotos.find(
+      (photo) => photo.id === selectedPhotoId,
+    );
+
+    if (
+      !bundleId ||
+      !selectedPhotoId ||
+      !selectedPhoto ||
+      !progress.journeyId ||
+      !progress.resumeToken ||
+      previewPhotos.length !== 4
+    ) {
+      setDeliveryIssue("temporary_error");
+      return false;
+    }
+
+    const exchangeResult = await createSleepingExchange({
+      ownPhoto,
+      triggerLabel: "ねがお",
+      theme: "sleeping",
+      category: "sleeping",
+      seed: `${progress.submissionId}:commit`,
+      deliveryDateKey: progress.dateKey,
+      recipientCatId: ownPhoto.catId,
+      requestedCandidateCount: 4,
+      capability: "onboarding_choice_v1",
+      mode: "onboarding",
+      onboardingPhase: "commit",
+      onboardingSubmission: getOnboardingExchangeLedgerInput(progress),
+    });
+
+    if (
+      !exchangeResult ||
+      exchangeResult.error ||
+      exchangeResult.bundleId !== bundleId
+    ) {
+      setDeliveryIssue("temporary_error");
+      trackProductEvent("onboarding_preview_commit_failed", {
+        source: getEffectiveEntrySource(),
+        delivery_bundle_id: bundleId,
+        error_code: exchangeResult?.error ?? "commit_unavailable",
+        http_status: exchangeResult?.httpStatus ?? null,
+      });
+      return false;
+    }
+
+    const canonical = await finalizeOnboardingDeliveryChoice({
+      bundleId,
+      deliveryDateKey: progress.dateKey,
+      journeyId: progress.journeyId,
+      operation: "keep",
+      resumeToken: progress.resumeToken,
+      selectedPhotoId,
+      submissionId: progress.submissionId,
+    });
+
+    if (!canonical) {
+      setDeliveryIssue("temporary_error");
+      trackProductEvent("onboarding_preview_commit_failed", {
+        source: getEffectiveEntrySource(),
+        delivery_bundle_id: bundleId,
+        error_code: "choice_finalize_failed",
+      });
+      return false;
+    }
+
+    if (canonical.state === "skipped") {
+      trackProductEvent("onboarding_preview_commit_resolved_skipped", {
+        source: getEffectiveEntrySource(),
+        submission_id: progress.submissionId,
+        delivery_bundle_id: bundleId,
+        photo_id: null,
+        candidate_count: previewPhotos.length,
+        server_conflict: canonical.conflict,
+        outcome: "skipped",
+      });
+      markOnboardingDeliveryChoiceSkipped();
+      setState("joined");
+      return true;
+    }
+
+    const canonicalSelectedPhoto = canonical.selectedPhotoId
+      ? previewPhotos.find(
+          (photo) => photo.id === canonical.selectedPhotoId,
+        ) ?? null
+      : null;
+    if (!canonicalSelectedPhoto) {
+      setDeliveryIssue("temporary_error");
+      trackProductEvent("onboarding_preview_commit_failed", {
+        source: getEffectiveEntrySource(),
+        delivery_bundle_id: bundleId,
+        error_code: "canonical_photo_missing",
+      });
+      return false;
+    }
+
+    setDeliveredPhoto(canonicalSelectedPhoto);
+    setDeliveredPhotos(previewPhotos);
+    setDeliveryBundleId(bundleId);
+    setSelectedDeliveryPhotoId(canonicalSelectedPhoto.id);
+    trackProductEvent("onboarding_preview_committed", {
+      source: getEffectiveEntrySource(),
+      submission_id: progress.submissionId,
+      delivery_bundle_id: bundleId,
+      photo_id: canonicalSelectedPhoto.id,
+      candidate_count: previewPhotos.length,
+      server_conflict: canonical.conflict,
+      outcome: "kept",
+    });
+    markDeliveredPhotoReadyForOnboarding(canonicalSelectedPhoto);
+    setState("joined");
+    return true;
+  }
+
   async function handleRetryOnboardingDelivery() {
     if (isSubmittingRef.current || isRetryingDelivery) {
       return;
@@ -1352,8 +1936,17 @@ export function OnboardingFlow() {
     const progress = readCurrentOnboardingProgress();
     const ownPhoto = pendingOwnPhoto ?? progress?.ownPhoto ?? null;
     if (!ownPhoto) {
+      if (
+        progress?.stage === "photo_pending" &&
+        progress.deliveryBundleId &&
+        progress.pendingDeliveryPhotoId
+      ) {
+        restoreExistingProgress(progress, getEffectiveEntrySource());
+        return;
+      }
       setState("intro");
-      setMessage("写真をもう一度選んでください。");
+      setMessage("");
+      void handleStartOnboardingPreview();
       return;
     }
 
@@ -1367,13 +1960,21 @@ export function OnboardingFlow() {
     });
 
     try {
-      const delivered = await deliverOwnSleepingPhoto({
-        ownPhoto,
-        recipientCatId: ownPhoto.catId,
-        deliveryDateKey: progress?.dateKey,
-        submissionId: progress?.submissionId,
-        selectedPhotoSrc: selectedPhotoSrc || progress?.selectedPhotoSrc,
-      });
+      const delivered =
+        progress?.deliveryBundleId &&
+        progress.pendingDeliveryPhotoId &&
+        progress.deliveredPhotos?.some(
+          (photo) => photo.id === progress.pendingDeliveryPhotoId,
+        )
+          ? await commitOnboardingPreview({ ownPhoto, progress })
+          : await deliverOwnSleepingPhoto({
+              ownPhoto,
+              recipientCatId: ownPhoto.catId,
+              deliveryDateKey: progress?.dateKey,
+              submissionId: progress?.submissionId,
+              selectedPhotoSrc:
+                selectedPhotoSrc || progress?.selectedPhotoSrc,
+            });
 
       if (!delivered) {
         setState("empty");
@@ -1631,7 +2232,7 @@ export function OnboardingFlow() {
 
         if (!pendingOwnPhoto) {
           setMessage(
-            "とどく候補を追加しました。もう一度ねがおの写真を選ぶと、ねこだよりがとどきます。",
+            "とどく候補を追加しました。もう一度、4匹に会ってみてください。",
           );
           setState("intro");
           return;
@@ -1679,11 +2280,18 @@ export function OnboardingFlow() {
     });
 
     if (canShowTestTools) {
-      router.push("/settings");
+      window.location.assign("/settings");
       return;
     }
 
-    router.push("/home");
+    window.location.assign("/home");
+  }
+
+  function handleSkipPreviewAndGoHome() {
+    if (!canShowTestTools) {
+      markOnboardingSkipped(getEffectiveEntrySource());
+    }
+    handleGoHome();
   }
 
   const shouldShowExternalBrowserGuide =
@@ -1691,6 +2299,8 @@ export function OnboardingFlow() {
     isEmbeddedBrowser &&
     !isExternalBrowserGuideDismissed;
   const shouldShowBrandHeader = ![
+    "choice",
+    "photo_prompt",
     "envelope",
     "delivered",
   ].includes(state);
@@ -1767,7 +2377,10 @@ export function OnboardingFlow() {
           />
         ) : null}
 
-        {!shouldShowExternalBrowserGuide && (state === "intro" || state === "saving") ? (
+        {!shouldShowExternalBrowserGuide &&
+        (state === "intro" ||
+          state === "choice_loading" ||
+          state === "saving") ? (
           <section
             style={styles.hero}
             aria-label="ねてるねこのはじめかた"
@@ -1796,16 +2409,17 @@ export function OnboardingFlow() {
               {state === "saving" ? (
                 savingStage === "saving_photo"
                   ? "写真を保存しています"
-                  : "写真を用意しています"
+                  : "写真を交換しています"
+              ) : state === "choice_loading" ? (
+                "4匹のねこを用意しています"
               ) : (
                 <>
-                  うちの猫の写真を1枚残すと
+                  気になる子は、
                   <br />
-                  4匹の猫がとどきます
+                  どの子？
                 </>
               )}
             </h1>
-            {state === "intro" ? <OnboardingExchangeRoute /> : null}
             {state === "intro" ? (
               <>
                 <p
@@ -1813,20 +2427,11 @@ export function OnboardingFlow() {
                   data-onboarding-lead="true"
                   data-testid="onboarding-exchange-explanation"
                 >
-                  とどいた猫から、残したい1匹をえらべます。
-                </p>
-                <p
-                  style={styles.privacyNote}
-                  data-testid="onboarding-privacy-note"
-                >
-                  <span aria-hidden="true" style={styles.privacyNoteIcon}>
-                    <LockIcon size={14} />
-                  </span>
-                  最初の1枚は、運営確認後にほかの利用者へとどくことがあります。公開一覧やSNSには表示されません
+                  まずは、4匹のねこに会ってみてください。
                 </p>
               </>
             ) : null}
-            {state === "saving" ? (
+            {state === "saving" || state === "choice_loading" ? (
               <DeliveryWaiting photoSrc={selectedPhotoSrc} stage={savingStage} />
             ) : null}
             {state === "intro" ? (
@@ -1835,13 +2440,13 @@ export function OnboardingFlow() {
                   type="button"
                   data-testid="onboarding-photo-select"
                   onClick={() => {
-                    void handleSelectSleepingPhoto();
+                    void handleStartOnboardingPreview();
                   }}
                   fullWidth
                   style={styles.onboardingCta}
                   data-onboarding-cta="true"
                 >
-                  最初の1枚をえらぶ
+                  4匹に会ってみる
                 </AppButton>
               </>
             ) : null}
@@ -1887,12 +2492,15 @@ export function OnboardingFlow() {
           </section>
         ) : null}
 
-        {state === "delivered" &&
-        hasOnboardingPhotoChoice &&
-        !isDeliveredPhotoKept ? (
+        {(state === "choice" ||
+          (state === "delivered" &&
+            hasOnboardingPhotoChoice &&
+            !isDeliveredPhotoKept)) ? (
           <section
             style={{ ...styles.result, ...styles.deliveredResult }}
             aria-labelledby="onboarding-delivered-title"
+            aria-hidden={previewDeliveryPhoto ? true : undefined}
+            inert={previewDeliveryPhoto ? true : undefined}
             data-testid="onboarding-four-choice"
             data-bundle-id={deliveryBundleId ?? undefined}
           >
@@ -1902,7 +2510,9 @@ export function OnboardingFlow() {
                   id="onboarding-delivered-title"
                   style={styles.onboardingDeliveredTitle}
                 >
-                  最初のねこだより
+                  {state === "choice"
+                    ? "気になる子は、どの子？"
+                    : "最初のねこだより"}
                 </p>
                 <span
                   style={styles.onboardingDeliveredMastheadRule}
@@ -1910,23 +2520,30 @@ export function OnboardingFlow() {
                 />
               </div>
               <p style={styles.onboardingFourChoiceLead}>
-                「ねこだより」に残す1枚をえらんでください
+                {state === "choice" ? (
+                  <>
+                    気になる1匹を選んでください。
+                    <br />
+                    保存には、いっしょに暮らす猫の写真が1枚必要です。
+                  </>
+                ) : (
+                  "「ねこだより」に保存する猫を選んでください"
+                )}
               </p>
               <div
-                role="radiogroup"
-                aria-label="保存する写真"
+                role="group"
+                aria-label="届いた猫を大きく見る"
                 style={styles.onboardingFourChoiceGrid}
               >
                 {deliveredPhotos.map((photo, index) => {
                   const isSelected = photo.id === selectedDeliveryPhotoId;
+                  const isUnavailable = failedDeliveryPhotoIds.has(photo.id);
                   return (
                     <button
                       key={photo.id}
                       type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      aria-label={`${index + 1}枚目の写真をえらぶ`}
-                      disabled={isFinalizingDeliveryChoice}
+                      aria-label={`${index + 1}匹目の猫を大きく見る`}
+                      disabled={isUnavailable || isFinalizingDeliveryChoice}
                       data-testid="onboarding-four-choice-option"
                       data-photo-id={photo.id}
                       data-position={index + 1}
@@ -1936,18 +2553,11 @@ export function OnboardingFlow() {
                         ...(isSelected
                           ? styles.onboardingFourChoiceOptionSelected
                           : {}),
+                        ...(isUnavailable
+                          ? styles.onboardingFourChoiceOptionUnavailable
+                          : {}),
                       }}
-                      onClick={() => {
-                        setSelectedDeliveryPhotoId(photo.id);
-                        setDeliveryChoiceError("");
-                        trackProductEvent("onboarding_delivery_choice_selected", {
-                          source: getEffectiveEntrySource(),
-                          delivery_bundle_id: deliveryBundleId,
-                          photo_id: photo.id,
-                          selected_position: index + 1,
-                          candidate_count: deliveredPhotos.length,
-                        });
-                      }}
+                      onClick={() => openDeliveryPhotoPreview(photo, index)}
                     >
                       <StoredPhotoImage
                         src={getExchangePhotoDisplaySrc(photo)}
@@ -1955,52 +2565,189 @@ export function OnboardingFlow() {
                         alt=""
                         storageVariant="thumbnail"
                         loading="eager"
+                        onError={() => handleDeliveryPhotoError(photo)}
                         style={styles.onboardingFourChoicePhoto}
                       />
-                      {isSelected ? (
-                        <span
-                          aria-hidden="true"
-                          style={styles.onboardingFourChoiceMark}
-                        >
-                          選択中
+                      {isUnavailable ? (
+                        <span style={styles.onboardingFourChoiceUnavailableLabel}>
+                          読み込めません
                         </span>
                       ) : null}
                     </button>
                   );
                 })}
               </div>
+              {previewDeliveryPhoto ? (
+                <CatChoicePreview
+                  items={deliveredPhotos.map((photo) => ({
+                    id: photo.id,
+                    disabled: failedDeliveryPhotoIds.has(photo.id),
+                  }))}
+                  activeId={previewDeliveryPhoto.id}
+                  onActiveChange={(photoId, index) => {
+                    const photo = deliveredPhotos[index];
+                    if (!photo || photo.id !== photoId) {
+                      return;
+                    }
+                    openDeliveryPhotoPreview(
+                      photo,
+                      index,
+                      "preview_navigation",
+                    );
+                  }}
+                  onBack={() => setPreviewDeliveryPhotoId(null)}
+                  onConfirm={confirmDeliveryPhotoPreview}
+                  renderPhoto={(item, index, variant) => {
+                    const photo = deliveredPhotos[index];
+                    if (!photo || photo.id !== item.id) {
+                      return null;
+                    }
+                    return (
+                      <StoredPhotoImage
+                        src={getExchangePhotoDisplaySrc(photo)}
+                        fallbackSrcs={getExchangePhotoFallbackSrcs(photo)}
+                        alt={`${index + 1}匹目の猫`}
+                        storageVariant={
+                          variant === "main" ? "display" : "thumbnail"
+                        }
+                        loading="eager"
+                        onError={() => handleDeliveryPhotoError(photo)}
+                        style={
+                          variant === "main"
+                            ? styles.onboardingFourChoicePreviewPhoto
+                            : styles.onboardingFourChoicePreviewThumbnail
+                        }
+                      />
+                    );
+                  }}
+                  confirmLabel={
+                    state === "choice" ? "この猫を選ぶ" : "この猫を保存"
+                  }
+                  confirmBusyLabel="保存しています…"
+                  confirmDisabled={isFinalizingDeliveryChoice}
+                  isConfirming={isFinalizingDeliveryChoice}
+                  errorMessage={deliveryChoiceError}
+                  manageHistory
+                  testId="onboarding-four-choice-preview"
+                  confirmTestId="onboarding-four-choice-save"
+                />
+              ) : null}
               {deliveryChoiceError ? (
                 <p role="alert" style={styles.onboardingFourChoiceError}>
                   {deliveryChoiceError}
                 </p>
               ) : null}
-              <AppButton
-                type="button"
-                fullWidth
-                disabled={!selectedDeliveryPhoto || isFinalizingDeliveryChoice}
-                onClick={() => {
-                  void handleSaveOnboardingDeliveryChoice();
-                }}
-                style={styles.onboardingFourChoiceSave}
-                data-testid="onboarding-four-choice-save"
-              >
-                {isFinalizingDeliveryChoice
-                  ? "保存しています…"
-                  : "この1枚を保存"}
-              </AppButton>
-              <AppButton
-                type="button"
-                variant="quiet"
-                size="md"
-                disabled={isFinalizingDeliveryChoice}
-                onClick={() => {
-                  void handleSkipOnboardingDeliveryChoice();
-                }}
-                data-testid="onboarding-four-choice-skip"
-              >
-                保存しない
-              </AppButton>
+              {!previewDeliveryPhoto ? (
+                <AppButton
+                  type="button"
+                  fullWidth
+                  disabled={!selectedDeliveryPhoto || isFinalizingDeliveryChoice}
+                  onClick={() => {
+                    void (state === "choice"
+                      ? handleConfirmPreviewChoice()
+                      : handleSaveOnboardingDeliveryChoice());
+                  }}
+                  style={styles.onboardingFourChoiceSave}
+                  data-testid="onboarding-four-choice-save"
+                >
+                  {isFinalizingDeliveryChoice
+                    ? "保存しています…"
+                    : state === "choice"
+                      ? "この猫を選ぶ"
+                      : "この猫を保存"}
+                </AppButton>
+              ) : null}
+              {state === "choice" ? (
+                <AppButton
+                  type="button"
+                  variant="quiet"
+                  size="md"
+                  disabled={isFinalizingDeliveryChoice}
+                  onClick={() => {
+                    trackProductEvent("onboarding_preview_skipped", {
+                      source: getEffectiveEntrySource(),
+                      submission_id:
+                        readCurrentOnboardingProgress()?.submissionId ?? null,
+                      delivery_bundle_id: deliveryBundleId,
+                      candidate_count: deliveredPhotos.length,
+                    });
+                    handleSkipPreviewAndGoHome();
+                  }}
+                  data-testid="onboarding-preview-skip"
+                >
+                  見るだけで終わる
+                </AppButton>
+              ) : state === "delivered" ? (
+                <AppButton
+                  type="button"
+                  variant="quiet"
+                  size="md"
+                  disabled={isFinalizingDeliveryChoice}
+                  onClick={() => {
+                    void handleSkipOnboardingDeliveryChoice();
+                  }}
+                  data-testid="onboarding-four-choice-skip"
+                >
+                  保存しない
+                </AppButton>
+              ) : null}
             </div>
+          </section>
+        ) : null}
+
+        {state === "photo_prompt" && selectedDeliveryPhoto ? (
+          <section
+            style={{ ...styles.result, ...styles.deliveredResult }}
+            aria-label="選んだ猫を保存する"
+            data-testid="onboarding-photo-prompt"
+          >
+            <p style={styles.kicker}>気になる1匹を選びました</p>
+            <div style={styles.onboardingPromptPhotoFrame}>
+              <StoredPhotoImage
+                src={getExchangePhotoDisplaySrc(selectedDeliveryPhoto)}
+                fallbackSrcs={getExchangePhotoFallbackSrcs(
+                  selectedDeliveryPhoto,
+                )}
+                alt=""
+                storageVariant="display"
+                loading="eager"
+                style={styles.onboardingPromptPhoto}
+              />
+            </div>
+            <h2 style={styles.subTitle}>
+              この猫を保存しますか？
+            </h2>
+            <p style={styles.resultText}>
+              保存するには、あなたの猫の写真を1枚送ります。
+              <br />
+              選んだ猫は「ねこだより」に、送った写真は「うちのこ」に保存されます。
+            </p>
+            <p style={styles.privacyNote}>
+              <span aria-hidden="true" style={styles.privacyNoteIcon}>
+                <LockIcon size={14} />
+              </span>
+              送った写真は、運営確認後、ほかのおうちへ届く候補になります。公開一覧には出ません
+            </p>
+            <AppButton
+              type="button"
+              data-testid="onboarding-photo-invite"
+              onClick={() => {
+                void handleSelectSleepingPhoto();
+              }}
+              fullWidth
+              style={styles.onboardingCta}
+            >
+              写真を選んで保存する
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="quiet"
+              size="md"
+              onClick={handleSkipPreviewAndGoHome}
+            >
+              保存しない
+            </AppButton>
+            {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
 
@@ -2088,7 +2835,7 @@ export function OnboardingFlow() {
                     あなたの猫の写真は「うちのこ」に、
                     <br />
                     <span style={styles.onboardingDeliveredSavedPhrase}>
-                      えらんだ写真は「ねこだより」に残りました
+                      選んだ猫は「ねこだより」に残りました
                     </span>
                   </>
                 ) : (
@@ -2116,22 +2863,34 @@ export function OnboardingFlow() {
         {state === "empty" ? (
           <section
             style={styles.result}
-            aria-label="ねがおを保存しました"
+            aria-label={
+              pendingOwnPhoto
+                ? "ねがおを保存しました"
+                : "猫を読み込めませんでした"
+            }
             data-delivery-issue={deliveryIssue ?? undefined}
           >
-            <p style={styles.kicker}>ねがおは保存されています</p>
+            {pendingOwnPhoto ? (
+              <p style={styles.kicker}>ねがおは保存されています</p>
+            ) : null}
             {selectedPhotoSrc ? (
               <img src={selectedPhotoSrc} alt="" style={styles.savedPhoto} />
             ) : null}
-            <h2 style={styles.subTitle}>ねこだよりを読み込めませんでした</h2>
+            <h2 style={styles.subTitle}>
+              {pendingOwnPhoto
+                ? "交換を完了できませんでした"
+                : "猫を読み込めませんでした"}
+            </h2>
             <p style={styles.resultText}>
               {canShowTestTools
                 ? deliveryIssue === "temporary_error"
                   ? "候補の確認で止まりました。テスト用に、ここで候補を追加できます。"
                   : "とどく候補がまだありません。テスト用に、ここで候補を追加できます。"
-                : deliveryIssue === "no_candidate"
-                  ? "ねこだよりを用意できませんでした。少し時間をおいて、もう一度お試しください。"
-                  : "通信が途中で止まりました。ねがおは保存されています。通信を確認して、もう一度お試しください。"}
+                : pendingOwnPhoto
+                  ? "写真は「うちのこ」に残っています。通信を確認して、もう一度お試しください。"
+                  : deliveryIssue === "no_candidate"
+                    ? "今日の猫を用意できませんでした。少し時間をおいて、もう一度お試しください。"
+                    : "通信が途中で止まりました。通信を確認して、もう一度お試しください。"}
             </p>
             {canShowTestTools ? (
               <AppButton
@@ -2158,12 +2917,54 @@ export function OnboardingFlow() {
             >
               {isRetryingDelivery
                 ? "読み込んでいます..."
-                : "ねこだよりを もう一度読み込む"}
+                : pendingOwnPhoto
+                  ? "交換をもう一度完了する"
+                  : "もう一度読み込む"}
             </AppButton>
             <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               ホームへ
             </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
+          </section>
+        ) : null}
+
+        {state === "joined" ? (
+          <section
+            style={styles.result}
+            aria-label="写真を保存しました"
+            data-testid="onboarding-joined"
+          >
+            <p style={styles.kicker}>
+              {isDeliveredPhotoKept ? "交換できました" : "写真を残しました"}
+            </p>
+            {selectedPhotoSrc ? (
+              <img
+                src={selectedPhotoSrc}
+                alt=""
+                style={styles.savedPhoto}
+              />
+            ) : null}
+            <h2 style={styles.subTitle}>写真を保存しました</h2>
+            <p style={styles.resultText}>
+              あなたの猫の写真は「うちのこ」に残りました。
+              {isDeliveredPhotoKept ? (
+                <>
+                  <br />
+                  選んだ猫は「ねこだより」に残りました。
+                  <br />
+                  送った写真が、ほかのおうちで選ばれたときも分かります。
+                </>
+              ) : null}
+            </p>
+            <AppButton
+              type="button"
+              onClick={continueToOwnCatAfterJoining}
+              disabled={isContinuing}
+              fullWidth
+              style={styles.onboardingCta}
+            >
+              {isContinuing ? "準備しています…" : "保存した写真を見る"}
+            </AppButton>
           </section>
         ) : null}
 
@@ -2212,30 +3013,6 @@ function OnboardingEnvelopeArt({ compact = false }: { compact?: boolean }) {
         style={styles.onboardingEnvelopeImage}
       />
     </span>
-  );
-}
-
-function OnboardingExchangeRoute() {
-  return (
-    <div
-      style={styles.exchangeRoute}
-      aria-hidden="true"
-      data-onboarding-exchange-route="true"
-    >
-      <span
-        style={styles.exchangeRouteIcon}
-        data-onboarding-exchange-route-icon="true"
-      >
-        <CameraIcon size={21} />
-      </span>
-      <span style={styles.exchangeRouteLine} />
-      <span
-        style={styles.exchangeRouteIcon}
-        data-onboarding-exchange-route-icon="true"
-      >
-        <MailIcon size={21} />
-      </span>
-    </div>
   );
 }
 
@@ -2289,9 +3066,11 @@ function DeliveryWaiting({
           <span style={styles.deliveryWaitingDot} />
         </span>
         <span style={styles.deliveryWaitingText}>
-          {stage === "saving_photo"
-            ? "写真を読み込んでいます"
-            : "写真を保存しました"}
+          {stage === "loading_choices"
+            ? "4匹を読み込んでいます"
+            : stage === "saving_photo"
+              ? "写真を読み込んでいます"
+              : "写真を保存しました"}
         </span>
       </span>
     </div>
@@ -2333,7 +3112,7 @@ function ExternalBrowserGuide({
         すぐ試せます
       </h1>
       <p style={styles.externalBrowserText}>
-        写真を選んで、最初のねこだよりまで進めます。
+        このまま、4匹のねこに会ってみます。
       </p>
       {errorMessage ? (
         <p style={styles.externalBrowserCopiedText} role="alert">
@@ -3406,29 +4185,39 @@ const styles = {
     boxShadow:
       "0 0 0 2px color-mix(in srgb, var(--seal) 18%, transparent), 0 8px 20px rgba(70, 50, 30, 0.18)",
   },
+  onboardingFourChoiceOptionUnavailable: {
+    opacity: 0.42,
+    cursor: "default",
+  },
   onboardingFourChoicePhoto: {
     width: "100%",
     height: "100%",
     display: "block",
     objectFit: "cover",
   },
-  onboardingFourChoiceMark: {
+  onboardingFourChoiceUnavailableLabel: {
     position: "absolute",
-    right: "8px",
-    bottom: "8px",
-    minWidth: "26px",
-    height: "26px",
-    padding: "0 8px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
+    inset: "auto 8px 8px",
+    padding: "4px 6px",
     borderRadius: "999px",
-    background: "var(--seal)",
-    color: "#fff",
-    fontFamily: UI_FONT,
+    background: "rgba(36, 31, 27, 0.72)",
+    color: "#fffaf2",
     fontSize: "11px",
-    fontWeight: 500,
-    boxSizing: "border-box",
+    lineHeight: 1.3,
+    textAlign: "center",
+  },
+  onboardingFourChoicePreviewPhoto: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "contain",
+    background: "transparent",
+  },
+  onboardingFourChoicePreviewThumbnail: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
   },
   onboardingFourChoiceSave: {
     width: "100%",
@@ -3442,6 +4231,21 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.5,
     textAlign: "center",
+  },
+  onboardingPromptPhotoFrame: {
+    width: "min(36vw, 136px)",
+    aspectRatio: "1 / 1",
+    overflow: "hidden",
+    border: "5px solid rgba(255,253,248,0.82)",
+    borderRadius: "var(--radius-xl)",
+    background: "var(--paper-warm)",
+    boxShadow: "0 10px 24px rgba(90,76,60,0.1)",
+  },
+  onboardingPromptPhoto: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
   },
   onboardingDeliveredLetter: {
     ...deliveredLetterStyles.sheet,
@@ -3480,9 +4284,11 @@ const styles = {
     ...deliveredLetterStyles.action,
   },
   savedPhoto: {
-    width: "min(100%, 260px)",
-    aspectRatio: "4 / 3",
-    objectFit: "cover",
+    display: "block",
+    width: "auto",
+    maxWidth: "min(100%, 260px)",
+    height: "auto",
+    maxHeight: "240px",
     borderRadius: "var(--radius-2xl)",
     border: "7px solid rgba(255,253,248,0.82)",
     boxShadow: "0 14px 34px rgba(90,76,60,0.12)",

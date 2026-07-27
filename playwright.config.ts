@@ -79,6 +79,7 @@ const desktopSpecs = [
   "**/service-site.spec.ts",
   "**/sleeping-delivery-request-guards.spec.ts",
   "**/sleeping-delivery-pool-guards.spec.ts",
+  "**/source-owner-feedback.spec.ts",
   "**/storage-backup.spec.ts",
   "**/sw-image-cache.spec.ts",
 ];
@@ -98,6 +99,7 @@ const mobileSpecs = [
   "**/nekodayori-redesign.spec.ts",
   "**/evening-flow-preview.spec.ts",
   "**/home-sleeping-exchange-flow.spec.ts",
+  "**/onboarding-choice-first.spec.ts",
   "**/onboarding-branch-matrix.spec.ts",
   "**/onboarding-delivery-flow.spec.ts",
   "**/press-feedback.spec.ts",

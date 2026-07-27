@@ -66,7 +66,7 @@ test.describe("account deletion UI", () => {
 
     await expect(
       page.getByText(
-        "「うちのこ」で写真をひらくと、ねこだよりへの送信設定を変更できます。",
+        "「うちのこ」で写真をひらくと、ほかのおうちへの送信設定を変更できます。",
         { exact: false },
       ),
     ).toBeVisible();

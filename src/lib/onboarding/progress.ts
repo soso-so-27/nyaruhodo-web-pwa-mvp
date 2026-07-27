@@ -38,6 +38,9 @@ export type OnboardingSource =
   | "unknown";
 
 export type OnboardingProgressStage =
+  | "preview_ready"
+  | "photo_pending"
+  | "skipped"
   | "name_pending"
   | "submitted"
   | "arrived"
@@ -58,6 +61,7 @@ export type OnboardingProgress = {
   deliveredPhoto?: ExchangePhoto;
   deliveredPhotos?: ExchangePhoto[];
   deliveryBundleId?: string;
+  pendingDeliveryPhotoId?: string;
   isDeliveredPhotoKept?: boolean;
   completionCopy?: string;
   updatedAt: number;
@@ -316,6 +320,8 @@ function buildPatchedOnboardingProgress(
     ...(deliveredPhoto ? { deliveredPhoto } : {}),
     ...(deliveredPhotos ? { deliveredPhotos } : {}),
     deliveryBundleId: patch.deliveryBundleId ?? current?.deliveryBundleId,
+    pendingDeliveryPhotoId:
+      patch.pendingDeliveryPhotoId ?? current?.pendingDeliveryPhotoId,
     isDeliveredPhotoKept:
       patch.isDeliveredPhotoKept ?? current?.isDeliveredPhotoKept,
     completionCopy: patch.completionCopy ?? current?.completionCopy,
@@ -427,6 +433,18 @@ export function markOnboardingAlbumCreated(source: OnboardingSource) {
   window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
 }
 
+export function markOnboardingSkipped(source: OnboardingSource) {
+  patchOnboardingProgress({
+    stage: "skipped",
+    source,
+  });
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
+}
+
 export function getOrCreateOnboardingAnonymousId() {
   if (typeof window === "undefined") {
     return "anonymous-unavailable";
@@ -466,6 +484,10 @@ function isValidOnboardingProgress(
       (typeof value.deliveryBundleId === "string" &&
         value.deliveryBundleId.length > 0 &&
         value.deliveryBundleId.length <= 160)) &&
+    (value.pendingDeliveryPhotoId === undefined ||
+      (typeof value.pendingDeliveryPhotoId === "string" &&
+        value.pendingDeliveryPhotoId.length > 0 &&
+        value.pendingDeliveryPhotoId.length <= 240)) &&
     (value.deliveredPhotos === undefined ||
       (Array.isArray(value.deliveredPhotos) &&
         value.deliveredPhotos.length > 0 &&
@@ -483,6 +505,9 @@ function isOnboardingProgressStage(
   value: unknown,
 ): value is OnboardingProgressStage {
   return (
+    value === "preview_ready" ||
+    value === "photo_pending" ||
+    value === "skipped" ||
     value === "name_pending" ||
     value === "submitted" ||
     value === "arrived" ||

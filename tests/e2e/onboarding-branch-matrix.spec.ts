@@ -30,6 +30,9 @@ test.describe("onboarding branch matrix", () => {
     expect(
       resolveOnboardingResumeDecision({ ...base, stage: "album_created" }).kind,
     ).toBe("home");
+    expect(
+      resolveOnboardingResumeDecision({ ...base, stage: "skipped" }).kind,
+    ).toBe("home");
   });
 
   for (const scenario of [

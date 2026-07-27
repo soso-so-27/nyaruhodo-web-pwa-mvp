@@ -77,6 +77,7 @@ type ExchangeRequest = {
   capability?: string | null;
   debugDryRun?: boolean;
   mode?: "onboarding" | null;
+  onboardingPhase?: "preview" | "commit" | null;
   onboardingSubmission?: {
     dateKey?: string | null;
     journeyId?: string | null;
@@ -161,6 +162,7 @@ type OnboardingExceptionBucket = {
 const ONBOARDING_EXCEPTION_LIMIT_PER_IP = 3;
 const ONBOARDING_EXCEPTION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const ONBOARDING_EXCEPTION_MAX_BUCKETS = 1000;
+const ONBOARDING_PREVIEW_COMMIT_TTL_MS = 48 * 60 * 60 * 1000;
 const onboardingExceptionBuckets = new Map<string, OnboardingExceptionBucket>();
 
 function isExchangeDebugDryRunAllowed() {
@@ -207,21 +209,40 @@ async function handleExchangePost(request: Request) {
     return exchangeError("too_many_requests", 429);
   }
 
-  if (!isValidOwnPhotoInput(input)) {
+  const isOnboardingPreview =
+    input.mode === "onboarding" && input.onboardingPhase === "preview";
+  const isOnboardingCommit =
+    input.mode === "onboarding" && input.onboardingPhase === "commit";
+
+  if (!isOnboardingPreview && !isValidOwnPhotoInput(input)) {
     return NextResponse.json(
       { photo: null, source: "none", error: "invalid_exchange_request" },
       { status: 400 },
     );
   }
 
-  const ownPhoto = input.ownPhoto;
-  const createdAt = new Date(ownPhoto.createdAt ?? Date.now()).toISOString();
-  const ownerCatId = ownPhoto.ownerCatId || ownPhoto.catId;
-  const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
+  const ownPhoto = isValidOwnPhotoInput(input) ? input.ownPhoto : null;
+  const createdAt = new Date(ownPhoto?.createdAt ?? Date.now()).toISOString();
+  const ownerCatId = ownPhoto
+    ? ownPhoto.ownerCatId || ownPhoto.catId
+    : null;
+  const ownPhotoStoragePath = ownPhoto
+    ? getStoragePhotoPath(ownPhoto.src)
+    : null;
   const isOnboardingExchange = input.mode === "onboarding";
   const shouldAddOwnPhotoToPool =
-    ownPhoto.shared !== false &&
-    !isBlockedDeliveryPhotoUrl(ownPhoto.src);
+    Boolean(ownPhoto) &&
+    ownPhoto!.shared !== false &&
+    !isBlockedDeliveryPhotoUrl(ownPhoto!.src);
+  if (
+    isOnboardingCommit &&
+    (!ownPhoto ||
+      ownPhoto.shared !== true ||
+      !ownerCatId ||
+      !shouldAddOwnPhotoToPool)
+  ) {
+    return exchangeError("onboarding_shared_photo_required", 400);
+  }
   const shouldResolveEveningChoiceIdentity =
     !isOnboardingExchange && input.capability === EVENING_CHOICE_CAPABILITY;
   const debugDryRunRequested = input.debugDryRun === true;
@@ -234,7 +255,9 @@ async function handleExchangePost(request: Request) {
   const user =
     shouldAddOwnPhotoToPool ||
     ownPhotoStoragePath ||
-    shouldResolveEveningChoiceIdentity
+    shouldResolveEveningChoiceIdentity ||
+    isOnboardingPreview ||
+    isOnboardingCommit
       ? await getAuthenticatedUserForRequest(request)
       : null;
   markExchangeTiming(timing, "auth");
@@ -273,15 +296,17 @@ async function handleExchangePost(request: Request) {
     );
   }
 
-  const deliveryDateValidation = await validateExchangeDeliveryDateKey({
-    supabase,
-    userId,
-    anonymousId,
-    deliveryDateKey: input.deliveryDateKey,
-    mode: input.mode,
-    debugDryRun,
-    onboardingExceptionIpKey: buildSleepingDeliveryIpRateLimitKey(request),
-  });
+  const deliveryDateValidation = isOnboardingCommit
+    ? ({ ok: true } as const)
+    : await validateExchangeDeliveryDateKey({
+        supabase,
+        userId,
+        anonymousId,
+        deliveryDateKey: input.deliveryDateKey,
+        mode: input.mode,
+        debugDryRun,
+        onboardingExceptionIpKey: buildSleepingDeliveryIpRateLimitKey(request),
+      });
 
   if (!deliveryDateValidation.ok) {
     return NextResponse.json(
@@ -296,6 +321,10 @@ async function handleExchangePost(request: Request) {
   }
 
   const onboardingLedger = input.onboardingSubmission;
+  if ((isOnboardingPreview || isOnboardingCommit) && !onboardingLedger) {
+    return exchangeError("onboarding_submission_required", 400);
+  }
+
   if (onboardingLedger && !debugDryRun) {
     if (!adminSupabase) {
       return NextResponse.json(
@@ -311,10 +340,13 @@ async function handleExchangePost(request: Request) {
         anonymousId,
         dateKey: onboardingLedger.dateKey!,
         journeyId: onboardingLedger.journeyId,
-        ownPhotoId: ownPhoto.id ?? null,
+        ownPhotoId: isOnboardingCommit ? null : ownPhoto?.id ?? null,
         resumeToken: onboardingLedger.resumeToken!,
         source: onboardingLedger.source!,
-        stage: "submitted",
+        stage:
+          isOnboardingPreview || isOnboardingCommit
+            ? "selected"
+            : "submitted",
         submissionId: onboardingLedger.submissionId!,
       },
     });
@@ -382,6 +414,7 @@ async function handleExchangePost(request: Request) {
       isEveningChoiceRolloutAssigned({ userId, anonymousId }))
       ? "four_choice_v1"
       : "single_v1";
+  let existingOnboardingCommitBundle: RemoteDeliveryRow[] | null = null;
 
   if (
     idempotentDeliveryId &&
@@ -401,56 +434,69 @@ async function handleExchangePost(request: Request) {
         });
 
     if (existingBundle.length > 0) {
-      let responseDeliveries = existingBundle;
-      if (onboardingJourneyId) {
-        await transferOnboardingExchangeRows({
-          supabase,
-          anonymousId,
-          deliveryBundleId: idempotentDeliveryId,
-          ownPhotoId: ownPhoto.id,
-          submissionId: onboardingLedger!.submissionId!,
-          userId,
-        });
-
-        if (!isOnboardingChoiceCapableRequest) {
-          const legacyResponseDeliveries =
-            await orderOnboardingBundleForLegacyClient({
-              bundleId: idempotentDeliveryId,
-              deliveries: existingBundle,
-              input,
+      if (isOnboardingCommit) {
+        if (!isFreshOnboardingPreviewBundle(existingBundle)) {
+          return exchangeError("onboarding_preview_expired", 410);
+        }
+        existingOnboardingCommitBundle = existingBundle;
+      } else {
+        let responseDeliveries = existingBundle;
+        if (onboardingJourneyId) {
+          if (ownPhoto) {
+            await transferOnboardingExchangeRows({
               supabase,
+              anonymousId,
+              deliveryBundleId: idempotentDeliveryId,
+              ownPhotoId: ownPhoto.id,
+              submissionId: onboardingLedger!.submissionId!,
+              userId,
             });
-
-          if (!legacyResponseDeliveries) {
-            return NextResponse.json(
-              {
-                photo: null,
-                source: "none",
-                error: "onboarding_choice_unavailable",
-              },
-              { status: 409 },
-            );
           }
 
-          responseDeliveries = legacyResponseDeliveries;
+          if (!isOnboardingChoiceCapableRequest) {
+            const legacyResponseDeliveries =
+              await orderOnboardingBundleForLegacyClient({
+                bundleId: idempotentDeliveryId,
+                deliveries: existingBundle,
+                input,
+                supabase,
+              });
+
+            if (!legacyResponseDeliveries) {
+              return NextResponse.json(
+                {
+                  photo: null,
+                  source: "none",
+                  error: "onboarding_choice_unavailable",
+                },
+                { status: 409 },
+              );
+            }
+
+            responseDeliveries = legacyResponseDeliveries;
+          }
         }
+        markExchangeTiming(timing, "read_existing_bundle");
+        logExchangeTiming(timing, {
+          result: "existing_bundle",
+          deliveryDateKey: input.deliveryDateKey,
+          servedCount: existingBundle.length,
+        });
+        return buildExistingBundleResponse({
+          deliveries: responseDeliveries,
+          input,
+          isEveningChoiceCapableRequest: isFourChoiceCapableRequest,
+          supabase,
+          timing,
+          userId,
+          anonymousId,
+        });
       }
-      markExchangeTiming(timing, "read_existing_bundle");
-      logExchangeTiming(timing, {
-        result: "existing_bundle",
-        deliveryDateKey: input.deliveryDateKey,
-        servedCount: existingBundle.length,
-      });
-      return buildExistingBundleResponse({
-        deliveries: responseDeliveries,
-        input,
-        isEveningChoiceCapableRequest: isFourChoiceCapableRequest,
-        supabase,
-        timing,
-        userId,
-        anonymousId,
-      });
     }
+  }
+
+  if (isOnboardingCommit && !existingOnboardingCommitBundle) {
+    return exchangeError("onboarding_preview_required", 409);
   }
 
   if (idempotentDeliveryId) {
@@ -469,6 +515,9 @@ async function handleExchangePost(request: Request) {
 
     if (existingDelivery) {
       if (onboardingJourneyId) {
+        if (!ownPhoto) {
+          return exchangeError("onboarding_photo_required", 400);
+        }
         await transferOnboardingExchangeRows({
           supabase,
           anonymousId,
@@ -532,7 +581,11 @@ async function handleExchangePost(request: Request) {
     }
   }
 
-  if (isOnboardingExchange && !debugDryRun) {
+  if (
+    isOnboardingExchange &&
+    !debugDryRun &&
+    !existingOnboardingCommitBundle
+  ) {
     const priorDelivery = await readPriorExchangeForIdentity({
       supabase,
       userId,
@@ -566,7 +619,12 @@ async function handleExchangePost(request: Request) {
     }
   }
 
-  if (!debugDryRun && shouldAddOwnPhotoToPool) {
+  if (
+    !debugDryRun &&
+    shouldAddOwnPhotoToPool &&
+    ownPhoto &&
+    ownerCatId
+  ) {
     const existingOwnMoment = onboardingJourneyId
       ? await readExistingOnboardingOwnMoment({
           supabase,
@@ -666,6 +724,77 @@ async function handleExchangePost(request: Request) {
   }
   markExchangeTiming(timing, "own_photo");
 
+  if (
+    existingOnboardingCommitBundle &&
+    idempotentDeliveryId &&
+    onboardingLedger &&
+    ownPhoto
+  ) {
+    const committedMoment = await readExistingOnboardingOwnMoment({
+      supabase,
+      localMomentId: ownPhoto.id,
+      submissionId: onboardingLedger.submissionId!,
+    });
+    if (committedMoment.error || !committedMoment.data || !adminSupabase) {
+      return exchangeError("onboarding_photo_commit_failed", 500);
+    }
+
+    const ledgerCommit = await advanceOnboardingSubmission({
+      supabase: adminSupabase,
+      userId,
+      input: {
+        anonymousId,
+        dateKey: onboardingLedger.dateKey!,
+        journeyId: onboardingLedger.journeyId,
+        ownPhotoId: ownPhoto.id,
+        resumeToken: onboardingLedger.resumeToken!,
+        source: onboardingLedger.source!,
+        stage: "submitted",
+        submissionId: onboardingLedger.submissionId!,
+      },
+    });
+    if (!ledgerCommit.ok) {
+      const status =
+        ledgerCommit.error === "conflict"
+          ? 409
+          : ledgerCommit.error === "forbidden"
+            ? 403
+            : 503;
+      return exchangeError(
+        ledgerCommit.error === "conflict"
+          ? "onboarding_submission_conflict"
+          : ledgerCommit.error === "forbidden"
+            ? "onboarding_submission_forbidden"
+            : "onboarding_ledger_unavailable",
+        status,
+      );
+    }
+
+    await transferOnboardingExchangeRows({
+      supabase,
+      anonymousId,
+      deliveryBundleId: idempotentDeliveryId,
+      ownPhotoId: ownPhoto.id,
+      submissionId: onboardingLedger.submissionId!,
+      userId,
+    });
+    markExchangeTiming(timing, "commit_existing_bundle");
+    logExchangeTiming(timing, {
+      result: "existing_bundle_committed",
+      deliveryDateKey: input.deliveryDateKey,
+      servedCount: existingOnboardingCommitBundle.length,
+    });
+    return buildExistingBundleResponse({
+      deliveries: existingOnboardingCommitBundle,
+      input,
+      isEveningChoiceCapableRequest: true,
+      supabase,
+      timing,
+      userId,
+      anonymousId,
+    });
+  }
+
   const blockedPhotoIds = new Set(input.blockedPhotoIds ?? []);
   const deliveryExposureHistory = await readDeliveryExposureHistory({
     supabase,
@@ -684,7 +813,7 @@ async function handleExchangePost(request: Request) {
     anonymousId,
     senderAnonymousId,
     recipientCatId: input.recipientCatId,
-    excludePhotoId: ownPhoto.id,
+    excludePhotoId: ownPhoto?.id ?? "",
     blockedPhotoIds,
     deliveredSourceMomentIds,
   };
@@ -863,7 +992,7 @@ async function handleExchangePost(request: Request) {
             });
 
         if (existingDelivery) {
-          if (onboardingJourneyId) {
+          if (onboardingJourneyId && ownPhoto) {
             await transferOnboardingExchangeRows({
               supabase,
               anonymousId,
@@ -915,7 +1044,11 @@ async function handleExchangePost(request: Request) {
           });
         }
 
-        if (onboardingJourneyId && onboardingLedger?.submissionId) {
+        if (
+          onboardingJourneyId &&
+          onboardingLedger?.submissionId &&
+          ownPhoto
+        ) {
           const existingBundle = await readExistingOnboardingDeliveryBundle({
             supabase,
             bundleId: idempotentDeliveryId,
@@ -1088,8 +1221,15 @@ async function handleEveningChoiceExchange({
   ) {
     fallbackReason =
       selectedCandidates.length === 0 ? "no_candidate" : "candidate_shortage";
-    selectedCandidates = selectedCandidates.slice(0, 1);
-    servedVariant = "single_v1";
+    if (
+      isOnboardingExchange &&
+      input.onboardingPhase === "preview"
+    ) {
+      selectedCandidates = [];
+    } else {
+      selectedCandidates = selectedCandidates.slice(0, 1);
+      servedVariant = "single_v1";
+    }
   }
 
   if (selectedCandidates.length === 0) {
@@ -1178,6 +1318,9 @@ async function handleEveningChoiceExchange({
         requested_count: EVENING_CHOICE_REQUESTED_COUNT,
         served_count: servedCount,
         fallback_reason: fallbackReason,
+        ...(input.onboardingPhase
+          ? { onboarding_phase: input.onboardingPhase }
+          : {}),
         ...(!isOnboardingSingleFallback
           ? { delivery_position: index + 1 }
           : {}),
@@ -1853,6 +1996,11 @@ async function readExchangeRequest(request: Request): Promise<ExchangeRequestPar
       capability: toStringOrNull(body.capability),
       debugDryRun: body.debugDryRun === true,
       mode: body.mode === "onboarding" ? "onboarding" : null,
+      onboardingPhase:
+        body.onboardingPhase === "preview" ||
+        body.onboardingPhase === "commit"
+          ? body.onboardingPhase
+          : null,
       onboardingSubmission:
         body.onboardingSubmission && typeof body.onboardingSubmission === "object"
           ? {
@@ -1883,24 +2031,29 @@ function isValidOwnPhotoInput(
 } {
   return Boolean(
     typeof input.ownPhoto.id === "string" &&
+      input.ownPhoto.id.trim().length > 0 &&
       typeof input.ownPhoto.catId === "string" &&
+      input.ownPhoto.catId.trim().length > 0 &&
       typeof input.ownPhoto.src === "string" &&
-      input.ownPhoto.src,
+      input.ownPhoto.src.trim().length > 0,
   );
 }
 
 function validateExchangeRequest(
   input: Required<ExchangeRequest>,
 ): SleepingDeliveryValidationResult {
-  if (!isValidOwnPhotoInput(input)) {
+  const isOnboardingPreview =
+    input.mode === "onboarding" && input.onboardingPhase === "preview";
+
+  if (!isOnboardingPreview && !isValidOwnPhotoInput(input)) {
     return { ok: false, status: 400, error: "invalid_exchange_request" };
   }
 
   const ownPhoto = input.ownPhoto;
   const stringFields = [
-    ownPhoto.id,
-    ownPhoto.catId,
-    ownPhoto.ownerCatId,
+    ...(isOnboardingPreview
+      ? []
+      : [ownPhoto.id, ownPhoto.catId, ownPhoto.ownerCatId]),
     input.anonymousId,
     input.recipientCatId,
     input.preferredSourcePhotoId,
@@ -1918,8 +2071,9 @@ function validateExchangeRequest(
     input.seed,
     input.deliveryDateKey,
     input.mode,
-    ownPhoto.triggerLabel,
-    ownPhoto.theme,
+    ...(isOnboardingPreview
+      ? []
+      : [ownPhoto.triggerLabel, ownPhoto.theme]),
   ].filter((value): value is string => typeof value === "string");
 
   if (textFields.some((value) => value.length > MAX_TEXT_LENGTH)) {
@@ -1927,6 +2081,7 @@ function validateExchangeRequest(
   }
 
   if (
+    !isOnboardingPreview &&
     ownPhoto.shared !== undefined &&
     typeof ownPhoto.shared !== "boolean"
   ) {
@@ -1956,6 +2111,13 @@ function validateExchangeRequest(
     return { ok: false, status: 400, error: "invalid_exchange_request" };
   }
 
+  if (
+    input.onboardingPhase !== null &&
+    input.mode !== "onboarding"
+  ) {
+    return { ok: false, status: 400, error: "invalid_exchange_request" };
+  }
+
   const onboardingSubmission = input.onboardingSubmission;
   if (
     onboardingSubmission &&
@@ -1974,8 +2136,9 @@ function validateExchangeRequest(
               onboardingSubmission.journeyId,
               onboardingSubmission.dateKey,
             ) ||
-          ownPhoto.id !==
-            createOnboardingOwnPhotoId(onboardingSubmission.submissionId))) ||
+          (!isOnboardingPreview &&
+            ownPhoto.id !==
+            createOnboardingOwnPhotoId(onboardingSubmission.submissionId)))) ||
       (input.deliveryDateKey !== null &&
         input.deliveryDateKey !== onboardingSubmission.dateKey) ||
       typeof onboardingSubmission.source !== "string" ||
@@ -1985,6 +2148,20 @@ function validateExchangeRequest(
   }
 
   if (
+    (input.onboardingPhase === "preview" ||
+      input.onboardingPhase === "commit") &&
+    (input.capability !== ONBOARDING_CHOICE_CAPABILITY ||
+      input.requestedCandidateCount !== ONBOARDING_CHOICE_REQUESTED_COUNT ||
+      !input.deliveryDateKey ||
+      !onboardingSubmission ||
+      !onboardingSubmission.journeyId ||
+      onboardingSubmission.dateKey !== input.deliveryDateKey)
+  ) {
+    return { ok: false, status: 400, error: "invalid_exchange_request" };
+  }
+
+  if (
+    !isOnboardingPreview &&
     typeof ownPhoto.createdAt === "number" &&
     (!Number.isFinite(ownPhoto.createdAt) ||
       ownPhoto.createdAt < MIN_CREATED_AT ||
@@ -1993,7 +2170,11 @@ function validateExchangeRequest(
     return { ok: false, status: 400, error: "invalid_exchange_request" };
   }
 
-  return validateOwnPhotoSrc(ownPhoto.src);
+  if (isOnboardingPreview) {
+    return { ok: true };
+  }
+
+  return validateOwnPhotoSrc(ownPhoto.src ?? "");
 }
 
 async function recordOnboardingDeliveryProgress({
@@ -2063,7 +2244,7 @@ function isOnboardingSource(value: string) {
 
 function exchangeError(
   error: string,
-  status: 400 | 401 | 403 | 409 | 413 | 415 | 429 | 500,
+  status: 400 | 401 | 403 | 409 | 410 | 413 | 415 | 429 | 500 | 503,
 ) {
   return NextResponse.json({ photo: null, source: "none", error }, { status });
 }
@@ -2356,15 +2537,83 @@ async function readPriorExchange({
 }) {
   let query = supabase
     .from("cat_moment_deliveries")
-    .select("id")
+    .select("id, metadata")
     .eq(identityColumn, identityValue)
-    .limit(1);
+    .order("delivered_at", { ascending: false })
+    .limit(256);
 
   for (const localDeliveryId of excludeLocalDeliveryIds) {
     query = query.neq("local_delivery_id", localDeliveryId);
   }
 
-  return query.maybeSingle<{ id: string }>();
+  const { data, error } = await query;
+  if (error) {
+    return { data: null, error };
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    metadata: Record<string, unknown> | null;
+  }>;
+  const definitePrior = rows.find(
+    (row) => readMetadataString(row.metadata, "onboarding_phase") !== "preview",
+  );
+  if (definitePrior) {
+    return { data: { id: definitePrior.id }, error: null };
+  }
+
+  const previewSubmissionIds = [
+    ...new Set(
+      rows
+        .map((row) =>
+          readMetadataString(row.metadata, "onboarding_submission_id"),
+        )
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+  if (previewSubmissionIds.length === 0) {
+    return { data: null, error: null };
+  }
+
+  const ledgerResult = await supabase
+    .from("onboarding_submissions")
+    .select("submission_id, own_photo_id, stage")
+    .in("submission_id", previewSubmissionIds);
+  if (ledgerResult.error) {
+    return { data: null, error: ledgerResult.error };
+  }
+
+  const committedSubmissionIds = new Set(
+    (
+      (ledgerResult.data ?? []) as Array<{
+        submission_id: string;
+        own_photo_id: string | null;
+        stage: string;
+      }>
+    )
+      .filter(
+        (row) =>
+          Boolean(row.own_photo_id) &&
+          ["submitted", "delivered", "opened", "completed"].includes(
+            row.stage,
+          ),
+      )
+      .map((row) => row.submission_id),
+  );
+  const committedPreview = rows.find((row) => {
+    const submissionId = readMetadataString(
+      row.metadata,
+      "onboarding_submission_id",
+    );
+    return Boolean(
+      submissionId && committedSubmissionIds.has(submissionId),
+    );
+  });
+
+  return {
+    data: committedPreview ? { id: committedPreview.id } : null,
+    error: null,
+  };
 }
 
 async function readDeliveryExposureHistory({
@@ -3347,6 +3596,27 @@ function readPoolKind(metadata: Record<string, unknown> | null) {
   }
 
   return "unknown";
+}
+
+function readMetadataString(
+  metadata: Record<string, unknown> | null,
+  key: string,
+) {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value : null;
+}
+
+function isFreshOnboardingPreviewBundle(deliveries: RemoteDeliveryRow[]) {
+  const latestDeliveredAt = Math.max(
+    ...deliveries.map((delivery) => Date.parse(delivery.delivered_at)),
+  );
+  const now = Date.now();
+
+  return (
+    Number.isFinite(latestDeliveredAt) &&
+    latestDeliveredAt <= now + MAX_CREATED_AT_FUTURE_DRIFT_MS &&
+    now - latestDeliveredAt <= ONBOARDING_PREVIEW_COMMIT_TTL_MS
+  );
 }
 
 function hashText(value: string) {

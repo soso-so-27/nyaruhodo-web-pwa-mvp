@@ -38,6 +38,18 @@ type FourChoiceFunnelStep = FourChoiceMetric & {
   fromAssignedRate: number | null;
 };
 
+type PreviewOnboardingAnalytics = {
+  funnel: FunnelStep[];
+  skipped: Metric;
+  conversion: {
+    selectedUsers: number;
+    photoSubmittedUsers: number;
+    committedUsers: number;
+    selectedToPhotoSubmittedRate: number | null;
+    selectedToCommittedRate: number | null;
+  };
+};
+
 type AnalyticsResponse = {
   period: AnalyticsPeriodKey;
   audience: AnalyticsAudience;
@@ -48,6 +60,7 @@ type AnalyticsResponse = {
   overview: Metric[];
   funnel: FunnelStep[];
   newOnboardingFunnel: FunnelStep[];
+  previewOnboarding?: PreviewOnboardingAnalytics;
   returningFunnel: FunnelStep[];
   handoffFunnel: FunnelStep[];
   fourChoiceHealth?: {
@@ -195,6 +208,14 @@ const EVENT_LABELS: Record<string, string> = {
   photo_original_preservation_failed: "原本写真の保全失敗",
   cat_gallery_restore_failed: "うちのこ写真の復元失敗",
   evening_choice_own_record_clicked: "4匹保存後にうちのこを開いた",
+  onboarding_preview_started: "先に4匹を用意し始めた",
+  onboarding_preview_shown: "先に4匹を表示した",
+  onboarding_preview_selected: "先に気になる1匹を選んだ",
+  onboarding_photo_invite_click: "自分の写真へ進んだ",
+  onboarding_preview_committed: "選んだ1匹を確定した",
+  onboarding_preview_skipped: "先に選ぶ体験を見送った",
+  onboarding_preview_commit_resolved_skipped:
+    "別の操作ですでに見送られ、写真だけを保存した",
 };
 
 export default function AdminAnalyticsClient() {
@@ -397,6 +418,23 @@ export default function AdminAnalyticsClient() {
             />
             <FunnelTable steps={data.newOnboardingFunnel ?? data.funnel} />
           </section>
+
+          {data.previewOnboarding ? (
+            <section
+              style={styles.section}
+              aria-labelledby="preview-onboarding-title"
+            >
+              <SectionHeading
+                id="preview-onboarding-title"
+                title="選択先行オンボ"
+                note="先に1匹を選んだ人が、自分の写真保存と選択確定まで進んだか"
+              />
+              <FunnelTable steps={data.previewOnboarding.funnel} />
+              <PreviewOnboardingConversionTable
+                analytics={data.previewOnboarding}
+              />
+            </section>
+          ) : null}
 
           <section style={styles.section} aria-labelledby="returning-title">
             <SectionHeading
@@ -863,6 +901,7 @@ function buildCodexAnalyticsExport(data: AnalyticsResponse) {
     overview: data.overview,
     funnel: data.funnel,
     newOnboardingFunnel: data.newOnboardingFunnel,
+    previewOnboarding: data.previewOnboarding,
     returningFunnel: data.returningFunnel,
     handoffFunnel: data.handoffFunnel,
     fourChoiceHealth: data.fourChoiceHealth,
@@ -1025,6 +1064,37 @@ function FunnelTable({ steps }: { steps: FunnelStep[] }) {
           : formatRate(step.fromPreviousRate, step.users, step.previousUsers),
         formatPercent(step.fromStartRate),
       ])}
+    />
+  );
+}
+
+function PreviewOnboardingConversionTable({
+  analytics,
+}: {
+  analytics: PreviewOnboardingAnalytics;
+}) {
+  const { conversion, skipped } = analytics;
+
+  return (
+    <AnalyticsTable
+      columns={["目的指標", "到達", "選択から"]}
+      rows={[
+        [
+          "1匹選択 → 自分の写真を保存",
+          `${conversion.photoSubmittedUsers}/${conversion.selectedUsers} ID`,
+          formatPercent(conversion.selectedToPhotoSubmittedRate),
+        ],
+        [
+          "1匹選択 → 選んだ1匹を確定",
+          `${conversion.committedUsers}/${conversion.selectedUsers} ID`,
+          formatPercent(conversion.selectedToCommittedRate),
+        ],
+        [
+          skipped.label,
+          `${skipped.users} ID`,
+          `${skipped.events} イベント`,
+        ],
+      ]}
     />
   );
 }

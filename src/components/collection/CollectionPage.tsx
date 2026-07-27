@@ -999,21 +999,21 @@ export function CollectionPage() {
 
       if (result.error === "local_share_update_failed") {
         showToast(
-          "ねこだよりに変更できませんでした。写真は自分だけのままです。画面をひらき直して、もう一度お試しください。",
+          "ほかのおうちへ送る設定に変更できませんでした。写真は自分だけのままです。画面をひらき直して、もう一度お試しください。",
         );
         return null;
       }
 
       if (result.error === "share_backup_failed_restored") {
         showToast(
-          "ねこだよりに変更できませんでした。写真は自分だけのままです。通信を確認して、もう一度お試しください。",
+          "ほかのおうちへ送る設定に変更できませんでした。写真は自分だけのままです。通信を確認して、もう一度お試しください。",
         );
         return null;
       }
 
       if (result.error === "share_backup_failed_uncertain" && result.photo) {
         showToast(
-          "変更結果を確認できませんでした。安全のため、ねこだよりの候補として表示しています。通信を確認して「自分だけにする」を押してください。",
+          "変更結果を確認できませんでした。安全のため、ほかのおうちへ届く候補のままにしています。通信を確認して「自分だけにする」を押してください。",
         );
         return {
           photo: result.photo,
@@ -1023,7 +1023,7 @@ export function CollectionPage() {
 
       if (result.error === "private_backup_failed") {
         showToast(
-          "自分だけに変更できませんでした。写真はねこだよりの候補のままです。通信を確認して、もう一度お試しください。",
+          "自分だけに変更できませんでした。写真はほかのおうちへ届く候補のままです。通信を確認して、もう一度お試しください。",
         );
         return null;
       }
@@ -1127,7 +1127,7 @@ export function CollectionPage() {
 
     showToast(
       displayedShared
-        ? "ねこだよりの候補として運営確認に送りました"
+        ? "ほかのおうちへ届く候補として、運営確認に送りました"
         : "自分だけの写真にしました",
     );
     trackProductEvent(
@@ -1287,7 +1287,7 @@ export function CollectionPage() {
       result.photo.shared ?? result.photo.visibility === "shared";
     showToast(
       displayedShared
-        ? "ねこだよりの候補として運営確認に送りました"
+        ? "ほかのおうちへ届く候補として、運営確認に送りました"
         : "自分だけの写真にしました",
     );
     trackProductEvent(
@@ -1682,7 +1682,7 @@ export function CollectionPage() {
                   : "ねこだよりへ戻る"}
               </button>
               <h1 style={styles.nekodayoriManageTitle}>
-                ねこだよりに送る写真の設定
+                ほかのおうちへ送る写真の設定
               </h1>
               <p style={styles.nekodayoriManageLead}>
                 ほかの人へ送ってよい写真を、確認・変更できます。
@@ -2030,7 +2030,7 @@ function BoxOverview({
     <section
       style={styles.boxOverview}
       aria-label={
-        side === "sent" ? "ねこだよりに送る写真の設定" : "ねこだより"
+        side === "sent" ? "ほかのおうちへ送る写真の設定" : "ねこだより"
       }
     >
       <MainichiPhotoBoard
@@ -2351,7 +2351,7 @@ function MainichiBoardEmptyState({ activeSide }: { activeSide: MainichiBoardSide
         </AppButton>
       ) : (
         <p style={styles.mainichiBoardEmptyCopy}>
-          えらんだ猫が、ここに増えていきます。
+          選んだ猫が、ここに増えていきます。
         </p>
       )}
     </section>
@@ -3629,7 +3629,7 @@ function MainichiFullscreenPhoto({
   const canNavigate = photoCount > 1;
   const deliveryActionLabel = photo.shared
     ? "自分だけにする"
-    : "ねこだよりにする";
+    : "ほかのおうちへ送る";
   const pendingActionCopy =
     pendingAction === "delete"
       ? {
@@ -3934,7 +3934,7 @@ function BoxPhotoDetailSheet({
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
   const deliveryActionLabel = currentPhoto?.shared
     ? "自分だけにする"
-    : "ねこだよりにする";
+    : "ほかのおうちへ送る";
   const pendingActionCopy =
     pendingAction === "delete"
       ? {
@@ -7378,11 +7378,9 @@ const styles = {
     boxShadow: "none",
   },
   mainichiMonthPickerSheet: {
-    zIndex: 120,
     paddingBottom: "calc(30px + env(safe-area-inset-bottom))",
   },
   mainichiMonthBundleAppSheet: {
-    zIndex: 120,
     paddingBottom: "calc(30px + env(safe-area-inset-bottom))",
   },
   mainichiMonthBundleDays: {

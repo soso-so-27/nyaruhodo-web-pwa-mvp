@@ -13,6 +13,7 @@ type ModalBehaviorOptions = {
   onClose: () => void;
   lockScroll?: boolean;
   manageHistory?: boolean;
+  initialFocus?: "first" | "container";
 };
 
 let modalHistorySequence = 0;
@@ -22,6 +23,7 @@ export function useModalBehavior<ElementType extends HTMLElement>({
   onClose,
   lockScroll = true,
   manageHistory = false,
+  initialFocus = "first",
 }: ModalBehaviorOptions): {
   modalRef: RefObject<ElementType | null>;
   handleModalKeyDown: (event: KeyboardEvent<ElementType>) => void;
@@ -63,8 +65,11 @@ export function useModalBehavior<ElementType extends HTMLElement>({
     }
 
     const focusTimer = window.setTimeout(() => {
-      const firstFocusable = getFocusableElements(modalRef.current)[0] ?? modalRef.current;
-      firstFocusable?.focus({ preventScroll: true });
+      const focusTarget =
+        initialFocus === "container"
+          ? modalRef.current
+          : getFocusableElements(modalRef.current)[0] ?? modalRef.current;
+      focusTarget?.focus({ preventScroll: true });
     }, 0);
 
     return () => {
@@ -79,7 +84,7 @@ export function useModalBehavior<ElementType extends HTMLElement>({
         previousFocus.focus({ preventScroll: true });
       }
     };
-  }, [lockScroll, open]);
+  }, [initialFocus, lockScroll, open]);
 
   useEffect(() => {
     if (!open || !manageHistory || typeof window === "undefined") {

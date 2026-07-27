@@ -369,7 +369,7 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
     await expect(
-      page.getByRole("button", { name: "ねこだよりに送る写真の設定" }),
+      page.getByRole("button", { name: "ほかのおうちへ送る写真の設定" }),
     ).toHaveCount(0);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
 
@@ -1010,10 +1010,9 @@ test.describe("collection album flow", () => {
 
     await page.getByRole("link", { name: "うちのこ" }).click();
     await page.waitForURL("**/cats");
-    await page.getByRole("link", { name: "ねこだより" }).click();
-    await page.waitForURL("**/collection");
+    await page.goBack();
+    await page.waitForURL("**/collection?manage=sent");
     await page.waitForLoadState("networkidle");
-    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
 
     const targetRequestCountsAfterRevisit = countRequestKeys(
@@ -2073,10 +2072,10 @@ test.describe("collection album flow", () => {
 
     await page.getByRole("button", { name: "自分だけにする" }).click();
     await expect(page.getByText("自分だけの写真にしました")).toBeVisible();
-    await expect(page.getByRole("button", { name: "ねこだよりにする" })).toBeVisible();
-    await page.getByRole("button", { name: "ねこだよりにする" }).click();
+    await expect(page.getByRole("button", { name: "ほかのおうちへ送る" })).toBeVisible();
+    await page.getByRole("button", { name: "ほかのおうちへ送る" }).click();
     await expect(
-      page.getByText("ねこだよりの候補として運営確認に送りました"),
+      page.getByText("ほかのおうちへ届く候補として、運営確認に送りました"),
     ).toBeVisible();
     await page.getByRole("button", { name: "自分だけにする" }).click();
     await expect
@@ -2151,7 +2150,7 @@ test.describe("collection album flow", () => {
 
     await expect(
       page.getByText(
-        "自分だけに変更できませんでした。写真はねこだよりの候補のままです。通信を確認して、もう一度お試しください。",
+        "自分だけに変更できませんでした。写真はほかのおうちへ届く候補のままです。通信を確認して、もう一度お試しください。",
       ),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "自分だけにする" })).toBeVisible();
@@ -2219,11 +2218,11 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await openOwnPhotoSettings(page);
     await page.getByTestId("mainichi-board-photo-sent").click();
-    await page.getByRole("button", { name: "ねこだよりにする" }).click();
+    await page.getByRole("button", { name: "ほかのおうちへ送る" }).click();
 
     await expect(
       page.getByText(
-        "変更結果を確認できませんでした。安全のため、ねこだよりの候補として表示しています。通信を確認して「自分だけにする」を押してください。",
+        "変更結果を確認できませんでした。安全のため、ほかのおうちへ届く候補のままにしています。通信を確認して「自分だけにする」を押してください。",
       ),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "自分だけにする" })).toBeVisible();
@@ -2296,15 +2295,15 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await openOwnPhotoSettings(page);
     await page.getByTestId("mainichi-board-photo-sent").click();
-    await page.getByRole("button", { name: "ねこだよりにする" }).click();
+    await page.getByRole("button", { name: "ほかのおうちへ送る" }).click();
 
     await expect(
       page.getByText(
-        "ねこだよりに変更できませんでした。写真は自分だけのままです。通信を確認して、もう一度お試しください。",
+        "ほかのおうちへ送る設定に変更できませんでした。写真は自分だけのままです。通信を確認して、もう一度お試しください。",
       ),
     ).toBeVisible();
     expect(backupRequestCount).toBe(2);
-    await expect(page.getByRole("button", { name: "ねこだよりにする" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "ほかのおうちへ送る" })).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -2514,7 +2513,7 @@ async function openOwnPhotoSettings(page: Page) {
   await page.goto("/collection?manage=sent");
   await expect(
     page.getByRole("heading", {
-      name: "ねこだよりに送る写真の設定",
+      name: "ほかのおうちへ送る写真の設定",
       exact: true,
     }),
   ).toBeVisible();

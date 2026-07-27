@@ -116,9 +116,9 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
           <p className="deviceGateLead">
             スマホでひらくと、
             <br />
-            ねがおの写真を1枚選んで
+            4匹のねこから1匹を選んで、
             <br />
-            ねこだよりがとどきます。
+            あなたの猫の写真と交換できます。
           </p>
           <p className="deviceGateCopy">
             このページをスマホでひらいてください。

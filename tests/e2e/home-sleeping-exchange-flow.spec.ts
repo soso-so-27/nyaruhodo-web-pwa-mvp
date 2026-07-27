@@ -1041,7 +1041,9 @@ test.describe("home sleeping exchange flow", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("status catの写真を残す")).toBeVisible();
-    await expect(dialog.getByText("ねこだよりに送りますか？")).toBeVisible();
+    await expect(
+      dialog.getByText("この写真をほかのおうちへ送りますか？"),
+    ).toBeVisible();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
       "保存すると、よる8時ごろにねこだよりがとどきます。",
     );

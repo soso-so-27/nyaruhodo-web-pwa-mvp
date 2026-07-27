@@ -42,12 +42,30 @@ test.describe("20時前の実機確認フロー", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByTestId("evening-four-choice-option")).toHaveCount(4);
     await dialog.getByTestId("evening-four-choice-option").nth(2).click();
-    await dialog.getByTestId("evening-four-choice-save").click();
+    const preview = page.getByTestId("evening-four-choice-preview");
+    await expect(preview).toBeVisible();
+    await expect(preview).toHaveAttribute("data-position", "3");
+    await expect(
+      preview.getByTestId("evening-four-choice-preview-thumbnail"),
+    ).toHaveCount(4);
+    await preview
+      .getByTestId("evening-four-choice-preview-thumbnail")
+      .first()
+      .click();
+    await expect(preview).toHaveAttribute("data-position", "1");
+    await expect(
+      dialog.getByTestId("evening-four-choice-option").first(),
+    ).toHaveAttribute("data-selected", "false");
+    await page.getByTestId("evening-four-choice-save").click();
     await expect(dialog.getByTestId("evening-four-choice-saved")).toBeVisible();
     await dialog.getByTestId("evening-four-choice-finish").click();
 
     await expect(page.getByTestId("evening-preview-done")).toContainText(
       "1枚を「ねこだより」に残しました",
+    );
+    await expect(page.getByRole("img", { name: "保存した猫" })).toHaveAttribute(
+      "src",
+      "/sample-cats/pose-box.webp",
     );
     expect(protectedRequests).toEqual([]);
     expect(
@@ -55,7 +73,7 @@ test.describe("20時前の実機確認フロー", () => {
     ).toBeLessThanOrEqual(390);
   });
 
-  test("閉じる確認から戻っても仮選択を保ち、保存しないで終了できる", async ({
+  test("端末の戻る操作は写真確認だけを閉じ、保存しないで終了できる", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 568 });
@@ -65,18 +83,24 @@ test.describe("20時前の実機確認フロー", () => {
     await page.getByTestId("evening-preview-open").click();
 
     let dialog = page.getByTestId("evening-four-choice");
-    const selected = dialog.getByTestId("evening-four-choice-option").nth(1);
-    await selected.click();
+    const viewed = dialog.getByTestId("evening-four-choice-option").nth(1);
+    await viewed.click();
+    await expect(page.getByTestId("evening-four-choice-preview")).toBeVisible();
+    await page.goBack();
+    await expect(page.getByTestId("evening-four-choice-preview")).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "選ぶのをやめますか？" }),
+    ).toHaveCount(0);
     await dialog.getByTestId("evening-four-choice-close").click();
 
     await expect(
       page.getByRole("dialog", { name: "選ぶのをやめますか？" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "選ぶ画面にもどる" }).click();
-    await expect(dialog.getByTestId("evening-four-choice-option").nth(1)).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    await expect(
+      dialog.getByTestId("evening-four-choice-option").nth(1),
+    ).toHaveAttribute("data-selected", "false");
     await dialog.getByTestId("evening-four-choice-skip").click();
 
     await expect(page.getByTestId("evening-preview-done")).toContainText(

@@ -105,6 +105,12 @@ function toAdvanceInput(
   const isUnresolvedFourChoice = Boolean(
     progress.deliveryBundleId && !progress.isDeliveredPhotoKept,
   );
+  const isPendingPreviewCommit = Boolean(
+    progress.stage === "submitted" &&
+      progress.deliveryBundleId &&
+      progress.pendingDeliveryPhotoId &&
+      !progress.isDeliveredPhotoKept,
+  );
 
   return {
     anonymousId: progress.anonymousId,
@@ -119,7 +125,9 @@ function toAdvanceInput(
     sourcePhotoId: isUnresolvedFourChoice
       ? null
       : (progress.deliveredPhoto?.sourcePhotoId ?? null),
-    stage: mapProgressStage(progress.stage),
+    stage: isPendingPreviewCommit
+      ? "selected"
+      : mapProgressStage(progress.stage),
     submissionId: progress.submissionId,
   };
 }
@@ -127,6 +135,10 @@ function toAdvanceInput(
 function mapProgressStage(
   stage: OnboardingProgress["stage"],
 ): OnboardingServerStage {
+  if (stage === "preview_ready" || stage === "photo_pending") {
+    return "selected";
+  }
+
   if (stage === "submitted") {
     return "submitted";
   }
@@ -136,6 +148,10 @@ function mapProgressStage(
   }
 
   if (stage === "album_created") {
+    return "completed";
+  }
+
+  if (stage === "skipped") {
     return "completed";
   }
 

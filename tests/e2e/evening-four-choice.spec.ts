@@ -188,7 +188,7 @@ test.describe("20時便の4枚選択", () => {
         `[data-testid="evening-four-choice-option"][data-photo-id="${selectedPhotoId}"]`,
       )
       .click();
-    await choiceDialog.getByTestId("evening-four-choice-save").click();
+    await page.getByTestId("evening-four-choice-save").click();
 
     await expect.poll(() => readEveningSelection(page)).toEqual({
       keptPhotoIds: [selectedPhotoId],
@@ -240,7 +240,7 @@ test.describe("20時便の4枚選択", () => {
         '[data-testid="evening-four-choice-option"][data-photo-id="four-choice-delivery-1"]',
       )
       .click();
-    await choiceDialog.getByTestId("evening-four-choice-save").click();
+    await page.getByTestId("evening-four-choice-save").click();
     const ownRecordLink = choiceDialog.getByTestId(
       "evening-four-choice-own-record",
     );
@@ -310,7 +310,7 @@ test.describe("20時便の4枚選択", () => {
         '[data-testid="evening-four-choice-option"][data-photo-id="four-choice-delivery-1"]',
       )
       .click();
-    await choiceDialog.getByTestId("evening-four-choice-save").click();
+    await page.getByTestId("evening-four-choice-save").click();
     await choiceDialog.getByTestId("evening-four-choice-own-record").click();
 
     await expect(page).toHaveURL(/\/cats$/);
@@ -330,7 +330,7 @@ test.describe("20時便の4枚選択", () => {
     await expect(page.getByTestId("cats-photo-today-link")).toHaveCount(0);
   });
 
-  test("閉じる前に確認し、選択に戻るか今回分を保存せず終了できる", async ({
+  test("写真を見ただけでは選択にせず、閉じる前に終了方法を確認できる", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 568 });
@@ -360,11 +360,17 @@ test.describe("20時便の4枚選択", () => {
         `[data-testid="evening-four-choice-option"][data-photo-id="${draftPhotoId}"]`,
       )
       .click();
+    const preview = page.getByTestId("evening-four-choice-preview");
+    await expect(preview).toBeVisible();
+    await expect(
+      preview.getByTestId("evening-four-choice-preview-thumbnail"),
+    ).toHaveCount(4);
     expect(
-      await choiceDialog
+      await preview
         .getByTestId("evening-four-choice-save")
         .evaluate((element) => element.getBoundingClientRect().bottom <= window.innerHeight),
     ).toBe(true);
+    await preview.getByTestId("evening-four-choice-preview-back").click();
     expect(
       await choiceDialog
         .getByTestId("evening-four-choice-skip")
@@ -382,13 +388,13 @@ test.describe("20時便の4枚選択", () => {
       choiceDialog.locator(
         `[data-testid="evening-four-choice-option"][data-photo-id="${draftPhotoId}"]`,
       ),
-    ).toHaveAttribute("aria-checked", "true");
+    ).toHaveAttribute("data-selected", "false");
     await expect.poll(() => readEveningSelection(page)).toEqual({
       keptPhotoIds: [],
       selectedPhotoId: null,
       hasKeptAt: false,
     });
-    await expect.poll(() => readEveningDraftSelection(page)).toBe(draftPhotoId);
+    await expect.poll(() => readEveningDraftSelection(page)).toBeNull();
 
     await page.goBack();
     await expect(exitConfirm).toBeVisible();
@@ -422,6 +428,7 @@ test.describe("20時便の4枚選択", () => {
         '[data-testid="evening-four-choice-option"][data-photo-id="four-choice-delivery-4"]',
       )
       .click();
+    await page.getByTestId("evening-four-choice-preview-back").click();
     await choiceDialog.getByTestId("evening-four-choice-skip").click();
 
     await expect(choiceDialog).toHaveCount(0);
@@ -493,7 +500,7 @@ test.describe("20時便の4枚選択", () => {
       `[data-testid="evening-four-choice-option"][data-photo-id="${reportedPhotoId}"]`,
     );
     await reportedChoice.click();
-    await choiceDialog.getByTestId("evening-four-choice-report").click();
+    await page.getByRole("button", { name: "運営に報告" }).click();
     await page.getByRole("button", { name: "ねこの写真ではない" }).click();
 
     await expect(reportedChoice).toBeDisabled();
@@ -521,7 +528,7 @@ test.describe("20時便の4枚選択", () => {
         `[data-testid="evening-four-choice-option"][data-photo-id="${keptPhotoId}"]`,
       )
       .click();
-    await choiceDialog.getByTestId("evening-four-choice-save").click();
+    await page.getByTestId("evening-four-choice-save").click();
 
     await expect.poll(() => readEveningSelection(page)).toEqual({
       keptPhotoIds: [keptPhotoId],
@@ -586,7 +593,7 @@ test.describe("20時便の4枚選択", () => {
         '[data-testid="evening-four-choice-option"][data-photo-id="four-choice-delivery-4"]',
       )
       .click();
-    await choiceDialog.getByTestId("evening-four-choice-save").click();
+    await page.getByTestId("evening-four-choice-save").click();
 
     await expect.poll(() => readEveningSelection(page)).toEqual({
       keptPhotoIds: ["four-choice-delivery-2"],
@@ -616,10 +623,12 @@ test.describe("20時便の4枚選択", () => {
         `[data-testid="evening-four-choice-option"][data-photo-id="${selectedPhotoId}"]`,
       )
       .click();
-    await choiceDialog.getByTestId("evening-four-choice-save").click();
+    await page.getByTestId("evening-four-choice-save").click();
 
     await expect(choiceDialog).toBeVisible();
-    await expect(choiceDialog.getByRole("alert")).toBeVisible();
+    await expect(
+      page.getByTestId("evening-four-choice-preview").getByRole("alert"),
+    ).toBeVisible();
     await expect.poll(() => readKeptPhotoIds(page)).toEqual([]);
     await expect.poll(() => readEveningDraftSelection(page)).toBe(selectedPhotoId);
   });

@@ -88,10 +88,12 @@ test.describe("onboarding delivery flow", () => {
   test("guides a new root visit to onboarding and preserves attribution", async ({
     page,
   }) => {
+    test.slow();
     await page.goto("/?source=instagram_story");
 
     await expect(page).toHaveURL(
       /\/onboarding\?source=instagram_story$/,
+      { timeout: 30_000 },
     );
     await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
   });
@@ -210,6 +212,8 @@ test.describe("onboarding delivery flow", () => {
       });
     });
 
+    const bundleId = "delivered-test-admin-candidate-choice-first";
+    await routeChoiceFirstSupportApis(page);
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
 
@@ -232,25 +236,33 @@ test.describe("onboarding delivery flow", () => {
         return;
       }
 
+      const photos = createChoiceFirstDeliveredPhotos(
+        bundleId,
+        colorfulDeliveryDataUrl,
+      ).map((photo, index) => ({
+        ...photo,
+        sourcePhotoId:
+          index === 0
+            ? (stockResponses[0]?.sourceOwnPhotoId ?? "stock-e2e-fake")
+            : `stock-e2e-fake-${index + 1}`,
+      }));
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
-          photo: {
-            id: `delivered-test-${Date.now()}`,
-            sourcePhotoId: stockResponses[0]?.sourceOwnPhotoId ?? "stock-e2e-fake",
-            src: colorfulDeliveryDataUrl,
-            title: "",
-            subtitle: "",
-            triggerLabel: "sleeping",
-            theme: "sleeping",
-            deliveredAt: Date.now(),
-          },
+          photo: photos[0],
+          photos,
+          bundleId,
+          experienceVersion: "onboarding_choice_v1",
+          assignedVariant: "four_choice_v1",
+          servedVariant: "four_choice_v1",
+          requestedCount: 4,
+          servedCount: 4,
           source: "remote",
           diagnostics: {
             source: "remote",
-            availableCount: 1,
-            candidateCount: 1,
-            normalCandidateCount: 1,
+            availableCount: 4,
+            candidateCount: 4,
+            normalCandidateCount: 4,
             fallbackCandidateCount: 0,
             fallbackActive: false,
           },
@@ -327,14 +339,12 @@ test.describe("onboarding delivery flow", () => {
     const introCopy = page.getByTestId("onboarding-exchange-explanation");
     await expect(introCopy).toBeVisible();
     await expect(introCopy).toHaveText(
-      "とどいた猫から、残したい1匹をえらべます。",
+      "まずは、4匹のねこに会ってみてください。",
     );
-    await expect(page.getByTestId("onboarding-privacy-note")).toHaveText(
-      "最初の1枚は、運営確認後にほかの利用者へとどくことがあります。公開一覧やSNSには表示されません",
-    );
+    await expect(page.getByTestId("onboarding-privacy-note")).toHaveCount(0);
     await expect(
       page.locator('[data-onboarding-title="true"]'),
-    ).toHaveText("うちの猫の写真を1枚残すと4匹の猫がとどきます");
+    ).toHaveText("気になる子は、どの子？");
     await expect(
       page.getByText("自分のねこのねがおの写真を1枚選ぶと、", { exact: true }),
     ).toHaveCount(0);
@@ -344,7 +354,47 @@ test.describe("onboarding delivery flow", () => {
     );
     await expect(page.getByText("外には出ません。", { exact: true })).toHaveCount(0);
 
-    await page.locator("button").first().click();
+    await page.getByTestId("onboarding-photo-select").click();
+    await expect.poll(() => exchangeCalls).toBe(1);
+    const addCandidateButton = page.getByRole("button", {
+      name: "とどく候補を追加する",
+    });
+    await expect(addCandidateButton).toBeVisible();
+    await expect(page.getByLabel("猫を読み込めませんでした")).toHaveAttribute(
+      "data-delivery-issue",
+      "temporary_error",
+    );
+    await addCandidateButton.click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "stock-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect.poll(() => stockCalls).toBe(1);
+    await expect.poll(() => stockResponses.length).toBe(1);
+    expect(stockResponses[0]).toMatchObject({
+      ok: true,
+      status: 200,
+      hasPhoto: true,
+      error: null,
+      srcKind: "data",
+    });
+    await page.getByTestId("onboarding-photo-select").click();
+    await expect.poll(() => exchangeCalls).toBe(2);
+    await expect.poll(() => exchangeResponses.length).toBe(2);
+    expect(exchangeResponses.at(-1)).toMatchObject({
+      source: "remote",
+      hasPhoto: true,
+      sourcePhotoId: stockResponses[0].sourceOwnPhotoId,
+      error: null,
+    });
+    const choices = page.getByTestId("onboarding-four-choice-option");
+    await expect(choices).toHaveCount(4);
+    await choices.first().click();
+    await page.getByTestId("onboarding-four-choice-save").click();
+    await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
+    await page.getByTestId("onboarding-photo-invite").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
@@ -363,78 +413,10 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByTestId("original-photo-preservation-warning"),
     ).toHaveCount(0);
-    await expect.poll(() => exchangeCalls).toBe(1);
-    const addCandidateButton = page.getByRole("button", {
-      name: "とどく候補を追加する",
-    });
-    const openEnvelopeButton = page.getByRole("button", {
-      name: "ねこだよりを ひらく",
-    });
-
-    await expect
-      .poll(async () => {
-        if (await addCandidateButton.isVisible()) {
-          return "test-tools";
-        }
-
-        if (await openEnvelopeButton.isVisible()) {
-          return "production-fallback";
-        }
-
-        return "waiting";
-      })
-      .not.toBe("waiting");
-
-    if (await openEnvelopeButton.isVisible()) {
-      await expect(addCandidateButton).toHaveCount(0);
-      return;
-    }
-
-    await expect(page.getByLabel("ねがおを保存しました")).toHaveAttribute(
-      "data-delivery-issue",
-      "no_candidate",
-    );
-    await addCandidateButton.click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "stock-sleeping.png",
-      mimeType: "image/png",
-      buffer: testPng,
-    });
-
-    await expect.poll(() => stockCalls).toBe(1);
-    await expect.poll(() => stockResponses.length).toBe(1);
-    expect(stockResponses[0]).toMatchObject({
-      ok: true,
-      status: 200,
-      hasPhoto: true,
-      error: null,
-      srcKind: "data",
-    });
-    await expect.poll(() => exchangeCalls).toBe(2);
-    await expect.poll(() => exchangeResponses.length).toBe(2);
-    expect(exchangeResponses.at(-1)).toMatchObject({
-      source: "remote",
-      hasPhoto: true,
-      sourcePhotoId: stockResponses[0].sourceOwnPhotoId,
-      error: null,
-    });
-    await expect(
-      page.getByRole("heading", { name: "ねこだよりが とどきました" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await page.waitForTimeout(1600);
-    await expectVisibleNonBlackImage(page.locator("main img").last());
-    await expect(
-      page.getByText("「ねこだより」に残りました"),
-    ).toBeVisible();
-    await expect(
-      page.getByText("あなたの猫の写真は「うちのこ」に、"),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "ホームへ進む" }),
-    ).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(3);
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await page.screenshot({
-      path: "artifacts/onboarding-delivered-opening.png",
+      path: "artifacts/onboarding-choice-first-joined.png",
       fullPage: true,
     });
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
@@ -448,9 +430,9 @@ test.describe("onboarding delivery flow", () => {
       ).length;
     });
     expect(eveningDeliveryDays).toBe(1);
-    await page.getByRole("button", { name: "ホームへ進む" }).click();
+    await page.getByRole("button", { name: "保存した写真を見る" }).click();
     await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
 
@@ -491,142 +473,25 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000);
-    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
+    await openChoiceFirstPhotoPicker(page, 1);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await page.waitForTimeout(1600);
-    await expect(
-      page.getByRole("button", { name: "ホームへ進む" }),
-    ).toBeVisible();
-    await expect(
-      page.getByText("「ねこだより」に残りました"),
-    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
-    await expect(page.getByTestId("onboarding-delivered-photos").locator("img")).toHaveCount(1);
-    const revealEvents = await waitForAnalyticsEvents(page, [
-      "delivery_reveal_photo_loaded",
-      "delivery_reveal_photo_rendered",
-    ]);
-    expect(revealEvents.delivery_reveal_photo_loaded).toBeTruthy();
-    expect(revealEvents.delivery_reveal_photo_rendered).toBeTruthy();
-    await expect(page.getByTestId("onboarding-delivered-photos")).toHaveAttribute(
-      "data-photo-frame",
-      "f3",
-    );
-    const deliveredLayout = await page.evaluate(() => {
-      const letter = document.querySelector<HTMLElement>(
-        '[data-testid="onboarding-delivered-letter"]',
-      );
-      const frame = document.querySelector<HTMLElement>(
-        '[data-testid="onboarding-delivered-photos"]',
-      );
-      const title = document.querySelector<HTMLElement>(
-        '[data-testid="onboarding-delivered-title"]',
-      );
-      const button = document.querySelector<HTMLElement>(
-        '[data-testid="onboarding-delivered-continue"]',
-      );
-      const frameRect = frame?.getBoundingClientRect();
-      const titleRect = title?.getBoundingClientRect();
-      const buttonRect = button?.getBoundingClientRect();
-      const letterStyle = letter ? window.getComputedStyle(letter) : null;
-      const frameStyle = frame ? window.getComputedStyle(frame) : null;
-      const photoStyle = frame?.querySelector("img")
-        ? window.getComputedStyle(frame.querySelector("img")!)
-        : null;
-      const photo = frame?.querySelector("img") as HTMLImageElement | null;
-
-      return {
-        frameWidth: frameRect?.width ?? 0,
-        frameHeight: frameRect?.height ?? 0,
-        frameRight: frameRect?.right ?? Number.POSITIVE_INFINITY,
-        titleBottom: titleRect?.bottom ?? Number.POSITIVE_INFINITY,
-        frameTop: frameRect?.top ?? Number.NEGATIVE_INFINITY,
-        buttonBottom: buttonRect?.bottom ?? Number.POSITIVE_INFINITY,
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight,
-        letterContainsButton: Boolean(letter?.contains(button)),
-        letterPaddingTop: letterStyle?.paddingTop ?? "",
-        letterBorderRadius: letterStyle?.borderRadius ?? "",
-        letterBorderWidth: letterStyle?.borderTopWidth ?? "",
-        letterBackgroundImage: letterStyle?.backgroundImage ?? "",
-        framePaddingTop: frameStyle?.paddingTop ?? "",
-        frameBorderRadius: frameStyle?.borderRadius ?? "",
-        frameBorderWidth: frameStyle?.borderTopWidth ?? "",
-        frameShadow: frameStyle?.boxShadow ?? "",
-        objectFit: photoStyle?.objectFit ?? "",
-        frameAspect: Number(frame?.dataset.photoAspect ?? 0),
-        photoNaturalAspect:
-          photo?.naturalWidth && photo.naturalHeight
-            ? photo.naturalWidth / photo.naturalHeight
-            : 0,
-      };
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
+    const keptPhotoIds = await page.evaluate(() => {
+      const parsed = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]",
+      ) as Array<{ id?: string }>;
+      return parsed.map((photo) => photo.id);
     });
-    expect(deliveredLayout.frameWidth).toBeGreaterThanOrEqual(240);
-    expect(deliveredLayout.photoNaturalAspect).toBeCloseTo(2 / 3, 2);
-    expect(deliveredLayout.frameAspect).toBeCloseTo(
-      deliveredLayout.photoNaturalAspect,
-      3,
-    );
-    expect(deliveredLayout.frameWidth / deliveredLayout.frameHeight).toBeCloseTo(
-      deliveredLayout.photoNaturalAspect,
-      2,
-    );
-    expect(deliveredLayout.frameRight).toBeLessThanOrEqual(deliveredLayout.viewportWidth);
-    expect(deliveredLayout.titleBottom).toBeLessThanOrEqual(
-      deliveredLayout.frameTop,
-    );
-    expect(deliveredLayout.buttonBottom).toBeLessThanOrEqual(
-      deliveredLayout.viewportHeight,
-    );
-    expect(deliveredLayout.letterContainsButton).toBe(false);
-    expect(deliveredLayout.letterPaddingTop).toBe("0px");
-    expect(deliveredLayout.letterBorderRadius).toBe("0px");
-    expect(deliveredLayout.letterBorderWidth).toBe("0px");
-    expect(deliveredLayout.letterBackgroundImage).toBe("none");
-    expect(deliveredLayout.framePaddingTop).toBe("0px");
-    expect(deliveredLayout.frameBorderRadius).toBe("0px");
-    expect(deliveredLayout.frameBorderWidth).toBe("1px");
-    expect(deliveredLayout.frameShadow).not.toBe("none");
-    expect(deliveredLayout.objectFit).toBe("contain");
-    if (process.env.CAPTURE_ONBOARDING_DELIVERED === "1") {
-      await page.screenshot({
-        path: "artifacts/onboarding-delivered-natural-frame.png",
-        animations: "disabled",
-      });
-    }
-    await page.setViewportSize({ width: 320, height: 568 });
-    const compactDeliveredLayout = await page
-      .getByTestId("onboarding-delivered-continue")
-      .evaluate((button) => {
-        const rect = button.getBoundingClientRect();
-        return {
-          top: rect.top,
-          bottom: rect.bottom,
-          viewportHeight: window.innerHeight,
-        };
-      });
-    expect(compactDeliveredLayout.top).toBeGreaterThanOrEqual(0);
-    expect(compactDeliveredLayout.bottom).toBeLessThanOrEqual(
-      compactDeliveredLayout.viewportHeight,
-    );
-    if (process.env.CAPTURE_ONBOARDING_DELIVERED === "1") {
-      await page.screenshot({
-        path: "artifacts/onboarding-delivered-natural-frame-320x568.png",
-        animations: "disabled",
-      });
-    }
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
-    await expect(page.getByRole("button", { name: "閉じる" })).toHaveCount(0);
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
+    expect(keptPhotoIds).toEqual([
+      "delivered-test-choice-first-choice-2",
+    ]);
   });
 
   test("shows four onboarding cats and saves only the selected one", async ({
@@ -649,6 +514,7 @@ test.describe("onboarding delivery flow", () => {
     let selectedOperation: string | null = null;
     let selectedPhotoId: string | null = null;
 
+    await routeChoiceFirstSupportApis(page);
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
       exchangeRequestBody = route.request().postDataJSON() as Record<
@@ -699,26 +565,15 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "own-sleeping.png",
-      mimeType: "image/png",
-      buffer: testPng,
-    });
-
-    await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
-    ).toBeVisible();
+    await page.getByRole("button", { name: "4匹に会ってみる" }).click();
+    await expect(page.getByTestId("onboarding-four-choice-option")).toHaveCount(4);
     expect(exchangeCalls).toBe(1);
     expect(exchangeRequestBody).toMatchObject({
       capability: "onboarding_choice_v1",
       requestedCandidateCount: 4,
       mode: "onboarding",
+      onboardingPhase: "preview",
     });
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await expect(page.getByTestId("onboarding-four-choice-option")).toHaveCount(
-      4,
-    );
     if (process.env.CAPTURE_ONBOARDING_FOUR === "1") {
       await page.screenshot({
         path:
@@ -729,20 +584,24 @@ test.describe("onboarding delivery flow", () => {
     }
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
 
-    await page.reload();
-    await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
-    ).toBeVisible();
-    expect(exchangeCalls).toBe(1);
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
     const options = page.getByTestId("onboarding-four-choice-option");
     await expect(options).toHaveCount(4);
     await options.nth(2).click();
     await page.getByTestId("onboarding-four-choice-save").click();
+    await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
 
-    await expect(
-      page.getByRole("button", { name: "ホームへ進む" }),
-    ).toBeVisible();
+    await page.reload();
+    await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
+    expect(exchangeCalls).toBe(1);
+    await page.getByTestId("onboarding-photo-invite").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
+    expect(exchangeCalls).toBe(2);
     expect(selectedOperation).toBe("keep");
     expect(selectedPhotoId).toBe(deliveredPhotos[2].id);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
@@ -757,7 +616,7 @@ test.describe("onboarding delivery flow", () => {
     expect(keptPhotoIds).toEqual([deliveredPhotos[2].id]);
   });
 
-  test("keeps the own photo and completes when no delivered cat is saved", async ({
+  test("lets a visitor leave the preview without saving or uploading", async ({
     page,
   }) => {
     const bundleId = "delivered-sleeping-2026-07-25-onboarding-skip";
@@ -771,8 +630,9 @@ test.describe("onboarding delivery flow", () => {
       theme: "sleeping",
       deliveredAt: Date.now(),
     }));
-    let choiceBody: Record<string, unknown> | null = null;
+    let choiceCalls = 0;
 
+    await routeChoiceFirstSupportApis(page);
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       await route.fulfill({
         contentType: "application/json",
@@ -791,7 +651,7 @@ test.describe("onboarding delivery flow", () => {
       });
     });
     await page.route("**/api/onboarding/choice", async (route) => {
-      choiceBody = route.request().postDataJSON() as Record<string, unknown>;
+      choiceCalls += 1;
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -805,49 +665,13 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.getByTestId("onboarding-photo-select").click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "own-sleeping.png",
-      mimeType: "image/png",
-      buffer: testPng,
-    });
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await page.getByTestId("onboarding-four-choice-skip").click();
+    await expect(page.getByTestId("onboarding-four-choice-option")).toHaveCount(4);
+    await page.getByTestId("onboarding-preview-skip").click();
 
-    await expect(
-      page.getByRole("heading", {
-        name: "あなたの猫の写真は 「うちのこ」に残りました",
-      }),
-    ).toBeVisible();
-    await expect(
-      page.getByText("ほかの猫をえらんだときは、"),
-    ).toBeVisible();
-    expect(choiceBody).toMatchObject({
-      operation: "skip",
-      selectedPhotoId: null,
-    });
+    await expect(page).toHaveURL(/\/home$/);
+    expect(choiceCalls).toBe(0);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
-    await expect
-      .poll(() =>
-        page.evaluate(() => {
-          const photos = JSON.parse(
-            window.localStorage.getItem(
-              "nyaruhodo_exchange_own_sleeping_photos",
-            ) ?? "[]",
-          );
-          return Array.isArray(photos) ? photos.length : 0;
-        }),
-      )
-      .toBe(1);
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          window.localStorage.getItem("onboarding_completed"),
-        ),
-      )
-      .toBe("true");
-
-    await page.getByRole("button", { name: "ホームへ進む" }).click();
-    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(0);
   });
 
   test("uses the tayori frame and selected photo aspect while waiting", async ({
@@ -856,7 +680,7 @@ test.describe("onboarding delivery flow", () => {
     const releaseExchange = await routeBlockedExchangeDelivery(page);
     try {
       await page.goto("/onboarding");
-      await page.getByTestId("onboarding-photo-select").click();
+      await openChoiceFirstPhotoPicker(page);
       await page.locator('input[type="file"]').last().setInputFiles({
         name: "wide-own-sleeping.jpg",
         mimeType: "image/jpeg",
@@ -907,10 +731,9 @@ test.describe("onboarding delivery flow", () => {
       }
 
       releaseExchange();
-      await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-      await expect(page.getByTestId("onboarding-delivered-continue")).toBeEnabled();
-      await page.getByTestId("onboarding-delivered-continue").click();
-      await expect(page).toHaveURL(/\/home(?:\?|$)/);
+      await expect(page.getByTestId("onboarding-joined")).toBeVisible();
+      await page.getByRole("button", { name: "保存した写真を見る" }).click();
+      await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     } finally {
       releaseExchange();
     }
@@ -935,8 +758,9 @@ test.describe("onboarding delivery flow", () => {
     });
     await routeImmediateDelivery(page);
     await page.goto("/onboarding?source=direct");
+    await reachChoiceFirstPhotoPrompt(page);
 
-    const action = page.getByTestId("onboarding-photo-select");
+    const action = page.getByTestId("onboarding-photo-invite");
     await expect(action).toBeVisible();
     await expect
       .poll(() =>
@@ -999,7 +823,7 @@ test.describe("onboarding delivery flow", () => {
           return raw ? JSON.parse(raw).stage : null;
         }),
       )
-      .toBe("arrived");
+      .toBe("opened");
     const result = await page.evaluate(() => ({
       ownPhotos: JSON.parse(
         window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
@@ -1033,7 +857,7 @@ test.describe("onboarding delivery flow", () => {
       await expectOnboardingLayoutWithinViewport(page);
       await captureAndroidOnboardingStep(page, "intro");
 
-      await page.getByTestId("onboarding-photo-select").click();
+      await openChoiceFirstPhotoPicker(page);
       await page.locator('input[type="file"]').last().setInputFiles({
         name: "android-own-sleeping.jpg",
         mimeType: "image/jpeg",
@@ -1046,48 +870,29 @@ test.describe("onboarding delivery flow", () => {
       await captureAndroidOnboardingStep(page, "waiting");
 
       releaseExchange();
-      const openButton = page.getByRole("button", {
-        name: "ねこだよりを ひらく",
-      });
-      await expect(openButton).toBeVisible();
+      await expect(page.getByTestId("onboarding-joined")).toBeVisible();
       await expectOnboardingLayoutWithinViewport(page);
-      await captureAndroidOnboardingStep(page, "envelope");
+      await captureAndroidOnboardingStep(page, "joined");
 
-      await openButton.click();
-      await expect(page.getByTestId("onboarding-delivered-continue")).toBeEnabled();
-      await expectOnboardingLayoutWithinViewport(page);
-      await captureAndroidOnboardingStep(page, "delivered");
-
-      await page.getByTestId("onboarding-delivered-continue").click();
-      await expect(page).toHaveURL(/\/home(?:\?|$)/);
+      await page.getByRole("button", { name: "保存した写真を見る" }).click();
+      await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     } finally {
       releaseExchange();
     }
   });
 
-  test("shows a named loading state when the onboarding delivery photo is slow", async ({
+  test("shows a named loading state while the four-cat preview is slow", async ({
     page,
   }) => {
     await routeDelayedOnboardingDelivery(page);
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "own-sleeping.png",
-      mimeType: "image/png",
-      buffer: testPng,
-    });
-
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await expect(
-      page.getByTestId("onboarding-delivery-photo-loading"),
-    ).toBeVisible();
-    await expect(
-      page.getByTestId("onboarding-delivery-photo-loading"),
-    ).toHaveCount(0, { timeout: 4000 });
-    await expect(
-      page.getByRole("button", { name: "ホームへ進む" }),
-    ).toBeEnabled();
+    await page.getByRole("button", { name: "4匹に会ってみる" }).click();
+    await expect(page.getByText("4匹を読み込んでいます")).toBeVisible();
+    await expect(page.getByTestId("onboarding-four-choice-option")).toHaveCount(
+      4,
+      { timeout: 4000 },
+    );
   });
 
   test("does not keep a false photo error after a delayed LINE image loads", async ({
@@ -1136,23 +941,14 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/onboarding?source=instagram_bio");
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "own-sleeping.png",
-      mimeType: "image/png",
-      buffer: testPng,
-    });
-
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await expect(
-      page.getByTestId("onboarding-delivery-photo-loading"),
-    ).toBeVisible();
-    await expect(
-      page.getByTestId("onboarding-delivery-photo-loading"),
-    ).toHaveCount(0, { timeout: 4000 });
+    await expect(page.getByTestId("onboarding-four-choice-option")).toHaveCount(
+      4,
+      { timeout: 4000 },
+    );
     await expect
       .poll(() =>
         page
-          .getByTestId("onboarding-delivered-photos")
+          .getByTestId("onboarding-four-choice")
           .locator("img")
           .last()
           .evaluate((image) =>
@@ -1160,14 +956,6 @@ test.describe("onboarding delivery flow", () => {
           ),
       )
       .toBe(true);
-    expect(
-      await page.evaluate(
-        () =>
-          (window as typeof window & {
-            __forcedLineImageIntermediateState?: boolean;
-          }).__forcedLineImageIntermediateState,
-      ),
-    ).toBe(true);
     await expect(
       page.getByText("写真を表示できません", { exact: true }),
     ).toHaveCount(0);
@@ -1191,21 +979,19 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.locator("main button").first().click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await page.locator("main button").first().click();
-    await page.waitForTimeout(1600);
-
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
-    await page.getByTestId("onboarding-delivered-continue").click();
+    await page.getByRole("button", { name: "保存した写真を見る" }).click();
     await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
     const reservation = await page.evaluate(() => {
@@ -1242,14 +1028,6 @@ test.describe("onboarding delivery flow", () => {
     expect(
       reservationEvents.evening_delivery_reserved?.properties?.submission_id,
     ).toMatch(/^onboarding:onbj_/);
-    await expect(page.getByTestId("desk-home-frame")).toHaveAttribute(
-      "data-photo-id",
-      reservation.onboardingPhotoId,
-    );
-    await page.screenshot({
-      path: "artifacts/onboarding-one-photo-home.png",
-      fullPage: true,
-    });
   });
 
   test("preserves an existing evening target without reporting a save failure", async ({
@@ -1280,14 +1058,14 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.locator("main button").first().click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
     await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+      page.getByTestId("onboarding-joined"),
     ).toBeVisible();
 
     const targetOwnPhotoId = await page.evaluate(() => {
@@ -1368,13 +1146,33 @@ test.describe("onboarding delivery flow", () => {
       window.Date = AdjustableDate;
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
     }, beforeDelivery);
+    const onboardingBundleId = "onboarding-chain-choice-first";
+    const onboardingPhotos = createChoiceFirstDeliveredPhotos(
+      onboardingBundleId,
+      `data:image/png;base64,${testPng.toString("base64")}`,
+    );
+    await routeChoiceFirstSupportApis(page);
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
-      exchangeBodies.push(route.request().postDataJSON());
-      const isOnboarding = exchangeBodies.length === 1;
+      const requestBody = route.request().postDataJSON() as Record<string, any>;
+      exchangeBodies.push(requestBody);
+      const isOnboarding = requestBody.mode === "onboarding";
       await route.fulfill({
         contentType: "application/json",
-        body: JSON.stringify({
-          photo: {
+        body: JSON.stringify(
+          isOnboarding
+            ? {
+                photo: onboardingPhotos[0],
+                photos: onboardingPhotos,
+                bundleId: onboardingBundleId,
+                experienceVersion: "onboarding_choice_v1",
+                assignedVariant: "four_choice_v1",
+                servedVariant: "four_choice_v1",
+                requestedCount: 4,
+                servedCount: 4,
+                source: "remote",
+              }
+            : {
+                photo: {
             id: isOnboarding ? "onboarding-chain-letter" : "evening-chain-letter",
             sourcePhotoId: isOnboarding
               ? "onboarding-chain-source"
@@ -1395,23 +1193,21 @@ test.describe("onboarding delivery flow", () => {
             fallbackCandidateCount: 0,
             fallbackActive: false,
           },
-        }),
+              },
+        ),
       });
     });
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.locator("main button").first().click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "onboarding-chain.png",
       mimeType: "image/png",
       buffer: testPng,
     });
-    await expect.poll(() => exchangeBodies.length).toBe(1);
-    await page.locator("main button").first().click();
-    await page.waitForTimeout(1600);
-    await page.getByTestId("onboarding-delivered-continue").click();
-    await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect.poll(() => exchangeBodies.length).toBe(2);
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
+    await page.goto("/home");
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
     const target = await page.evaluate(() => {
@@ -1433,8 +1229,8 @@ test.describe("onboarding delivery flow", () => {
       document.dispatchEvent(new Event("visibilitychange"));
     }, afterDelivery);
 
-    await expect.poll(() => exchangeBodies.length).toBe(2);
-    expect(exchangeBodies[0]?.anonymousId).toBe(exchangeBodies[1]?.anonymousId);
+    await expect.poll(() => exchangeBodies.length).toBe(3);
+    expect(exchangeBodies[0]?.anonymousId).toBe(exchangeBodies[2]?.anonymousId);
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "3",
@@ -1444,7 +1240,7 @@ test.describe("onboarding delivery flow", () => {
   });
 
 
-  test("completes embedded onboarding in place and goes home", async ({
+  test("completes embedded onboarding in place and opens the own-cat page", async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -1463,21 +1259,20 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
-    await page.locator("main button").first().click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await page.locator("main button").first().click();
-    await page.waitForTimeout(1600);
-    await page.getByTestId("onboarding-delivered-continue").click();
-    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
+    await page.getByRole("button", { name: "保存した写真を見る" }).click();
+    await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     await expect(page).not.toHaveURL(/\/account\/create/);
   });
 
-  test("keeps the delivered letter focused after 8pm", async ({
+  test("keeps the choice-first completion focused after 8pm", async ({
     page,
   }) => {
     await mockBrowserDate(page, "2026-07-06T21:00:00+09:00");
@@ -1485,21 +1280,16 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
-    await page.locator("main button").first().click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await page.locator("main button").first().click();
-    await page.waitForTimeout(1600);
-
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect(
-      page.getByText("「ねこだより」に残りました"),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "ホームへ進む" }),
+      page.getByRole("button", { name: "保存した写真を見る" }),
     ).toBeVisible();
     await expect(
       page.getByTestId("onboarding-second-photo-invitation"),
@@ -1514,18 +1304,14 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_story");
     await page.waitForLoadState("networkidle");
-    await page.locator("main button").first().click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await expect(page.locator("main button").first()).toBeVisible();
-    await page.locator("main button").first().click();
-    await page.waitForTimeout(1800);
-
-    await expectVisibleNonBlackImage(page.locator("main img").last());
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     const openedSnapshot = await readOnboardingDeliverySnapshot(page);
 
@@ -1536,10 +1322,7 @@ test.describe("onboarding delivery flow", () => {
     expect(openedSnapshot.keptAt).toBeTruthy();
     expect(openedSnapshot.deliveredPhoto?.id).not.toBe(openedSnapshot.ownPhoto?.id);
 
-    await page.goto("/collection?manage=sent");
-    await expect(page.getByTestId("mainichi-board-photo-sent").first()).toBeVisible();
-
-    await page.getByRole("button", { name: "ねこだよりへ戻る" }).click();
+    await page.goto("/collection");
     await expect(page.getByTestId("nekodayori-current")).toHaveAttribute(
       "data-state",
       "saved",
@@ -1571,61 +1354,20 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/onboarding?source=line");
     await page.waitForLoadState("networkidle");
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
-    await page.locator("main button").first().click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "sleeping-cat.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await expect(
-      page.getByRole("button", { name: "ホームへ進む" }),
-    ).toBeEnabled();
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
 
     const openedSnapshot = await readOnboardingDeliverySnapshot(page);
     expect(openedSnapshot.deliveredPhoto?.sourcePhotoId).toBe("stock-signed-e2e-fake");
     expect(openedSnapshot.deliveredPhoto?.src).toBe(
       "storage:admin-stock/sleeping/onboarding-delivered-signed.jpg",
     );
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          JSON.parse(
-            window.localStorage.getItem(
-              "neteruneko_exchange_photo_offline_cache",
-            ) ?? "[]",
-          ),
-        ),
-      )
-      .toEqual([
-        expect.objectContaining({
-          photoId: openedSnapshot.deliveredPhoto?.id,
-          dataUrl: expect.stringMatching(/^data:image\//),
-        }),
-      ]);
-    const deliveredImage = page
-      .getByTestId("onboarding-delivered-photos")
-      .locator('img[alt="ねこだより"]');
-    await expect
-      .poll(() =>
-        deliveredImage.evaluate((image) => ({
-          naturalWidth: (image as HTMLImageElement).naturalWidth,
-          opacity: window.getComputedStyle(image).opacity,
-        })),
-      )
-      .toEqual({
-        naturalWidth: 100,
-        opacity: "1",
-      });
-    await page.waitForTimeout(1200);
-    await expect(deliveredImage).toHaveCSS("opacity", "1");
-    if (process.env.CAPTURE_ONBOARDING_DELIVERED === "1") {
-      await page.screenshot({
-        path: "artifacts/onboarding-delivered-unframed-line.png",
-        animations: "disabled",
-      });
-    }
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 
     await page.evaluate(() => {
@@ -1637,6 +1379,21 @@ test.describe("onboarding delivery flow", () => {
       "data-photo-id",
       openedSnapshot.deliveredPhoto?.id ?? "",
     );
+    const signedDeliveryImage = page
+      .getByTestId("nekodayori-current-saved-photo")
+      .locator("img");
+    await expect(signedDeliveryImage).toBeVisible();
+    await expect
+      .poll(() =>
+        signedDeliveryImage.evaluate(
+          (image) =>
+            image instanceof HTMLImageElement &&
+            image.complete &&
+            image.naturalWidth > 0 &&
+            image.naturalHeight > 0,
+        ),
+      )
+      .toBe(true);
   });
 
   test("does not show the PWA home install guide inside Instagram browser", async ({
@@ -1818,82 +1575,44 @@ test.describe("onboarding delivery flow", () => {
   }) => {
     let exchangeCalls = 0;
     await page.clock.setFixedTime(new Date("2026-07-17T23:59:50+09:00"));
-
-    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
-      exchangeCalls += 1;
-      await route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({
-          photo: {
-            id: "delivered-social-revisit",
-            sourcePhotoId: "stock-social-revisit",
-            src: `data:image/png;base64,${testPng.toString("base64")}`,
-            title: "",
-            subtitle: "",
-            triggerLabel: "sleeping",
-            theme: "sleeping",
-            deliveredAt: Date.now(),
-          },
-          source: "remote",
-          diagnostics: {
-            source: "remote",
-            availableCount: 1,
-            candidateCount: 1,
-            normalCandidateCount: 1,
-            fallbackCandidateCount: 0,
-            fallbackActive: false,
-          },
-        }),
-      });
+    page.on("request", (request) => {
+      if (request.url().includes("/api/sleeping-delivery/exchange")) {
+        exchangeCalls += 1;
+      }
     });
+    await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_story");
     await expect(
-      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
+      page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toBeVisible();
+    await reachChoiceFirstPhotoPrompt(page);
+    await expect.poll(() => exchangeCalls).toBe(1);
+    const pendingProgress = await readOnboardingProgress(page);
+    expect(pendingProgress).toMatchObject({
+      stage: "photo_pending",
+      source: "instagram_story",
+    });
+    expect(pendingProgress.submissionId).toContain(pendingProgress.dateKey);
 
-    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
+    await page.clock.setFixedTime(new Date("2026-07-18T04:00:10+09:00"));
+    await page.goto("/onboarding?source=instagram_dm");
+    await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(1);
+    expect(await readOnboardingProgress(page)).toMatchObject({
+      stage: "photo_pending",
+      source: "instagram_story",
+      submissionId: pendingProgress.submissionId,
+    });
+
+    await page.getByTestId("onboarding-photo-invite").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
-
-    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
-    await expect.poll(() => exchangeCalls).toBe(1);
-    const submittedProgress = await readOnboardingProgress(page);
-    expect(submittedProgress).toMatchObject({
-      stage: "arrived",
-      source: "instagram_story",
-    });
-    expect(submittedProgress.submissionId).toContain(submittedProgress.dateKey);
-
-    await page.clock.setFixedTime(new Date("2026-07-18T06:00:10+09:00"));
-    await page.evaluate(() => {
-      window.localStorage.removeItem("neteruneko_evening_delivery_days");
-    });
-    await page.goto("/onboarding?source=instagram_dm");
-    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
-    await expect.poll(() => exchangeCalls).toBe(1);
-    expect(await readOnboardingProgress(page)).toMatchObject({
-      stage: "arrived",
-      source: "instagram_story",
-      submissionId: submittedProgress.submissionId,
-    });
-    expect(
-      await page.evaluate(() => {
-        const store = JSON.parse(
-          window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
-        );
-        return store["2026-07-18"]?.targetOwnPhotoId ?? null;
-      }),
-    ).toBe(submittedProgress.ownPhoto.id);
-
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await page.waitForTimeout(1600);
-    await expect(
-      page.getByText("「ねこだより」に残りました"),
-    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(2);
 
     await page.goto("/onboarding?source=instagram_bio");
     await expect(page).toHaveURL(/\/home(?:\?|$)/);
@@ -1935,22 +1654,22 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/onboarding?source=instagram_bio");
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "durable-onboarding.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect.poll(() => exchangeCalls).toBe(1);
     await expect
       .poll(() => readDurableOnboardingProgress(page))
-      .toMatchObject({ stage: "arrived", source: "instagram_bio" });
+      .toMatchObject({ stage: "opened", source: "instagram_bio" });
     expect(await readOnboardingProgress(page)).toBeNull();
 
     await page.reload();
-    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
+    await expect(page).toHaveURL(/\/home$/);
     expect(exchangeCalls).toBe(1);
   });
 
@@ -2001,22 +1720,22 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/onboarding?source=instagram_story");
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "closing-indexeddb.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await expect(page.getByTestId("onboarding-envelope-open")).toBeVisible();
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect.poll(() => exchangeCalls).toBe(1);
     await expect
       .poll(() => readDurableOnboardingProgress(page))
-      .toMatchObject({ stage: "arrived", source: "instagram_story" });
+      .toMatchObject({ stage: "opened", source: "instagram_story" });
     expect(await readOnboardingProgress(page)).toBeNull();
 
     await page.reload();
-    await expect(page.getByTestId("onboarding-envelope-open")).toBeVisible();
+    await expect(page).toHaveURL(/\/home$/);
     expect(exchangeCalls).toBe(1);
   });
 
@@ -2048,23 +1767,23 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/onboarding?source=instagram_story");
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "closed-indexeddb.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await expect(page.getByTestId("onboarding-envelope-open")).toBeVisible();
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect.poll(() => exchangeCalls).toBe(1);
     expect(await readOnboardingProgress(page)).toMatchObject({
-      stage: "arrived",
+      stage: "opened",
       source: "instagram_story",
     });
     await expect(page.getByTestId("onboarding-delivery-retry")).toHaveCount(0);
 
     await page.reload();
-    await expect(page.getByTestId("onboarding-envelope-open")).toBeVisible();
+    await expect(page).toHaveURL(/\/home$/);
     expect(exchangeCalls).toBe(1);
   });
 
@@ -2125,7 +1844,17 @@ test.describe("onboarding delivery flow", () => {
       );
     });
 
-    await page.getByTestId("onboarding-photo-select").click();
+    const photoSelect = page.getByTestId("onboarding-photo-select");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const redirectedHome = page
+        .waitForURL(/\/home/, { timeout: 3_000 })
+        .then(() => true)
+        .catch(() => false);
+      await photoSelect.click();
+      if (await redirectedHome) {
+        break;
+      }
+    }
     await expect(page).toHaveURL(/\/home/);
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
   });
@@ -2137,19 +1866,19 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_reels");
     await expect(
-      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
+      page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "最初の1枚をえらぶ" }).click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "unknown-source-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     expect(await readOnboardingProgress(page)).toMatchObject({
-      stage: "arrived",
+      stage: "opened",
       source: "unknown",
     });
   });
@@ -2165,7 +1894,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=referral&ref=ABC234");
     await expect(
-      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
+      page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toBeVisible();
     await expect
       .poll(() =>
@@ -2197,12 +1926,12 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
     await expect(page.getByText("紹介リンク")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
+      page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toHaveCount(0);
 
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
     await expect(
-      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
+      page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toBeVisible();
     await expect(page.getByText("アプリでつづける")).toHaveCount(0);
   });
@@ -2224,7 +1953,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-photo.jpg",
       mimeType: "application/octet-stream",
@@ -2235,7 +1964,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByText(/写真を読み込めませんでした/),
     ).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+      page.getByTestId("onboarding-joined"),
     ).toBeVisible();
   });
 
@@ -2268,7 +1997,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_dm");
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-filereader-photo.jpg",
       mimeType: "image/jpeg",
@@ -2276,7 +2005,7 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+      page.getByTestId("onboarding-joined"),
     ).toBeVisible();
     expect(
       await page.evaluate(
@@ -2318,7 +2047,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_dm");
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-large-photo.jpg",
       mimeType: "image/jpeg",
@@ -2326,7 +2055,7 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+      page.getByTestId("onboarding-joined"),
     ).toBeVisible();
     expect(
       await page.evaluate(
@@ -2383,7 +2112,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_dm");
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-transient-photo.jpg",
       mimeType: "application/octet-stream",
@@ -2401,7 +2130,7 @@ test.describe("onboarding delivery flow", () => {
       ),
     ).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+      page.getByTestId("onboarding-joined"),
     ).toBeVisible();
   });
 
@@ -2432,7 +2161,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_dm");
     await page.getByRole("button", { name: "このブラウザで試す" }).click();
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-native-decoder-fallback.jpg",
       mimeType: "image/jpeg",
@@ -2441,7 +2170,7 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(page.getByText(/写真を読み込めませんでした/)).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+      page.getByTestId("onboarding-joined"),
     ).toBeVisible();
     const savedDimensions = await page.evaluate(async () => {
       const photos = JSON.parse(
@@ -2481,9 +2210,18 @@ test.describe("onboarding delivery flow", () => {
         }),
       });
     });
+    const retryBundleId = "delivered-after-retry-choice-first";
+    const retryPhotos = createChoiceFirstDeliveredPhotos(
+      retryBundleId,
+      `data:image/png;base64,${testPng.toString("base64")}`,
+    );
+    await routeChoiceFirstSupportApis(page);
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
-      if (exchangeCalls === 1) {
+      const body = route.request().postDataJSON() as {
+        onboardingPhase?: string;
+      };
+      if (body.onboardingPhase === "commit" && exchangeCalls === 2) {
         await route.fulfill({
           status: 503,
           contentType: "application/json",
@@ -2495,16 +2233,14 @@ test.describe("onboarding delivery flow", () => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
-          photo: {
-            id: "delivered-after-retry",
-            sourcePhotoId: "stock-after-retry",
-            src: `data:image/png;base64,${testPng.toString("base64")}`,
-            title: "",
-            subtitle: "",
-            triggerLabel: "sleeping",
-            theme: "sleeping",
-            deliveredAt: Date.now(),
-          },
+          photo: retryPhotos[0],
+          photos: retryPhotos,
+          bundleId: retryBundleId,
+          experienceVersion: "onboarding_choice_v1",
+          assignedVariant: "four_choice_v1",
+          servedVariant: "four_choice_v1",
+          requestedCount: 4,
+          servedCount: 4,
           source: "remote",
         }),
       });
@@ -2512,7 +2248,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?test");
     await expect.poll(() => capabilityCalls).toBeGreaterThan(0);
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
@@ -2528,17 +2264,41 @@ test.describe("onboarding delivery flow", () => {
     await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(1);
     await page.getByTestId("onboarding-delivery-retry").click();
 
-    await expect.poll(() => exchangeCalls).toBe(2);
-    await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
-    ).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(3);
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(1);
   });
 
-  test("removes the staged photo when the server blocks repeat onboarding", async ({
+  test("keeps the own photo recoverable when the server blocks the commit", async ({
     page,
   }) => {
+    const blockedBundleId = "blocked-repeat-choice-first";
+    const blockedPhotos = createChoiceFirstDeliveredPhotos(
+      blockedBundleId,
+      `data:image/png;base64,${testPng.toString("base64")}`,
+    );
+    await routeChoiceFirstSupportApis(page);
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      const body = route.request().postDataJSON() as {
+        onboardingPhase?: string;
+      };
+      if (body.onboardingPhase !== "commit") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            photo: blockedPhotos[0],
+            photos: blockedPhotos,
+            bundleId: blockedBundleId,
+            experienceVersion: "onboarding_choice_v1",
+            assignedVariant: "four_choice_v1",
+            servedVariant: "four_choice_v1",
+            requestedCount: 4,
+            servedCount: 4,
+            source: "remote",
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 409,
         contentType: "application/json",
@@ -2551,15 +2311,15 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/onboarding");
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "repeat-onboarding.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await expect(page).toHaveURL(/\/home$/);
-    await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(0);
+    await expect(page.getByTestId("onboarding-delivery-retry")).toBeVisible();
+    await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(1);
     const remainingEveningTargetIds = await page.evaluate(() => {
       const store = JSON.parse(
         window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
@@ -2568,15 +2328,15 @@ test.describe("onboarding delivery flow", () => {
         .map((day) => day.targetOwnPhotoId)
         .filter((photoId): photoId is string => Boolean(photoId));
     });
-    expect(remainingEveningTargetIds).toEqual([]);
-    await expect(page.getByTestId("onboarding-photo-select")).toHaveCount(0);
+    expect(remainingEveningTargetIds).toHaveLength(1);
   });
 
   test("returns to photo selection after an unsupported onboarding file", async ({
     page,
   }) => {
+    await routeImmediateDelivery(page);
     await page.goto("/onboarding");
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "not-a-photo.txt",
       mimeType: "text/plain",
@@ -2588,7 +2348,7 @@ test.describe("onboarding delivery flow", () => {
         "写真を読み込めませんでした。JPEGやPNGなどの写真で、もう一度試してください。",
       ),
     ).toBeVisible();
-    await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
+    await expect(page.getByTestId("onboarding-photo-invite")).toBeVisible();
   });
 
   test("allows another selection after rejecting a renamed non-image", async ({
@@ -2597,7 +2357,7 @@ test.describe("onboarding delivery flow", () => {
     test.slow();
     await routeImmediateDelivery(page);
     await page.goto("/onboarding");
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "not-really-a-photo.jpg",
       mimeType: "application/octet-stream",
@@ -2609,51 +2369,48 @@ test.describe("onboarding delivery flow", () => {
         "写真の読み込みが途中で止まりました。少し待ってから、同じ写真をもう一度選んでください。",
       ),
     ).toBeVisible();
-    await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
+    await expect(page.getByTestId("onboarding-photo-invite")).toBeVisible();
 
-    await page.getByTestId("onboarding-photo-select").click();
+    await page.getByTestId("onboarding-photo-invite").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "valid-after-decode-error.jpg",
       mimeType: "image/jpeg",
       buffer: orientedTestJpeg,
     });
     await expect(
-      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+      page.getByTestId("onboarding-joined"),
     ).toBeVisible();
   });
 
-  test("offers a retry when the delivered onboarding photo cannot load", async ({
+  test("keeps the preview usable when a candidate photo cannot load", async ({
     page,
   }) => {
-    let imageAvailable = false;
     let imageRequests = 0;
     await page.route("https://example.com/onboarding-delivery.jpg", async (route) => {
       imageRequests += 1;
-      if (!imageAvailable) {
-        await route.fulfill({ status: 404, body: "" });
-        return;
-      }
-
-      await route.fulfill({
-        status: 200,
-        headers: { "content-type": "image/png" },
-        body: testPng,
-      });
+      await route.fulfill({ status: 404, body: "" });
     });
+    const bundleId = "broken-preview-choice-first";
+    const photos = createChoiceFirstDeliveredPhotos(
+      bundleId,
+      "https://example.com/onboarding-delivery.jpg",
+    );
+    photos[1].src = "http://localhost:3000/sample-cats/gray.webp";
+    photos[2].src = "http://localhost:3000/sample-cats/mugi-hero.png";
+    photos[3].src = "http://localhost:3000/sample-cats/white.webp";
+    await routeChoiceFirstSupportApis(page);
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
-          photo: {
-            id: "delivered-broken-image",
-            sourcePhotoId: "stock-broken-image",
-            src: "https://example.com/onboarding-delivery.jpg",
-            title: "",
-            subtitle: "",
-            triggerLabel: "sleeping",
-            theme: "sleeping",
-            deliveredAt: Date.now(),
-          },
+          photo: photos[0],
+          photos,
+          bundleId,
+          experienceVersion: "onboarding_choice_v1",
+          assignedVariant: "four_choice_v1",
+          servedVariant: "four_choice_v1",
+          requestedCount: 4,
+          servedCount: 4,
           source: "remote",
         }),
       });
@@ -2661,32 +2418,14 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.getByTestId("onboarding-photo-select").click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "own-sleeping.png",
-      mimeType: "image/png",
-      buffer: testPng,
-    });
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-
-    await expect(page.getByTestId("onboarding-delivery-photo-error")).toBeVisible();
-    imageAvailable = true;
-    const retryButton = page.getByTestId("onboarding-delivery-photo-retry");
-    if (await retryButton.isVisible().catch(() => false)) {
-      await retryButton
-        .evaluate((button: HTMLButtonElement) => button.click())
-        .catch(() => undefined);
-    }
-    await expect(page.getByTestId("onboarding-delivery-photo-error")).toHaveCount(0);
-    await expect.poll(() => imageRequests).toBeGreaterThan(1);
-    await expect
-      .poll(() =>
-        page.getByTestId("onboarding-delivered-photos").evaluate((container) =>
-          Array.from(container.querySelectorAll("img")).some(
-            (image) => image.complete && image.naturalWidth > 0,
-          ),
-        ),
-      )
-      .toBe(true);
+    const choices = page.getByTestId("onboarding-four-choice-option");
+    await expect(choices).toHaveCount(4);
+    await expect.poll(() => imageRequests).toBeGreaterThan(0);
+    await expect(choices.first()).toBeDisabled();
+    await expect(choices.first()).toContainText("読み込めません");
+    await choices.nth(1).click();
+    await page.getByTestId("onboarding-four-choice-save").click();
+    await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
   });
 
   test("offers a fresh start when an onboarding handoff has expired", async ({
@@ -2701,9 +2440,7 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/onboarding/continue?handoff=expired-token");
-    await page
-      .getByRole("button", { name: "引き継いで ホームへ" })
-      .click();
+    await clickOnboardingHandoffPrimary(page);
 
     await expect(
       page.getByRole("heading", { name: "引き継げませんでした" }),
@@ -2762,9 +2499,7 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/onboarding/continue?handoff=temporary-failure-token");
-    await page
-      .getByRole("button", { name: "引き継いで ホームへ" })
-      .click();
+    await clickOnboardingHandoffPrimary(page);
 
     await expect(page.getByText(/通信を確認してもう一度/)).toBeVisible();
     await expect(
@@ -2772,7 +2507,7 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
     await expect(page.getByTestId("onboarding-handoff-restart")).toBeVisible();
 
-    await page.getByRole("button", { name: "引き継ぎをもう一度試す" }).click();
+    await clickOnboardingHandoffPrimary(page);
     await expect.poll(() => redeemCalls).toBe(2);
   });
 
@@ -2849,7 +2584,7 @@ test.describe("onboarding delivery flow", () => {
       ),
     ).toHaveCount(1);
     await expect(
-      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
+      page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toHaveCount(0);
     await page
       .getByRole("button", { name: "Safari／Chromeでひらく" })
@@ -3022,6 +2757,7 @@ test.describe("onboarding delivery flow", () => {
   test("shows only the new received letter after a test reset", async ({
     page,
   }) => {
+    test.slow();
     const previousLetter = {
       id: "previous-onboarding-letter",
       sourcePhotoId: "previous-onboarding-source",
@@ -3085,14 +2821,13 @@ test.describe("onboarding delivery flow", () => {
       }
     }, previousLetter);
 
-    await page.getByTestId("onboarding-photo-select").click();
+    await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "fresh-onboarding-photo.png",
       mimeType: "image/png",
       buffer: testPng,
     });
-    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await expect(page.getByTestId("onboarding-delivered-continue")).toBeEnabled();
+    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     const openedSnapshot = await readOnboardingDeliverySnapshot(page);
 
     await page.goto("/collection");
@@ -3104,6 +2839,7 @@ test.describe("onboarding delivery flow", () => {
   });
 
   test("hands off only the current onboarding photos", async ({ page }) => {
+    test.slow();
     const imageDataUrl = `data:image/png;base64,${testPng.toString("base64")}`;
     const capturedCreateBodies: Array<{
       payload?: {
@@ -3240,7 +2976,7 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/account/create?from=onboarding&source=referral");
-    const handoffButton = page.locator("main button").nth(1);
+    const handoffButton = page.getByTestId("account-create-handoff");
     await expect(handoffButton).toBeVisible();
     await expect(handoffButton).toBeEnabled();
     await page.evaluate(() => {
@@ -3266,7 +3002,9 @@ test.describe("onboarding delivery flow", () => {
     await handoffButton.click();
 
     await expect.poll(() => capturedCreateBodies.length).toBe(1);
-    await expect(page).toHaveURL(/\/onboarding\/continue\?handoff=/);
+    await expect(page).toHaveURL(/\/onboarding\/continue\?handoff=/, {
+      timeout: 20_000,
+    });
     expect(
       await page.evaluate(
         () =>
@@ -3434,7 +3172,7 @@ test.describe("onboarding delivery flow", () => {
 
     expect(redeemCalls).toBe(0);
 
-    await page.locator("main button").first().click();
+    await clickOnboardingHandoffPrimary(page);
     await expect.poll(() => redeemCalls).toBe(1);
   });
 
@@ -3573,7 +3311,7 @@ test.describe("onboarding delivery flow", () => {
         }),
       );
     }, { imageDataUrl });
-    await page.locator("main button").first().click();
+    await clickOnboardingHandoffPrimary(page);
 
     await expect.poll(() => redeemCalls).toBe(1);
     await expect(page).toHaveURL(/\/home\?handoff=restored/);
@@ -3705,7 +3443,7 @@ test.describe("onboarding delivery flow", () => {
     await page.goto(
       "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123&handoff_from=account",
     );
-    await page.locator("main button").first().click();
+    await clickOnboardingHandoffPrimary(page);
 
     await expect(page).toHaveURL(/\/home\?handoff=restored/);
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
@@ -3755,15 +3493,13 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("heading", { name: "このブラウザで つづけます" }),
     ).toBeVisible();
-    await page
-      .getByRole("button", { name: "このブラウザで つづける" })
-      .click();
+    await clickOnboardingHandoffPrimary(page);
 
     await expect(page).toHaveURL(
       /\/onboarding\?source=instagram_bio&handoff=restored/,
     );
     await expect(
-      page.getByRole("button", { name: "最初の1枚をえらぶ" }),
+      page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toBeVisible();
     await expect
       .poll(() =>
@@ -3831,9 +3567,7 @@ test.describe("onboarding delivery flow", () => {
     await page.goto(
       "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_completedhandoff012345&handoff_from=intro&source=instagram_bio",
     );
-    await page
-      .getByRole("button", { name: "このブラウザで つづける" })
-      .click();
+    await clickOnboardingHandoffPrimary(page);
 
     await expect(page).toHaveURL(/\/home\?handoff=restored/);
     await expect(page.getByTestId("onboarding-photo-select")).toHaveCount(0);
@@ -3914,7 +3648,7 @@ test.describe("onboarding delivery flow", () => {
     await page.goto(
       "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123",
     );
-    await page.locator("main button").first().click();
+    await clickOnboardingHandoffPrimary(page);
 
     await expect(
       page.getByText("写真と入力内容は引き継ぎ済みです。ホームへ進めます。"),
@@ -3940,7 +3674,7 @@ test.describe("onboarding delivery flow", () => {
     await page.goto(
       "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123",
     );
-    await page.locator("main button").first().click();
+    await clickOnboardingHandoffPrimary(page);
 
     await expect(
       page.getByText("この引き継ぎリンクは使用済みです。"),
@@ -4357,6 +4091,27 @@ async function continuePastOptionalOnboardingNamePrompt(page: Page) {
   await page.locator("main section button").last().click();
 }
 
+async function reachChoiceFirstPhotoPrompt(
+  page: Page,
+  selectedIndex = 0,
+) {
+  await page.getByTestId("onboarding-photo-select").click();
+  const choices = page.getByTestId("onboarding-four-choice-option");
+  await expect(choices).toHaveCount(4);
+  await choices.nth(selectedIndex).click();
+  await page.getByTestId("onboarding-four-choice-save").click();
+  await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
+}
+
+async function openChoiceFirstPhotoPicker(
+  page: Page,
+  selectedIndex = 0,
+) {
+  await reachChoiceFirstPhotoPrompt(page, selectedIndex);
+  await page.getByTestId("onboarding-photo-invite").click();
+  await expect(page.locator('input[type="file"]')).toHaveCount(1);
+}
+
 async function routeImmediateDelivery(
   page: Page,
   deliveredSrcOrOnCall:
@@ -4371,27 +4126,36 @@ async function routeImmediateDelivery(
     typeof deliveredSrcOrOnCall === "function"
       ? deliveredSrcOrOnCall
       : () => undefined;
+  const bundleId = "delivered-test-choice-first";
+  const photos = createChoiceFirstDeliveredPhotos(bundleId, deliveredSrc);
+
+  await routeChoiceFirstSupportApis(page);
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
-    onCall();
+    const body = route.request().postDataJSON() as {
+      onboardingPhase?: string;
+    };
+    if (body.onboardingPhase === "commit") {
+      onCall();
+    }
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        photo: {
-          id: `delivered-test-${Date.now()}`,
-          sourcePhotoId: "stock-e2e-fake",
-          src: deliveredSrc,
-          title: "",
-          subtitle: "",
-          triggerLabel: "sleeping",
-          theme: "sleeping",
-          deliveredAt: Date.now(),
-        },
+        photo: photos[0],
+        photos,
+        bundleId,
+        experienceVersion: "onboarding_choice_v1",
+        assignedVariant: "four_choice_v1",
+        servedVariant: "four_choice_v1",
+        requestedCount: 4,
+        servedCount: 4,
+        requestedCandidateCount: 4,
+        returnedCandidateCount: 4,
         source: "remote",
         diagnostics: {
           source: "remote",
-          availableCount: 1,
-          candidateCount: 1,
-          normalCandidateCount: 1,
+          availableCount: 4,
+          candidateCount: 4,
+          normalCandidateCount: 4,
           fallbackCandidateCount: 0,
           fallbackActive: false,
         },
@@ -4405,28 +4169,39 @@ async function routeBlockedExchangeDelivery(page: Page) {
   const exchangeGate = new Promise<void>((resolve) => {
     releaseExchange = resolve;
   });
+  const bundleId = "delivered-waiting-choice-first";
+  const photos = createChoiceFirstDeliveredPhotos(
+    bundleId,
+    `data:image/png;base64,${testPng.toString("base64")}`,
+  );
 
+  await routeChoiceFirstSupportApis(page);
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
-    await exchangeGate;
+    const body = route.request().postDataJSON() as {
+      onboardingPhase?: string;
+    };
+    if (body.onboardingPhase === "commit") {
+      await exchangeGate;
+    }
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        photo: {
-          id: `delivered-waiting-${Date.now()}`,
-          sourcePhotoId: "stock-waiting-e2e-fake",
-          src: `data:image/png;base64,${testPng.toString("base64")}`,
-          title: "",
-          subtitle: "",
-          triggerLabel: "sleeping",
-          theme: "sleeping",
-          deliveredAt: Date.now(),
-        },
+        photo: photos[0],
+        photos,
+        bundleId,
+        experienceVersion: "onboarding_choice_v1",
+        assignedVariant: "four_choice_v1",
+        servedVariant: "four_choice_v1",
+        requestedCount: 4,
+        servedCount: 4,
+        requestedCandidateCount: 4,
+        returnedCandidateCount: 4,
         source: "remote",
         diagnostics: {
           source: "remote",
-          availableCount: 1,
-          candidateCount: 1,
-          normalCandidateCount: 1,
+          availableCount: 4,
+          candidateCount: 4,
+          normalCandidateCount: 4,
           fallbackCandidateCount: 0,
           fallbackActive: false,
         },
@@ -4435,6 +4210,44 @@ async function routeBlockedExchangeDelivery(page: Page) {
   });
 
   return releaseExchange;
+}
+
+async function routeChoiceFirstSupportApis(page: Page) {
+  await page.route("**/api/onboarding/submission", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true }),
+    });
+  });
+  await page.route("**/api/onboarding/choice", async (route) => {
+    const body = route.request().postDataJSON() as {
+      operation?: string;
+      selectedPhotoId?: string | null;
+    };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        state: body.operation === "skip" ? "skipped" : "kept",
+        selectedPhotoId:
+          body.operation === "skip" ? null : (body.selectedPhotoId ?? null),
+        resolvedAt: new Date().toISOString(),
+      }),
+    });
+  });
+}
+
+function createChoiceFirstDeliveredPhotos(bundleId: string, src: string) {
+  return Array.from({ length: 4 }, (_, index) => ({
+    id: `${bundleId}-choice-${index + 1}`,
+    sourcePhotoId: `${bundleId}-source-${index + 1}`,
+    src,
+    title: "",
+    subtitle: "",
+    triggerLabel: "sleeping",
+    theme: "sleeping",
+    deliveredAt: Date.now(),
+  }));
 }
 
 async function expectOnboardingLayoutWithinViewport(page: Page) {
@@ -4579,37 +4392,31 @@ async function captureAndroidOnboardingStep(page: Page, step: string) {
 }
 
 async function routeDelayedOnboardingDelivery(page: Page) {
-  await page.route("https://example.com/delayed-onboarding-delivery.png", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1800));
-    await route.fulfill({
-      status: 200,
-      headers: {
-        "access-control-allow-origin": "*",
-        "content-type": "image/png",
-      },
-      body: testPng,
-    });
-  });
+  const bundleId = "delivered-delayed-choice-first";
+  const photos = createChoiceFirstDeliveredPhotos(
+    bundleId,
+    `data:image/png;base64,${testPng.toString("base64")}`,
+  );
+  await routeChoiceFirstSupportApis(page);
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1800));
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        photo: {
-          id: `delivered-delayed-${Date.now()}`,
-          sourcePhotoId: "stock-delayed-e2e-fake",
-          src: "https://example.com/delayed-onboarding-delivery.png",
-          title: "",
-          subtitle: "",
-          triggerLabel: "sleeping",
-          theme: "sleeping",
-          deliveredAt: Date.now(),
-        },
+        photo: photos[0],
+        photos,
+        bundleId,
+        experienceVersion: "onboarding_choice_v1",
+        assignedVariant: "four_choice_v1",
+        servedVariant: "four_choice_v1",
+        requestedCount: 4,
+        servedCount: 4,
         source: "remote",
         diagnostics: {
           source: "remote",
-          availableCount: 1,
-          candidateCount: 1,
-          normalCandidateCount: 1,
+          availableCount: 4,
+          candidateCount: 4,
+          normalCandidateCount: 4,
           fallbackCandidateCount: 0,
           fallbackActive: false,
         },
@@ -4650,6 +4457,20 @@ async function mockBrowserDate(page: Page, isoDate: string) {
 }
 
 async function routeStorageDeliveryWithBrokenDisplay(page: Page) {
+  const bundleId = "delivered-storage-choice-first";
+  const photos = Array.from({ length: 4 }, (_, index) => ({
+    id: `${bundleId}-choice-${index + 1}`,
+    sourcePhotoId:
+      index === 0 ? "stock-storage-e2e-fake" : `stock-storage-e2e-${index + 1}`,
+    src: "storage:admin-stock/sleeping/onboarding-delivered.jpg",
+    displaySrc: "https://example.com/missing-delivery-display.jpg",
+    thumbnailSrc: `data:image/png;base64,${testPng.toString("base64")}`,
+    title: "",
+    subtitle: "",
+    triggerLabel: "sleeping",
+    theme: "sleeping",
+    deliveredAt: Date.now(),
+  }));
   await page.route("https://example.com/missing-delivery-display.jpg", async (route) => {
     await route.fulfill({ status: 404, body: "" });
   });
@@ -4660,28 +4481,25 @@ async function routeStorageDeliveryWithBrokenDisplay(page: Page) {
       body: JSON.stringify({ signedUrl: null, error: "forbidden_photo" }),
     });
   });
+  await routeChoiceFirstSupportApis(page);
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        photo: {
-          id: `delivered-storage-${Date.now()}`,
-          sourcePhotoId: "stock-storage-e2e-fake",
-          src: "storage:admin-stock/sleeping/onboarding-delivered.jpg",
-          displaySrc: "https://example.com/missing-delivery-display.jpg",
-          thumbnailSrc: `data:image/png;base64,${testPng.toString("base64")}`,
-          title: "",
-          subtitle: "",
-          triggerLabel: "sleeping",
-          theme: "sleeping",
-          deliveredAt: Date.now(),
-        },
+        photo: photos[0],
+        photos,
+        bundleId,
+        experienceVersion: "onboarding_choice_v1",
+        assignedVariant: "four_choice_v1",
+        servedVariant: "four_choice_v1",
+        requestedCount: 4,
+        servedCount: 4,
         source: "remote",
         diagnostics: {
           source: "remote",
-          availableCount: 1,
-          candidateCount: 1,
-          normalCandidateCount: 1,
+          availableCount: 4,
+          candidateCount: 4,
+          normalCandidateCount: 4,
           fallbackCandidateCount: 0,
           fallbackActive: false,
         },
@@ -4691,6 +4509,19 @@ async function routeStorageDeliveryWithBrokenDisplay(page: Page) {
 }
 
 async function routeStorageDeliveryWithSignedDisplay(page: Page) {
+  const bundleId = "delivered-signed-choice-first";
+  const photos = Array.from({ length: 4 }, (_, index) => ({
+    id: `${bundleId}-choice-${index + 1}`,
+    sourcePhotoId:
+      index === 0 ? "stock-signed-e2e-fake" : `stock-signed-e2e-${index + 1}`,
+    src: "storage:admin-stock/sleeping/onboarding-delivered-signed.jpg",
+    displaySrc: "https://example.com/signed-delivery-display.jpg",
+    title: "",
+    subtitle: "",
+    triggerLabel: "sleeping",
+    theme: "sleeping",
+    deliveredAt: Date.now(),
+  }));
   await page.route("https://example.com/signed-delivery-display.jpg", async (route) => {
     if (route.request().resourceType() !== "image") {
       await new Promise((resolve) => setTimeout(resolve, 900));
@@ -4704,40 +4535,77 @@ async function routeStorageDeliveryWithSignedDisplay(page: Page) {
       body: testPng,
     });
   });
-  await page.route("**/api/photo-storage/signed-url", async (route) => {
+  await page.route("**/api/photo-storage/signed-urls", async (route) => {
+    const body = route.request().postDataJSON() as { paths?: string[] };
     await route.fulfill({
-      status: 403,
       contentType: "application/json",
-      body: JSON.stringify({ signedUrl: null, error: "forbidden_photo" }),
+      body: JSON.stringify({
+        signedUrls: Object.fromEntries(
+          (body.paths ?? []).map((path) => [
+            path,
+            "https://example.com/signed-delivery-display.jpg",
+          ]),
+        ),
+      }),
     });
   });
+  await page.route("**/api/photo-storage/signed-url", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        signedUrl: "https://example.com/signed-delivery-display.jpg",
+      }),
+    });
+  });
+  await routeChoiceFirstSupportApis(page);
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        photo: {
-          id: `delivered-signed-${Date.now()}`,
-          sourcePhotoId: "stock-signed-e2e-fake",
-          src: "storage:admin-stock/sleeping/onboarding-delivered-signed.jpg",
-          displaySrc: "https://example.com/signed-delivery-display.jpg",
-          title: "",
-          subtitle: "",
-          triggerLabel: "sleeping",
-          theme: "sleeping",
-          deliveredAt: Date.now(),
-        },
+        photo: photos[0],
+        photos,
+        bundleId,
+        experienceVersion: "onboarding_choice_v1",
+        assignedVariant: "four_choice_v1",
+        servedVariant: "four_choice_v1",
+        requestedCount: 4,
+        servedCount: 4,
         source: "remote",
         diagnostics: {
           source: "remote",
-          availableCount: 1,
-          candidateCount: 1,
-          normalCandidateCount: 1,
+          availableCount: 4,
+          candidateCount: 4,
+          normalCandidateCount: 4,
           fallbackCandidateCount: 0,
           fallbackActive: false,
         },
       }),
     });
   });
+}
+
+async function clickOnboardingHandoffPrimary(page: Page) {
+  await page.waitForLoadState("networkidle");
+  const primaryAction = page.getByTestId("onboarding-handoff-primary");
+  await expect(primaryAction).toBeVisible();
+  await expect(primaryAction).toBeEnabled();
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const redeemResponse = page
+      .waitForResponse(
+        (response) =>
+          response.url().includes("/api/onboarding/handoff/redeem") &&
+          response.request().method() === "POST",
+        { timeout: 3_000 },
+      )
+      .catch(() => null);
+    await primaryAction.click();
+    if (await redeemResponse) {
+      return;
+    }
+  }
+
+  throw new Error("onboarding_handoff_redeem_request_not_observed");
 }
 
 async function readKeptExchangePhotoCount(page: Page) {

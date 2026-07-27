@@ -11,6 +11,13 @@ import {
   normalizeAnonymousTransferPaths,
 } from "../../src/lib/auth/anonymousStorageTransfer";
 import { authorizeAdminTaskRequest } from "../../src/lib/server/adminTaskAuth";
+import { POST as exchangePost } from "../../src/app/api/sleeping-delivery/exchange/handler";
+import {
+  createOnboardingJourneyId,
+  createOnboardingJourneySubmissionId,
+  createOnboardingOwnPhotoId,
+} from "../../src/lib/onboarding/journeyContract";
+import { createOnboardingResumeToken } from "../../src/lib/onboarding/submissionContract";
 
 const validPngDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP8z8BQDwAFgwJ/lm6v9wAAAABJRU5ErkJggg==";
@@ -51,6 +58,64 @@ test.describe("sleeping delivery request guards", () => {
     expect(
       validateOwnStoragePhotoPathAccess("user-1/cat/sleeping/photo.webp", "user-1"),
     ).toEqual({ ok: true });
+  });
+
+  test("requires the exact four-choice capability for an onboarding preview", async () => {
+    const onboarding = createOnboardingRequestIdentity();
+    const response = await exchangePost(
+      new Request("https://example.test/api/sleeping-delivery/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          anonymousId: `preview-shape-${crypto.randomUUID()}`,
+          deliveryDateKey: onboarding.dateKey,
+          mode: "onboarding",
+          onboardingPhase: "preview",
+          recipientCatId: "default-cat",
+          requestedCandidateCount: 4,
+          onboardingSubmission: onboarding.submission,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "invalid_exchange_request",
+    });
+  });
+
+  test("does not commit an onboarding bundle with a private own photo", async () => {
+    const onboarding = createOnboardingRequestIdentity();
+    const response = await exchangePost(
+      new Request("https://example.test/api/sleeping-delivery/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          anonymousId: `private-commit-${crypto.randomUUID()}`,
+          capability: "onboarding_choice_v1",
+          deliveryDateKey: onboarding.dateKey,
+          mode: "onboarding",
+          onboardingPhase: "commit",
+          ownPhoto: {
+            id: createOnboardingOwnPhotoId(
+              onboarding.submission.submissionId,
+            ),
+            catId: "default-cat",
+            ownerCatId: "default-cat",
+            src: validPngDataUrl,
+            shared: false,
+          },
+          recipientCatId: "default-cat",
+          requestedCandidateCount: 4,
+          onboardingSubmission: onboarding.submission,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "onboarding_shared_photo_required",
+    });
   });
 
   test("rejects unsafe storage paths", () => {
@@ -180,6 +245,26 @@ test.describe("sleeping delivery request guards", () => {
     }
   });
 });
+
+function createOnboardingRequestIdentity() {
+  const dateKey = "2026-07-26";
+  const journeyId = createOnboardingJourneyId();
+  const submissionId = createOnboardingJourneySubmissionId(
+    journeyId,
+    dateKey,
+  );
+
+  return {
+    dateKey,
+    submission: {
+      dateKey,
+      journeyId,
+      resumeToken: createOnboardingResumeToken(),
+      source: "direct",
+      submissionId,
+    },
+  };
+}
 
 function restoreEnv(key: string, value: string | undefined) {
   if (value === undefined) {

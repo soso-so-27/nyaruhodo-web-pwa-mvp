@@ -67,7 +67,7 @@ test.describe("nekodayori redesign", () => {
       page.getByRole("link", { name: "きょうの一枚を撮る" }),
     ).toHaveAttribute("href", "/home");
     await expect(
-      page.getByRole("button", { name: "ねこだよりに送る写真の設定" }),
+      page.getByRole("button", { name: "ほかのおうちへ送る写真の設定" }),
     ).toHaveCount(0);
 
     await page.goto("/collection?manage=sent&from=collection&keep=1");
@@ -84,7 +84,7 @@ test.describe("nekodayori redesign", () => {
     await expect(page.getByTestId("mainichi-board-photo-sent")).toBeVisible();
     await expect(
       page.getByRole("heading", {
-        name: "ねこだよりに送る写真の設定",
+        name: "ほかのおうちへ送る写真の設定",
         exact: true,
       }),
     ).toBeVisible();

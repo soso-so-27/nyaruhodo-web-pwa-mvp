@@ -148,7 +148,11 @@ function OnboardingContinueContent({
       ) {
         setStatus("restored");
         setRestoreErrorCode(null);
-        setMessage("写真と入力内容は引き継ぎ済みです。ホームへ進めます。");
+        setMessage(
+          isIntroHandoff
+            ? "引き継ぎ済みです。このブラウザでつづけられます。"
+            : "写真と入力内容は引き継ぎ済みです。ホームへ進めます。",
+        );
         return;
       }
 
@@ -274,7 +278,7 @@ function OnboardingContinueContent({
                     : "引き継いでいます..."
                   : status === "restored"
                     ? isIntroHandoff
-                      ? "写真を選ぶ"
+                      ? "4匹に会ってみる"
                       : "ホームへ"
                     : status === "error"
                       ? "引き継ぎをもう一度試す"
@@ -401,7 +405,7 @@ function getRestoreBody(status: RestoreStatus, isIntroHandoff: boolean) {
     }
 
     if (status === "restored") {
-      return "このブラウザで写真を選べます。";
+      return "このブラウザで、4匹のねこに会えます。";
     }
 
     return "引き継ぎ情報を確認できませんでした。";

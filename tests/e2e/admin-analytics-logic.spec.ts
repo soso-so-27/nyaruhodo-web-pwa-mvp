@@ -53,6 +53,84 @@ test.describe("admin analytics logic", () => {
     });
   });
 
+  test("measures selection-first onboarding from preview choice to photo and commit", () => {
+    const complete = [
+      "onboarding_intro_view",
+      "onboarding_preview_started",
+      "onboarding_preview_shown",
+      "onboarding_preview_selected",
+      "onboarding_photo_invite_click",
+      "onboarding_photo_submitted",
+      "onboarding_preview_committed",
+    ];
+    const events = [
+      ...complete.map((eventName, index) =>
+        event("complete", eventName, index, {
+          submissionId: "preview-complete",
+        }),
+      ),
+      ...complete.slice(0, 6).map((eventName, index) =>
+        event("submitted", eventName, 10 + index, {
+          submissionId: "preview-submitted",
+        }),
+      ),
+      ...complete.slice(0, 4).map((eventName, index) =>
+        event("selected-only", eventName, 20 + index, {
+          submissionId: "preview-selected-only",
+        }),
+      ),
+      event("selected-only", "onboarding_photo_submitted", 25, {
+        submissionId: "another-attempt",
+      }),
+      event("skipped", "onboarding_intro_view", 30, {
+        submissionId: "preview-skipped",
+      }),
+      event("skipped", "onboarding_preview_started", 31, {
+        submissionId: "preview-skipped",
+      }),
+      event("skipped", "onboarding_preview_shown", 32, {
+        submissionId: "preview-skipped",
+      }),
+      event("skipped", "onboarding_preview_skipped", 33, {
+        submissionId: "preview-skipped",
+      }),
+      event("out-of-order", "onboarding_intro_view", 40, {
+        submissionId: "preview-out-of-order",
+      }),
+      event("out-of-order", "onboarding_photo_submitted", 41, {
+        submissionId: "preview-out-of-order",
+      }),
+      event("out-of-order", "onboarding_preview_started", 42, {
+        submissionId: "preview-out-of-order",
+      }),
+      event("out-of-order", "onboarding_preview_shown", 43, {
+        submissionId: "preview-out-of-order",
+      }),
+      event("out-of-order", "onboarding_preview_selected", 44, {
+        submissionId: "preview-out-of-order",
+      }),
+      event("legacy-flow", "onboarding_intro_view", 50),
+      event("legacy-flow", "onboarding_photo_submitted", 51),
+    ];
+
+    const result = buildAdminAnalytics(events).previewOnboarding;
+
+    expect(result.funnel.map((step) => step.users)).toEqual([
+      5, 5, 5, 4, 2, 2, 1,
+    ]);
+    expect(result.skipped).toMatchObject({
+      users: 1,
+      events: 1,
+    });
+    expect(result.conversion).toEqual({
+      selectedUsers: 4,
+      photoSubmittedUsers: 2,
+      committedUsers: 1,
+      selectedToPhotoSubmittedRate: 50,
+      selectedToCommittedRate: 25,
+    });
+  });
+
   test("counts one saved photo once across related events", () => {
     const events = [
       event("actor-a", "onboarding_photo_submitted", 0, {
