@@ -13,6 +13,8 @@ import { clearPhotoHistoryLedger } from "../photoHistoryLedger";
 import { clearCollectionPhotoLedger } from "../collection/photoHistoryLedger";
 import { markInternalAnalyticsSession } from "../analytics/traffic";
 import { clearOnboardingJourney } from "./journey";
+import { clearEveningResolutionFallbacks } from "../home/eveningDelivery";
+import { clearInMemoryKeptExchangePhotos } from "../home/sleepingPhotos";
 
 const RESET_QUERY_KEY = "reset_onboarding";
 const LEGACY_RESET_QUERY_KEY = "reset";
@@ -70,6 +72,7 @@ const ONBOARDING_TEST_RESET_PREFIXES = [
 
 const ONBOARDING_TEST_RESET_SESSION_KEYS = [
   "neteruneko_onboarding_album_completion_ready",
+  "neteruneko_evening_resolution_fallbacks",
 ] as const;
 
 export async function consumeOnboardingTestResetRequest() {
@@ -131,10 +134,12 @@ export async function clearOnboardingTestTargetState() {
 
 async function clearOnboardingTestLocalState() {
   clearOnboardingJourney();
+  clearInMemoryKeptExchangePhotos();
   await Promise.all([
     clearDurableOnboardingProgress().catch(() => undefined),
     clearPhotoHistoryLedger().catch(() => undefined),
     clearCollectionPhotoLedger().catch(() => undefined),
+    clearEveningResolutionFallbacks().catch(() => undefined),
   ]);
 
   for (const key of ONBOARDING_TEST_RESET_KEYS) {

@@ -80,7 +80,10 @@ export function upsertPhotoHistoryEntries<T extends PhotoHistoryLedgerEntry>(
     const persisted = await readDurableClientValue<PhotoHistoryLedgerEntry[]>(
       getLedgerStorageKey(kind),
     );
-    const merged = mergeLedgerEntries(normalizeLedgerEntries(persisted), entries);
+    const merged = sanitizeLedgerEntriesForKind(
+      kind,
+      mergeLedgerEntries(normalizeLedgerEntries(persisted), entries),
+    );
     await writeDurableClientValue(getLedgerStorageKey(kind), merged);
     ledgerCache.set(kind, merged);
   });
@@ -122,13 +125,19 @@ function queueLedgerWrite(
 ) {
   const previous = ledgerWriteQueues.get(kind) ?? Promise.resolve();
   const next = previous.catch(() => undefined).then(write);
-  ledgerWriteQueues.set(kind, next);
+  const tracked = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  ledgerWriteQueues.set(kind, tracked);
 
-  return next.finally(() => {
-    if (ledgerWriteQueues.get(kind) === next) {
+  void tracked.finally(() => {
+    if (ledgerWriteQueues.get(kind) === tracked) {
       ledgerWriteQueues.delete(kind);
     }
   });
+
+  return next;
 }
 
 function getLedgerStorageKey(kind: PhotoHistoryLedgerKind) {
@@ -173,6 +182,20 @@ function mergeLedgerEntries(
   return merged.sort(
     (first, second) => getLedgerTimestamp(second) - getLedgerTimestamp(first),
   );
+}
+
+function sanitizeLedgerEntriesForKind(
+  kind: PhotoHistoryLedgerKind,
+  entries: PhotoHistoryLedgerEntry[],
+) {
+  if (kind !== "kept") {
+    return entries;
+  }
+
+  return entries.map((entry) => {
+    const { offlineSrc: _offlineSrc, ...persistentEntry } = entry;
+    return persistentEntry;
+  });
 }
 
 function hasMatchingLedgerIdentity(

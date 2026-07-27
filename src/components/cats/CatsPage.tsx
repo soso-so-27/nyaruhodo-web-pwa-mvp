@@ -367,6 +367,18 @@ export function CatsPage() {
       ),
     [localLensPhotos.all, remoteLensPhotosByCat],
   );
+  const feedbackLocalPhotoIds = useMemo(
+    () =>
+      uniqueStrings(
+        [
+          ...localLensPhotos.all,
+          ...Object.values(remoteLensPhotosByCat).flat(),
+        ]
+          .filter((photo) => photo.kind === "sleeping")
+          .map((photo) => photo.id),
+      ),
+    [localLensPhotos.all, remoteLensPhotosByCat],
+  );
   const lensPhotosByCat = applySourceOwnerFeedback(
     mergeLensPhotoSources(
       localLensPhotos.byCat,
@@ -675,12 +687,17 @@ export function CatsPage() {
           }
         : null;
 
-    if (feedbackSourceMomentIds.length === 0 && !onboarding) {
+    if (
+      feedbackLocalPhotoIds.length === 0 &&
+      feedbackSourceMomentIds.length === 0 &&
+      !onboarding
+    ) {
       setSourceOwnerFeedbackByKey({});
       return;
     }
 
     void readSourceOwnerFeedback({
+      localPhotoIds: feedbackLocalPhotoIds,
       sourceMomentIds: feedbackSourceMomentIds,
       onboarding,
     }).then((feedback) => {
@@ -707,7 +724,7 @@ export function CatsPage() {
     return () => {
       isCancelled = true;
     };
-  }, [clientNow, feedbackSourceMomentIds]);
+  }, [clientNow, feedbackLocalPhotoIds, feedbackSourceMomentIds]);
 
   useEffect(() => {
     setSelectedRecordPhoto((current) => {
@@ -4212,7 +4229,11 @@ function LensPhotoGrid({
           <div style={styles.lensPhotoTileWrap}>
             <PhotoTile
               src={getLensPhotoThumbnailSrc(photo)}
-              alt={`${formatLensPhotoGridDate(photo.createdAt)}の${photo.catNames[0] ?? "ねこ"}`}
+              alt={`${formatLensPhotoGridDate(photo.createdAt)}の${photo.catNames[0] ?? "ねこ"}${
+                photo.ownerFeedback
+                  ? `、${getSourceOwnerFeedbackListLabel(photo.ownerFeedback)}`
+                  : ""
+              }`}
               variant="bare"
               aspect="1 / 1"
               fit="cover"
@@ -4223,9 +4244,8 @@ function LensPhotoGrid({
             />
             {photo.ownerFeedback === "selected" ? (
               <span
-                role="img"
-                aria-label="どこかのおうちの ねこだよりに残った写真"
-                title="どこかのおうちの ねこだよりに残りました"
+                aria-hidden="true"
+                title="ねこだよりに のこった"
                 data-testid="cats-photo-selected-mark"
                 style={styles.lensPhotoSelectedMark}
               >
@@ -4236,6 +4256,14 @@ function LensPhotoGrid({
           <span style={styles.lensPhotoDate}>
             {formatLensPhotoGridDate(photo.createdAt)}
           </span>
+          {photo.ownerFeedback ? (
+            <span
+              data-testid="cats-photo-owner-feedback-summary"
+              style={styles.lensPhotoOwnerFeedback}
+            >
+              {getSourceOwnerFeedbackListLabel(photo.ownerFeedback)}
+            </span>
+          ) : null}
           {showCatNames && photo.catNames.length > 0 ? (
             <span style={styles.lensPhotoCats}>
               {photo.catNames.join("・")}
@@ -5230,6 +5258,17 @@ function PhotoFullscreenViewer({
                 style={styles.photoViewerSharing}
                 data-testid="cats-photo-delivery-setting"
               >
+                {photo.ownerFeedback ? (
+                  <p
+                    style={styles.photoViewerOwnerFeedback}
+                    data-testid="cats-photo-owner-feedback"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    {getSourceOwnerFeedbackDetailLabel(photo.ownerFeedback)}
+                  </p>
+                ) : null}
                 <div style={styles.photoViewerSharingCopy}>
                   <p style={styles.photoViewerSharingTitle}>
                     ほかのおうちへ送る
@@ -5273,16 +5312,6 @@ function PhotoFullscreenViewer({
                     }}
                   />
                 </div>
-                {photo.ownerFeedback ? (
-                  <p
-                    style={styles.photoViewerOwnerFeedback}
-                    data-testid="cats-photo-owner-feedback"
-                  >
-                    {photo.ownerFeedback === "selected"
-                      ? "どこかのおうちの ねこだよりに残りました。"
-                      : "運営確認後、ほかのおうちへ届く候補です。"}
-                  </p>
-                ) : null}
                 <p style={styles.photoViewerSharingNote}>
                   変更はこれから届く分に反映されます。すでに届いた写真は、相手の記録に残ります。
                 </p>
@@ -5695,6 +5724,22 @@ function sourceOwnerFeedbackMomentKey(sourceMomentId: string) {
 
 function sourceOwnerFeedbackLocalKey(localPhotoId: string) {
   return `local:${localPhotoId}`;
+}
+
+function getSourceOwnerFeedbackListLabel(
+  feedback: SourceOwnerFeedbackState,
+) {
+  return feedback === "selected"
+    ? "ねこだよりに のこった"
+    : "ねこだよりの候補になった";
+}
+
+function getSourceOwnerFeedbackDetailLabel(
+  feedback: SourceOwnerFeedbackState,
+) {
+  return feedback === "selected"
+    ? "どこかのおうちの ねこだよりに、この写真が のこりました。"
+    : "この写真が、どこかのおうちの ねこだより候補になりました。";
 }
 
 function mergeSourceOwnerFeedback(
@@ -9291,6 +9336,17 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.3,
     letterSpacing: CATS_META_TRACKING,
+  },
+  lensPhotoOwnerFeedback: {
+    display: "block",
+    minHeight: "2.7em",
+    margin: "0 2px",
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.01em",
   },
   lensPhotoTodayMarker: {
     position: "absolute",

@@ -15,22 +15,41 @@ export type SourceOwnerFeedbackOnboardingCapability = {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_LOCAL_PHOTO_IDS = 100;
+const MAX_LOCAL_PHOTO_ID_LENGTH = 240;
 const MAX_SOURCE_MOMENT_IDS = 100;
+const MAX_FEEDBACK_ITEMS = MAX_LOCAL_PHOTO_IDS + MAX_SOURCE_MOMENT_IDS;
 
 export async function readSourceOwnerFeedback({
+  localPhotoIds = [],
   sourceMomentIds = [],
   onboarding,
 }: {
+  localPhotoIds?: string[];
   sourceMomentIds?: string[];
   onboarding?: SourceOwnerFeedbackOnboardingCapability | null;
 } = {}): Promise<SourceOwnerFeedback[]> {
+  const uniqueLocalPhotoIds = [
+    ...new Set(
+      localPhotoIds.filter(
+        (id) =>
+          id.trim().length > 0 &&
+          id.length <= MAX_LOCAL_PHOTO_ID_LENGTH &&
+          !/[\r\n]/.test(id),
+      ),
+    ),
+  ].slice(0, MAX_LOCAL_PHOTO_IDS);
   const uniqueSourceMomentIds = [
     ...new Set(
       sourceMomentIds.filter((id) => UUID_PATTERN.test(id)),
     ),
   ].slice(0, MAX_SOURCE_MOMENT_IDS);
 
-  if (uniqueSourceMomentIds.length === 0 && !onboarding) {
+  if (
+    uniqueLocalPhotoIds.length === 0 &&
+    uniqueSourceMomentIds.length === 0 &&
+    !onboarding
+  ) {
     return [];
   }
 
@@ -54,6 +73,7 @@ export async function readSourceOwnerFeedback({
       cache: "no-store",
       headers,
       body: JSON.stringify({
+        localPhotoIds: uniqueLocalPhotoIds,
         sourceMomentIds: uniqueSourceMomentIds,
         ...(onboarding ? { onboarding } : {}),
       }),
@@ -73,7 +93,7 @@ export async function readSourceOwnerFeedback({
 
     return payload.feedback
       .filter(isSourceOwnerFeedback)
-      .slice(0, MAX_SOURCE_MOMENT_IDS);
+      .slice(0, MAX_FEEDBACK_ITEMS);
   } catch {
     return [];
   }

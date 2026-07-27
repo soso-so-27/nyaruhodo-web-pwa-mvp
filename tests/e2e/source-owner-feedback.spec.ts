@@ -272,6 +272,31 @@ test.describe("source owner feedback", () => {
           },
         ],
       });
+
+      const localPhotoResponse = await request.post(
+        "/api/cat-moment-feedback",
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          data: {
+            localPhotoIds: momentRows.map((moment) => moment.local_moment_id),
+          },
+        },
+      );
+      expect(localPhotoResponse.status()).toBe(200);
+      const localPhotoPayload = await localPhotoResponse.json();
+      expect(localPhotoPayload).toEqual({
+        ok: true,
+        feedback: [
+          {
+            sourceMomentId: firstMomentId,
+            localPhotoId: momentRows[0].local_moment_id,
+            state: "delivered",
+          },
+        ],
+      });
+      expect(JSON.stringify(localPhotoPayload)).not.toMatch(
+        /anonymous|recipient|deliveryId|selectedAt|count/i,
+      );
     } finally {
       await adminSupabase
         .from("cat_moment_deliveries")

@@ -1,4 +1,8 @@
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
+import {
+  readDurableClientValue,
+  writeDurableClientValue,
+} from "../storage/durableClientStore";
 import { trackProductEvent } from "../analytics/productAnalytics";
 import {
   cacheExchangePhotoOfflineDataUrl,
@@ -13,6 +17,15 @@ export const EVENING_REVIEW_CUTOFF_HOUR = 19;
 export const EVENING_DELIVERY_VISIBLE_THRESHOLD = 30;
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const EVENING_RESOLUTION_FALLBACK_STORAGE_KEY =
+  "neteruneko_evening_resolution_fallbacks";
+const EVENING_RESOLUTION_FALLBACK_DURABLE_KEY =
+  "evening-delivery-resolution-fallbacks:v1";
+const inMemoryEveningResolutionFallbacks = new Map<
+  string,
+  EveningDeliveryDay
+>();
+let eveningResolutionFallbackWriteQueue = Promise.resolve();
 
 export type EveningDeliveryBundleMetadata = {
   deliveryBundleId?: string;
@@ -143,7 +156,7 @@ export function readEveningDeliveryStore(): EveningDeliveryStore {
       }
     }
 
-    return store;
+    return applyEveningResolutionFallbacks(store);
   } catch {
     return {};
   }
@@ -203,10 +216,12 @@ export function writeEveningDeliveryStore(store: EveningDeliveryStore) {
 
   for (const keepCount of [90, 30, 7, 1]) {
     try {
+      const compactedStore = pruneEveningDeliveryStore(store, keepCount);
       writeCachedJson(
         STORAGE_KEYS.eveningDeliveryDays,
-        pruneEveningDeliveryStore(store, keepCount),
+        compactedStore,
       );
+      clearPersistedEveningResolutionFallbacks(compactedStore);
       window.dispatchEvent(new Event("neteruneko_evening_delivery_updated"));
       return true;
     } catch {
@@ -215,6 +230,59 @@ export function writeEveningDeliveryStore(store: EveningDeliveryStore) {
   }
 
   return false;
+}
+
+export async function hydrateEveningResolutionFallbacks() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const durableFallbacks =
+    await readDurableClientValue<EveningDeliveryStore>(
+      EVENING_RESOLUTION_FALLBACK_DURABLE_KEY,
+    );
+  if (
+    !durableFallbacks ||
+    typeof durableFallbacks !== "object" ||
+    Array.isArray(durableFallbacks)
+  ) {
+    return;
+  }
+
+  let hydrated = false;
+  for (const [dateKey, day] of Object.entries(durableFallbacks)) {
+    if (!isValidDateKey(dateKey) || !isEveningDeliveryDay(day)) {
+      continue;
+    }
+    const fallback = normalizeEveningResolutionFallback(day);
+    if (!fallback) {
+      continue;
+    }
+    inMemoryEveningResolutionFallbacks.set(dateKey, fallback);
+    hydrated = true;
+  }
+
+  if (hydrated) {
+    writeEveningResolutionFallbackSession();
+    window.dispatchEvent(new Event("neteruneko_evening_delivery_updated"));
+  }
+}
+
+export function waitForEveningResolutionFallbackPersistence() {
+  return eveningResolutionFallbackWriteQueue;
+}
+
+export async function clearEveningResolutionFallbacks() {
+  inMemoryEveningResolutionFallbacks.clear();
+  try {
+    window.sessionStorage.removeItem(
+      EVENING_RESOLUTION_FALLBACK_STORAGE_KEY,
+    );
+  } catch {
+    // Durable cleanup still applies when sessionStorage is unavailable.
+  }
+  queueEveningResolutionFallbackDurableWrite();
+  await eveningResolutionFallbackWriteQueue;
 }
 
 export function recordEveningDeliveryTarget(
@@ -579,7 +647,7 @@ export function resolveEveningDeliveryWithPhoto(
     return false;
   }
 
-  store[dateKey] = {
+  const resolvedDay: EveningDeliveryDay = {
     ...day,
     ...clearEveningDeliveryBundleMetadata(),
     ...sanitizeEveningDeliveryBundleMetadata(metadata),
@@ -594,15 +662,17 @@ export function resolveEveningDeliveryWithPhoto(
     keptAt: resolvedAt,
     skippedAt: undefined,
   };
+  store[dateKey] = resolvedDay;
   const persisted = writeEveningDeliveryStore(store);
   const persistedDay = readEveningDeliveryStore()[dateKey];
-  return Boolean(
+  const didPersist = Boolean(
     persisted &&
       persistedDay?.deliveredPhoto?.id === sanitizedPhoto.id &&
       persistedDay.selectedPhotoId === sanitizedPhoto.id &&
       persistedDay.openedAt === resolvedAt &&
       persistedDay.keptAt === resolvedAt,
   );
+  return didPersist || rememberEveningResolutionFallback(resolvedDay);
 }
 
 export function selectEveningDeliveredPhoto(
@@ -637,7 +707,7 @@ export function selectEveningDeliveredPhoto(
     return false;
   }
 
-  store[dateKey] = {
+  const resolvedDay: EveningDeliveryDay = {
     ...day,
     deliveredPhoto: selectedPhoto,
     deliveredPhotos: undefined,
@@ -647,9 +717,10 @@ export function selectEveningDeliveredPhoto(
     openedBy: "user",
     keptAt: selectedAt,
   };
+  store[dateKey] = resolvedDay;
   const persisted = writeEveningDeliveryStore(store);
   const persistedDay = readEveningDeliveryStore()[dateKey];
-  return Boolean(
+  const didPersist = Boolean(
     persisted &&
       persistedDay?.deliveredPhoto?.id === selectedPhoto.id &&
       persistedDay.selectedPhotoId === selectedPhoto.id &&
@@ -657,6 +728,7 @@ export function selectEveningDeliveredPhoto(
       persistedDay.openedAt === selectedAt &&
       persistedDay.keptAt === selectedAt,
   );
+  return didPersist || rememberEveningResolutionFallback(resolvedDay);
 }
 
 export function markEveningDeliveryOpened(
@@ -858,19 +930,6 @@ export function updateEveningDeliveredPhotoDataUrl(
   if (nextPhoto !== deliveredPhoto) {
     cacheExchangePhotoOfflineDataUrl(deliveredPhoto, dataUrl);
   }
-
-  const nextDeliveredPhotos = day.deliveredPhotos?.map((photo) =>
-    isSameExchangePhoto(photo, deliveredPhoto) ? nextPhoto : photo,
-  );
-  store[dateKey] = {
-    ...day,
-    deliveredPhoto:
-      day.deliveredPhoto && isSameExchangePhoto(day.deliveredPhoto, deliveredPhoto)
-        ? nextPhoto
-        : day.deliveredPhoto,
-    deliveredPhotos: nextDeliveredPhotos,
-  };
-  writeEveningDeliveryStore(store);
 
   return nextPhoto;
 }
@@ -1102,10 +1161,237 @@ function pruneEveningDeliveryStore(store: EveningDeliveryStore, keepCount = 90) 
     .slice(0, keepCount)
     .map(([dateKey, day]) => {
       const { targetPhoto: _legacyTargetPhoto, ...compactDay } = day;
-      return [dateKey, compactDay] as const;
+      const deliveredPhoto = sanitizeExchangePhotoForPersistence(
+        compactDay.deliveredPhoto,
+      );
+      const deliveredPhotos = compactDay.deliveredPhotos
+        ?.map(sanitizeExchangePhotoForPersistence)
+        .filter((photo): photo is ExchangePhoto => Boolean(photo));
+
+      return [
+        dateKey,
+        {
+          ...compactDay,
+          deliveredPhoto: deliveredPhoto ?? undefined,
+          deliveredPhotos:
+            deliveredPhotos && deliveredPhotos.length > 0
+              ? deliveredPhotos
+              : undefined,
+        },
+      ] as const;
     });
 
   return Object.fromEntries(entries);
+}
+
+function rememberEveningResolutionFallback(day: EveningDeliveryDay) {
+  const fallback = normalizeEveningResolutionFallback(day);
+  if (!fallback) {
+    return false;
+  }
+
+  for (const [dateKey, existing] of Object.entries(
+    readEveningResolutionFallbacks(),
+  )) {
+    inMemoryEveningResolutionFallbacks.set(dateKey, existing);
+  }
+  inMemoryEveningResolutionFallbacks.set(day.dateKey, fallback);
+  pruneInMemoryEveningResolutionFallbacks();
+  writeEveningResolutionFallbackSession();
+  queueEveningResolutionFallbackDurableWrite();
+  return true;
+}
+
+function normalizeEveningResolutionFallback(
+  day: EveningDeliveryDay,
+): EveningDeliveryDay | null {
+  const photo = sanitizeExchangePhotoForPersistence(day.deliveredPhoto);
+  if (
+    !photo ||
+    !day.deliveryBundleId ||
+    !day.selectedPhotoId ||
+    !matchesExchangePhotoId(photo, day.selectedPhotoId) ||
+    typeof day.openedAt !== "number" ||
+    typeof day.keptAt !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    ...day,
+    deliveredPhoto: photo,
+    deliveredPhotos: undefined,
+    draftSelectedPhotoId: undefined,
+  };
+}
+
+function applyEveningResolutionFallbacks(store: EveningDeliveryStore) {
+  const fallbacks = readEveningResolutionFallbacks();
+
+  for (const [dateKey, fallback] of Object.entries(fallbacks)) {
+    const baseDay = store[dateKey];
+    const photo = sanitizeExchangePhotoForPersistence(fallback.deliveredPhoto);
+    if (
+      !baseDay ||
+      !photo ||
+      !fallback.deliveryBundleId ||
+      !matchesEveningResolutionFallbackBase(baseDay, fallback) ||
+      !fallback.selectedPhotoId ||
+      !matchesExchangePhotoId(photo, fallback.selectedPhotoId) ||
+      typeof fallback.openedAt !== "number" ||
+      typeof fallback.keptAt !== "number"
+    ) {
+      continue;
+    }
+
+    store[dateKey] = {
+      ...baseDay,
+      ...fallback,
+      deliveredPhoto: withExchangePhotoOfflineSrc(photo),
+      deliveredPhotos: undefined,
+      draftSelectedPhotoId: undefined,
+    };
+  }
+
+  return store;
+}
+
+function matchesEveningResolutionFallbackBase(
+  baseDay: EveningDeliveryDay,
+  fallback: EveningDeliveryDay,
+) {
+  if (baseDay.deliveryBundleId) {
+    return baseDay.deliveryBundleId === fallback.deliveryBundleId;
+  }
+
+  return Boolean(
+    baseDay.targetOwnPhotoId &&
+      fallback.targetOwnPhotoId &&
+      baseDay.targetOwnPhotoId === fallback.targetOwnPhotoId &&
+      (!baseDay.targetCatId ||
+        !fallback.targetCatId ||
+        baseDay.targetCatId === fallback.targetCatId),
+  );
+}
+
+export function getUnresolvedEveningDeliveryChoiceDay(now = Date.now()) {
+  const store = readEveningDeliveryStore();
+  return (
+    Object.values(store)
+      .filter(
+        (day) =>
+          Boolean(day.targetOwnPhotoId) &&
+          Boolean(day.deliveryBundleId) &&
+          Array.isArray(day.deliveredPhotos) &&
+          day.deliveredPhotos.length > 1 &&
+          !day.selectedPhotoId &&
+          !day.openedAt &&
+          !day.keptAt &&
+          !day.skippedAt &&
+          now >= getJstDeliveryTime(day.dateKey),
+      )
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey))[0] ?? null
+  );
+}
+
+function readEveningResolutionFallbacks(): EveningDeliveryStore {
+  const fallbacks: EveningDeliveryStore = {};
+
+  try {
+    const raw = window.sessionStorage.getItem(
+      EVENING_RESOLUTION_FALLBACK_STORAGE_KEY,
+    );
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      for (const [dateKey, day] of Object.entries(parsed)) {
+        if (isValidDateKey(dateKey) && isEveningDeliveryDay(day)) {
+          fallbacks[dateKey] = day;
+        }
+      }
+    }
+  } catch {
+    // The in-memory fallback still protects this page session.
+  }
+
+  for (const [dateKey, day] of inMemoryEveningResolutionFallbacks) {
+    fallbacks[dateKey] = day;
+  }
+
+  return fallbacks;
+}
+
+function clearPersistedEveningResolutionFallbacks(
+  store: EveningDeliveryStore,
+) {
+  const fallbacks = readEveningResolutionFallbacks();
+  let changed = false;
+
+  for (const [dateKey, fallback] of Object.entries(fallbacks)) {
+    const persisted = store[dateKey];
+    if (
+      persisted?.deliveryBundleId === fallback.deliveryBundleId &&
+      persisted.selectedPhotoId === fallback.selectedPhotoId &&
+      persisted.keptAt === fallback.keptAt
+    ) {
+      delete fallbacks[dateKey];
+      inMemoryEveningResolutionFallbacks.delete(dateKey);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    inMemoryEveningResolutionFallbacks.clear();
+    for (const [dateKey, fallback] of Object.entries(fallbacks)) {
+      inMemoryEveningResolutionFallbacks.set(dateKey, fallback);
+    }
+    writeEveningResolutionFallbackSession();
+    queueEveningResolutionFallbackDurableWrite();
+  }
+}
+
+function writeEveningResolutionFallbackSession() {
+  try {
+    const entries = [...inMemoryEveningResolutionFallbacks.entries()]
+      .sort(([left], [right]) => right.localeCompare(left))
+      .slice(0, 7);
+    window.sessionStorage.setItem(
+      EVENING_RESOLUTION_FALLBACK_STORAGE_KEY,
+      JSON.stringify(Object.fromEntries(entries)),
+    );
+  } catch {
+    // Keep the resolution in memory when sessionStorage is unavailable.
+  }
+}
+
+function pruneInMemoryEveningResolutionFallbacks() {
+  const retainedDateKeys = [...inMemoryEveningResolutionFallbacks.keys()]
+    .sort((left, right) => right.localeCompare(left))
+    .slice(0, 7);
+  const retained = new Set(retainedDateKeys);
+
+  for (const dateKey of inMemoryEveningResolutionFallbacks.keys()) {
+    if (!retained.has(dateKey)) {
+      inMemoryEveningResolutionFallbacks.delete(dateKey);
+    }
+  }
+}
+
+function queueEveningResolutionFallbackDurableWrite() {
+  const snapshot = Object.fromEntries(
+    [...inMemoryEveningResolutionFallbacks.entries()]
+      .sort(([left], [right]) => right.localeCompare(left))
+      .slice(0, 7),
+  );
+  eveningResolutionFallbackWriteQueue =
+    eveningResolutionFallbackWriteQueue
+      .catch(() => undefined)
+      .then(() =>
+        writeDurableClientValue(
+          EVENING_RESOLUTION_FALLBACK_DURABLE_KEY,
+          snapshot,
+        ),
+      )
+      .catch(() => undefined);
 }
 
 function isEveningDeliveryDay(value: unknown): value is EveningDeliveryDay {

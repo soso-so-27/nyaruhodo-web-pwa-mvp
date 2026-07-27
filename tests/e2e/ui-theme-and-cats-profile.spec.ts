@@ -345,9 +345,18 @@ test("shows private non-numeric feedback on an owner's sleeping photo", async ({
 
   const grid = page.getByTestId("cats-lens-photo-grid");
   await expect(grid.getByTestId("cats-photo-selected-mark")).toHaveCount(1);
+  await expect(
+    grid.getByTestId("cats-photo-owner-feedback-summary"),
+  ).toHaveText([
+    "ねこだよりに のこった",
+    "ねこだよりの候補になった",
+  ]);
+  await expect(grid.getByRole("button").first()).toHaveAccessibleName(
+    "7/23のむぎ、ねこだよりに のこった",
+  );
   await grid.getByRole("button", { name: "7/23のむぎ" }).click();
   await expect(page.getByTestId("cats-photo-owner-feedback")).toHaveText(
-    "どこかのおうちの ねこだよりに残りました。",
+    "どこかのおうちの ねこだよりに、この写真が のこりました。",
   );
   await expect(page.getByTestId("cats-photo-owner-feedback")).not.toContainText(
     /\d/,
@@ -356,7 +365,7 @@ test("shows private non-numeric feedback on an owner's sleeping photo", async ({
   await page.getByTestId("cats-photo-viewer-close").click();
   await grid.getByRole("button", { name: "7/22のむぎ" }).click();
   await expect(page.getByTestId("cats-photo-owner-feedback")).toHaveText(
-    "運営確認後、ほかのおうちへ届く候補です。",
+    "この写真が、どこかのおうちの ねこだより候補になりました。",
   );
 });
 
@@ -368,11 +377,30 @@ for (const viewport of [
     page,
   }, testInfo) => {
     const now = Date.parse("2026-07-23T20:30:00+09:00");
+    const feedbackMomentId =
+      viewport.width === 320
+        ? "33333333-3333-4333-8333-333333333333"
+        : "44444444-4444-4444-8444-444444444444";
 
     await page.route("**/api/sleeping-delivery/backup", async (route) => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({ ok: true, existing: true }),
+      });
+    });
+    await page.route("**/api/cat-moment-feedback", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          feedback: [
+            {
+              sourceMomentId: feedbackMomentId,
+              localPhotoId: `own-sleeping-${viewport.width}`,
+              state: "selected",
+            },
+          ],
+        }),
       });
     });
     await seedCatsPhotoTabState(page, {
@@ -381,6 +409,7 @@ for (const viewport of [
       sleepingPhotos: [
         {
           id: `own-sleeping-${viewport.width}`,
+          sourceMomentId: feedbackMomentId,
           createdAt: Date.parse("2026-07-23T19:00:00+09:00"),
           shared: true,
         },
@@ -415,6 +444,7 @@ for (const viewport of [
     await expect(image).toBeVisible();
     await expect(image).toHaveAttribute("data-fit-ready", "true");
     await expect(setting).toBeVisible();
+    await expect(page.getByTestId("cats-photo-owner-feedback")).toBeVisible();
     await expect(closeButton).toHaveText("とじる");
     await expect(deleteButton).toBeVisible();
     await expect(page.getByTestId("cats-photo-delivery-state")).toHaveText(

@@ -13,6 +13,8 @@ import { createSupabaseAdminClient } from "../../../lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const MAX_BODY_LENGTH = 16_384;
+const MAX_LOCAL_PHOTO_IDS = 100;
+const MAX_LOCAL_PHOTO_ID_LENGTH = 240;
 const MAX_SOURCE_MOMENT_IDS = 100;
 const MAX_SUBMISSION_ID_LENGTH = 240;
 const UUID_PATTERN =
@@ -22,6 +24,7 @@ const NO_STORE_HEADERS = {
 } as const;
 
 type FeedbackRequest = {
+  localPhotoIds?: unknown;
   onboarding?: unknown;
   sourceMomentIds?: unknown;
 };
@@ -75,6 +78,11 @@ export async function POST(request: Request) {
     return feedbackError("invalid_feedback_request", 400);
   }
 
+  const localPhotoIds = sanitizeLocalPhotoIds(parsed.input.localPhotoIds);
+  if (!localPhotoIds) {
+    return feedbackError("invalid_feedback_request", 400);
+  }
+
   const onboarding = sanitizeOnboardingCapability(parsed.input.onboarding);
   if (parsed.input.onboarding !== undefined && !onboarding) {
     return feedbackError("invalid_feedback_request", 400);
@@ -113,6 +121,25 @@ export async function POST(request: Request) {
 
     if (error) {
       console.warn("[cat-moment-feedback] owner lookup failed", {
+        code: error.code,
+      });
+      return feedbackError("feedback_unavailable", 503);
+    }
+
+    for (const row of (data ?? []) as OwnedMomentRow[]) {
+      ownedMomentMap.set(row.id, row);
+    }
+  }
+
+  if (user && localPhotoIds.length > 0) {
+    const { data, error } = await supabase
+      .from("cat_moments")
+      .select("id, local_moment_id")
+      .eq("user_id", user.id)
+      .in("local_moment_id", localPhotoIds);
+
+    if (error) {
+      console.warn("[cat-moment-feedback] local owner lookup failed", {
         code: error.code,
       });
       return feedbackError("feedback_unavailable", 503);
@@ -394,6 +421,27 @@ function sanitizeSourceMomentIds(value: unknown) {
     value.filter(
       (candidate): candidate is string =>
         typeof candidate === "string" && UUID_PATTERN.test(candidate),
+    ),
+  );
+
+  return ids.length === value.length ? ids : null;
+}
+
+function sanitizeLocalPhotoIds(value: unknown) {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value) || value.length > MAX_LOCAL_PHOTO_IDS) {
+    return null;
+  }
+
+  const ids = uniqueStrings(
+    value.filter(
+      (candidate): candidate is string =>
+        typeof candidate === "string" &&
+        candidate.trim().length > 0 &&
+        candidate.length <= MAX_LOCAL_PHOTO_ID_LENGTH &&
+        !/[\r\n]/.test(candidate),
     ),
   );
 

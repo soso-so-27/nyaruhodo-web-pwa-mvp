@@ -5,6 +5,10 @@ import { writeCachedJson } from "../../src/lib/storage/jsonCache";
 test("reclaims only recreatable storage when a write exceeds quota", () => {
   const values = new Map<string, string>([
     ["analytics_event_queue", "x".repeat(2_000)],
+    [
+      "neteruneko_exchange_photo_offline_cache",
+      JSON.stringify([{ dataUrl: `data:image/png;base64,${"A".repeat(2_000)}` }]),
+    ],
     ["nyaruhodo_exchange_own_sleeping_photos", JSON.stringify([{ src: "data:image/png;base64,AAAA" }])],
   ]);
   let firstWrite = true;
@@ -43,6 +47,7 @@ test("reclaims only recreatable storage when a write exceeds quota", () => {
     writeCachedJson("target", { saved: true });
     expect(values.get("target")).toBe('{"saved":true}');
     expect(values.has("analytics_event_queue")).toBe(false);
+    expect(values.has("neteruneko_exchange_photo_offline_cache")).toBe(false);
     expect(values.has("nyaruhodo_exchange_own_sleeping_photos")).toBe(true);
   } finally {
     Object.defineProperty(globalThis, "window", {

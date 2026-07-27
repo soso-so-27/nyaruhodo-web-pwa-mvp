@@ -5,7 +5,10 @@ import {
   dispatchBoxPhotoStorageEvent,
   readAllKeptExchangePhotos,
   readAllOwnSleepingPhotos,
+  sanitizeExchangePhotoForPersistence,
+  type ExchangePhoto,
 } from "../../lib/home/sleepingPhotos";
+import { hydrateEveningResolutionFallbacks } from "../../lib/home/eveningDelivery";
 import {
   getPhotoHistoryLedgerGeneration,
   hydratePhotoHistoryLedger,
@@ -32,6 +35,7 @@ export function PhotoHistoryLedgerController() {
     void Promise.all([
       hydratePhotoHistoryLedger(photoLedgerGeneration),
       hydrateCollectionPhotoLedger(collectionLedgerGeneration),
+      hydrateEveningResolutionFallbacks(),
     ])
       .then(() => {
         if (!isActive) {
@@ -42,9 +46,15 @@ export function PhotoHistoryLedgerController() {
           upsertPhotoHistoryEntries("own", readAllOwnSleepingPhotos(), {
             expectedGeneration: photoLedgerGeneration,
           }),
-          upsertPhotoHistoryEntries("kept", readAllKeptExchangePhotos(), {
-            expectedGeneration: photoLedgerGeneration,
-          }),
+          upsertPhotoHistoryEntries(
+            "kept",
+            readAllKeptExchangePhotos()
+              .map(sanitizeExchangePhotoForPersistence)
+              .filter((photo): photo is ExchangePhoto => Boolean(photo)),
+            {
+              expectedGeneration: photoLedgerGeneration,
+            },
+          ),
           upsertPhotoHistoryEntries("gallery", readCatGalleryPhotos(null), {
             expectedGeneration: photoLedgerGeneration,
           }),

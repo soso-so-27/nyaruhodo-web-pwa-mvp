@@ -284,6 +284,84 @@ test.describe("20時便の4枚選択", () => {
       .toBe(CAT_ID);
   });
 
+  test("端末キャッシュが満杯でも、確定結果を取り消さず再読込で4択へ戻さない", async ({
+    page,
+  }) => {
+    await seedPendingEveningDelivery(page, "durable-save-fallback");
+    await mockFourChoiceExchange(page);
+
+    await page.goto("/home");
+    await page.getByTestId("desk-open-letter").click();
+    await page.evaluate(() => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function setItemWithFullKeptCache(
+        key,
+        value,
+      ) {
+        if (
+          key === "nyaruhodo_exchange_kept_photos" ||
+          key === "neteruneko_evening_delivery_days"
+        ) {
+          throw new DOMException(
+            "The quota has been exceeded",
+            "QuotaExceededError",
+          );
+        }
+        return originalSetItem.call(this, key, value);
+      };
+    });
+
+    const selectedPhotoId = "four-choice-delivery-2";
+    const choiceDialog = page.getByTestId("evening-four-choice");
+    await choiceDialog
+      .locator(
+        `[data-testid="evening-four-choice-option"][data-photo-id="${selectedPhotoId}"]`,
+      )
+      .click();
+    await page.getByTestId("evening-four-choice-save").click();
+
+    await expect(
+      choiceDialog.getByTestId("evening-four-choice-saved"),
+    ).toBeVisible();
+    await expect.poll(() => readEveningSelection(page)).toEqual({
+      keptPhotoIds: [],
+      selectedPhotoId: null,
+      hasKeptAt: false,
+    });
+    await expect.poll(() => readDurableKeptPhotoIds(page)).toContain(
+      selectedPhotoId,
+    );
+    await addLegacyOfflineSrcToDurableKeptPhotos(page);
+    await expect.poll(() => readDurableKeptHasOfflineSrc(page)).toBe(true);
+    await choiceDialog.getByTestId("evening-four-choice-finish").click();
+    await expect(choiceDialog).toHaveCount(0);
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+
+    await page.evaluate(() => window.sessionStorage.clear());
+    await page.reload();
+    await expect(page.getByTestId("evening-four-choice")).toHaveCount(0);
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+    await expect.poll(() => readDurableKeptHasOfflineSrc(page)).toBe(false);
+
+    await clearDurableClientRecords(page);
+    await page.evaluate(() => window.sessionStorage.clear());
+    await page.reload();
+    await expect.poll(() => readEveningSelection(page)).toEqual({
+      keptPhotoIds: [selectedPhotoId],
+      selectedPhotoId,
+      hasKeptAt: true,
+    });
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+  });
+
   test("20時以降に撮った前日の一枚にも、翌日の4匹を結びつける", async ({
     page,
   }) => {
@@ -738,10 +816,14 @@ async function mockFourChoiceExchange(
 ) {
   let exchangeCalls = 0;
   let canonical = options.canonical ?? null;
+  let hasReceivedChoiceRequest = false;
   const responsePhotos = options.photos ?? fourCandidates;
 
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
     exchangeCalls += 1;
+    const exchangeResolution =
+      options.exchangeResolution ??
+      (hasReceivedChoiceRequest ? canonical : null);
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -758,9 +840,9 @@ async function mockFourChoiceExchange(
         servedCount: responsePhotos.length,
         requestedCandidateCount: 4,
         returnedCandidateCount: responsePhotos.length,
-        choiceResolution: options.exchangeResolution?.state ?? null,
-        selectedPhotoId: options.exchangeResolution?.selectedPhotoId ?? null,
-        choiceResolvedAt: options.exchangeResolution
+        choiceResolution: exchangeResolution?.state ?? null,
+        selectedPhotoId: exchangeResolution?.selectedPhotoId ?? null,
+        choiceResolvedAt: exchangeResolution
           ? "2026-07-22T11:06:00.000Z"
           : null,
       }),
@@ -768,6 +850,7 @@ async function mockFourChoiceExchange(
   });
 
   await page.route("**/api/sleeping-delivery/choice", async (route) => {
+    hasReceivedChoiceRequest = true;
     const request = route.request().postDataJSON() as {
       operation?: string;
       selectedPhotoId?: string | null;
@@ -899,6 +982,140 @@ async function readKeptPhotoIds(page: Page) {
     ) as Array<{ id?: string }>;
     return parsed.map((photo) => photo.id).filter((id): id is string => Boolean(id));
   });
+}
+
+async function readDurableKeptPhotoIds(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<string[]>((resolve, reject) => {
+        const openRequest = indexedDB.open("neteruneko-durable-state", 1);
+        openRequest.onerror = () =>
+          reject(openRequest.error ?? new Error("indexeddb_open_failed"));
+        openRequest.onsuccess = () => {
+          const database = openRequest.result;
+          const transaction = database.transaction("records", "readonly");
+          const getRequest = transaction
+            .objectStore("records")
+            .get("photo-history:kept:v1");
+          getRequest.onerror = () =>
+            reject(getRequest.error ?? new Error("indexeddb_read_failed"));
+          getRequest.onsuccess = () => {
+            const value = getRequest.result?.value as
+              | Array<{ id?: string }>
+              | undefined;
+            resolve(
+              (value ?? [])
+                .map((photo) => photo.id)
+                .filter((id): id is string => Boolean(id)),
+            );
+            database.close();
+          };
+        };
+      }),
+  );
+}
+
+async function clearDurableClientRecords(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const openRequest = indexedDB.open("neteruneko-durable-state", 1);
+        openRequest.onerror = () =>
+          reject(openRequest.error ?? new Error("indexeddb_open_failed"));
+        openRequest.onsuccess = () => {
+          const database = openRequest.result;
+          const transaction = database.transaction("records", "readwrite");
+          transaction.objectStore("records").clear();
+          transaction.oncomplete = () => {
+            database.close();
+            resolve();
+          };
+          transaction.onerror = () =>
+            reject(
+              transaction.error ?? new Error("indexeddb_clear_failed"),
+            );
+        };
+      }),
+  );
+}
+
+async function addLegacyOfflineSrcToDurableKeptPhotos(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const openRequest = indexedDB.open("neteruneko-durable-state", 1);
+        openRequest.onerror = () =>
+          reject(openRequest.error ?? new Error("indexeddb_open_failed"));
+        openRequest.onsuccess = () => {
+          const database = openRequest.result;
+          const transaction = database.transaction("records", "readwrite");
+          const store = transaction.objectStore("records");
+          const getRequest = store.get("photo-history:kept:v1");
+          getRequest.onerror = () =>
+            reject(getRequest.error ?? new Error("indexeddb_read_failed"));
+          getRequest.onsuccess = () => {
+            const record = getRequest.result as
+              | {
+                  key: string;
+                  updatedAt: number;
+                  value: Array<Record<string, unknown>>;
+                }
+              | undefined;
+            if (!record) {
+              reject(new Error("kept_ledger_missing"));
+              return;
+            }
+            store.put({
+              ...record,
+              updatedAt: Date.now(),
+              value: record.value.map((photo, index) =>
+                index === 0
+                  ? {
+                      ...photo,
+                      offlineSrc:
+                        "data:image/png;base64,legacy-duplicate-payload",
+                    }
+                  : photo,
+              ),
+            });
+          };
+          transaction.oncomplete = () => {
+            database.close();
+            resolve();
+          };
+          transaction.onerror = () =>
+            reject(
+              transaction.error ?? new Error("indexeddb_write_failed"),
+            );
+        };
+      }),
+  );
+}
+
+async function readDurableKeptHasOfflineSrc(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<boolean>((resolve, reject) => {
+        const openRequest = indexedDB.open("neteruneko-durable-state", 1);
+        openRequest.onerror = () =>
+          reject(openRequest.error ?? new Error("indexeddb_open_failed"));
+        openRequest.onsuccess = () => {
+          const database = openRequest.result;
+          const transaction = database.transaction("records", "readonly");
+          const getRequest = transaction
+            .objectStore("records")
+            .get("photo-history:kept:v1");
+          getRequest.onerror = () =>
+            reject(getRequest.error ?? new Error("indexeddb_read_failed"));
+          getRequest.onsuccess = () => {
+            resolve(JSON.stringify(getRequest.result?.value ?? []).includes(
+              '"offlineSrc"',
+            ));
+            database.close();
+          };
+        };
+      }),
+  );
 }
 
 async function readReportedPhotoIds(page: Page) {

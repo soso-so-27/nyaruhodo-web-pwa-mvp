@@ -5,19 +5,24 @@ import {
   buildEveningHomeState,
   getEveningDeliveryTargetDateKey,
   getPendingEveningDeliveryDay,
+  getUnresolvedEveningDeliveryChoiceDay,
   getSystemOpenedEveningDeliveryNotice,
   getJstDateKey,
   markEveningDeliveryKept,
   readEveningDeliveryStore,
   recordOnboardingEveningDeliveryTarget,
+  resolveEveningDeliveryWithPhoto,
   selectEveningDeliveredPhoto,
   setEveningDeliveryDraftSelection,
   setEveningDeliveredPhoto,
   setEveningDeliveredPhotos,
   updateEveningDeliveredPhotoDataUrl,
   writeEveningDeliveryStore,
+  type EveningDeliveryDay,
 } from "../../src/lib/home/eveningDelivery";
 import {
+  keepExchangePhoto,
+  readAllKeptExchangePhotos,
   reportExchangePhoto,
   type ExchangePhoto,
   type OwnSleepingPhoto,
@@ -149,6 +154,9 @@ test.describe("four-photo evening delivery state", () => {
     expect(stored.openedAt).toBeUndefined();
     expect(stored.keptAt).toBeUndefined();
     expect(getPendingEveningDeliveryDay(BEFORE_AUTO_OPEN)).toBeNull();
+    expect(
+      getUnresolvedEveningDeliveryChoiceDay(BEFORE_AUTO_OPEN)?.dateKey,
+    ).toBe(DELIVERY_DAY);
     expect(markEveningDeliveryKept(DELIVERY_DAY, DELIVERED_AT + 1)).toBe(false);
 
     const state = buildEveningHomeState({
@@ -194,6 +202,9 @@ test.describe("four-photo evening delivery state", () => {
       keptAt: selectedAt,
       deliveryBundleId: "bundle-select",
     });
+    expect(
+      getUnresolvedEveningDeliveryChoiceDay(BEFORE_AUTO_OPEN),
+    ).toBeNull();
 
     const state = buildEveningHomeState({
       activeCatId: null,
@@ -384,6 +395,9 @@ test.describe("four-photo evening delivery state", () => {
     let stored = readEveningDeliveryStore()[DELIVERY_DAY];
     expect(stored.deliveredPhoto?.offlineSrc).toBeUndefined();
     expect(stored.deliveredPhotos?.[2].offlineSrc).toBe(thirdDataUrl);
+    expect(
+      window.localStorage.getItem("neteruneko_evening_delivery_days"),
+    ).not.toContain("offlineSrc");
 
     const firstDataUrl = `${thirdDataUrl}AAAA`;
     expect(
@@ -392,6 +406,128 @@ test.describe("four-photo evening delivery state", () => {
     stored = readEveningDeliveryStore()[DELIVERY_DAY];
     expect(stored.deliveredPhoto?.offlineSrc).toBe(firstDataUrl);
     expect(stored.deliveredPhotos?.[0].offlineSrc).toBe(firstDataUrl);
+    expect(
+      window.localStorage.getItem("neteruneko_evening_delivery_days"),
+    ).not.toContain("data:image/");
+    expect(
+      window.localStorage.getItem("neteruneko_exchange_photo_offline_cache"),
+    ).toContain(firstDataUrl);
+  });
+
+  test("keeps the selected photo offline without duplicating base64 in albums", () => {
+    seedTarget();
+    const photos = createDeliveredPhotos(4);
+    expect(
+      setEveningDeliveredPhotos(DELIVERY_DAY, photos, DELIVERED_AT),
+    ).toBe(true);
+
+    const dataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
+    const selectedPhoto = updateEveningDeliveredPhotoDataUrl(
+      DELIVERY_DAY,
+      dataUrl,
+      photos[1].id,
+    );
+    expect(selectedPhoto?.offlineSrc).toBe(dataUrl);
+    expect(selectedPhoto && keepExchangePhoto(selectedPhoto)).toBe(true);
+
+    const rawAlbum =
+      window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "";
+    expect(rawAlbum).not.toContain("offlineSrc");
+    expect(rawAlbum).not.toContain("data:image/");
+    expect(readAllKeptExchangePhotos()[0]?.offlineSrc).toBe(dataUrl);
+  });
+
+  test("keeps a server-confirmed choice resolved when the main delivery store is full", () => {
+    seedTarget();
+    expect(
+      setEveningDeliveredPhotos(
+        DELIVERY_DAY,
+        createDeliveredPhotos(4),
+        DELIVERED_AT,
+        {
+          deliveryBundleId: "boundary-choice-bundle",
+          experienceVersion: "evening_choice_v1",
+          servedVariant: "four_choice_v1",
+        },
+      ),
+    ).toBe(true);
+
+    const originalSetItem = window.localStorage.setItem.bind(
+      window.localStorage,
+    );
+    window.localStorage.setItem = (key, value) => {
+      if (key === "neteruneko_evening_delivery_days") {
+        throw new DOMException(
+          "The quota has been exceeded",
+          "QuotaExceededError",
+        );
+      }
+      originalSetItem(key, value);
+    };
+
+    expect(
+      selectEveningDeliveredPhoto(
+        DELIVERY_DAY,
+        "delivery-photo-2",
+        DELIVERED_AT + 1,
+      ),
+    ).toBe(true);
+    const rawStore = JSON.parse(
+      window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+    ) as Record<string, EveningDeliveryDay>;
+    expect(rawStore[DELIVERY_DAY]?.selectedPhotoId).toBeUndefined();
+    expect(readEveningDeliveryStore()[DELIVERY_DAY]).toMatchObject({
+      selectedPhotoId: "delivery-photo-2",
+      deliveredPhoto: { id: "delivery-photo-2" },
+      keptAt: DELIVERED_AT + 1,
+    });
+
+    window.localStorage.setItem = originalSetItem;
+    expect(writeEveningDeliveryStore(readEveningDeliveryStore())).toBe(true);
+  });
+
+  test("reconciles a confirmed bundle even when the pending day had no bundle id", () => {
+    seedTarget();
+    const originalSetItem = window.localStorage.setItem.bind(
+      window.localStorage,
+    );
+    window.localStorage.setItem = (key, value) => {
+      if (key === "neteruneko_evening_delivery_days") {
+        throw new DOMException(
+          "The quota has been exceeded",
+          "QuotaExceededError",
+        );
+      }
+      originalSetItem(key, value);
+    };
+
+    const [canonicalPhoto] = createDeliveredPhotos(1);
+    expect(
+      resolveEveningDeliveryWithPhoto(
+        DELIVERY_DAY,
+        canonicalPhoto,
+        DELIVERED_AT + 2,
+        {
+          deliveryBundleId: "reconciled-choice-bundle",
+          experienceVersion: "evening_choice_v1",
+          servedVariant: "four_choice_v1",
+        },
+      ),
+    ).toBe(true);
+    const rawStore = JSON.parse(
+      window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+    ) as Record<string, EveningDeliveryDay>;
+    expect(rawStore[DELIVERY_DAY]?.deliveryBundleId).toBeUndefined();
+    expect(readEveningDeliveryStore()[DELIVERY_DAY]).toMatchObject({
+      deliveryBundleId: "reconciled-choice-bundle",
+      selectedPhotoId: "delivery-photo-1",
+      deliveredPhoto: { id: "delivery-photo-1" },
+      keptAt: DELIVERED_AT + 2,
+    });
+
+    window.localStorage.setItem = originalSetItem;
+    expect(writeEveningDeliveryStore(readEveningDeliveryStore())).toBe(true);
   });
 
   test("keeps the legacy single-photo state compatible", () => {
@@ -480,6 +616,7 @@ function createDeliveredPhotos(count: number): ExchangePhoto[] {
 function installMemoryWindow() {
   const previous = Object.getOwnPropertyDescriptor(globalThis, "window");
   const values = new Map<string, string>();
+  const sessionValues = new Map<string, string>();
   const localStorage: Storage = {
     get length() {
       return values.size;
@@ -502,6 +639,26 @@ function installMemoryWindow() {
   };
   const memoryWindow = {
     localStorage,
+    sessionStorage: {
+      get length() {
+        return sessionValues.size;
+      },
+      clear() {
+        sessionValues.clear();
+      },
+      getItem(key: string) {
+        return sessionValues.get(key) ?? null;
+      },
+      key(index: number) {
+        return [...sessionValues.keys()][index] ?? null;
+      },
+      removeItem(key: string) {
+        sessionValues.delete(key);
+      },
+      setItem(key: string, value: string) {
+        sessionValues.set(key, value);
+      },
+    } satisfies Storage,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
     dispatchEvent: () => true,

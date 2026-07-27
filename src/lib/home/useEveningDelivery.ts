@@ -9,6 +9,7 @@ import {
   getJstAutoOpenTime,
   getJstDeliveryTime,
   getPendingEveningDeliveryDay,
+  getUnresolvedEveningDeliveryChoiceDay,
   readEveningDeliveryStore,
   repairMissingEveningDeliveryTarget,
   clearAppBadge,
@@ -17,11 +18,15 @@ import {
   markEveningDeliverySkipped,
   resolveEveningDeliveryWithoutSelection,
   resolveEveningDeliveryWithPhoto,
+  waitForEveningResolutionFallbackPersistence,
   writeEveningDeliveryStore,
   type EveningDeliveryDay,
 } from "./eveningDelivery";
 import { recordEveningDeliveryTrace } from "./eveningDeliveryTrace";
-import { keepExchangePhoto, type OwnSleepingPhoto } from "./sleepingPhotos";
+import {
+  keepExchangePhotoDurably,
+  type OwnSleepingPhoto,
+} from "./sleepingPhotos";
 
 const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 500_000;
 const EVENING_DELIVERY_SLOW_MS = 4_000;
@@ -123,7 +128,9 @@ export function useEveningDelivery({
       const todayKey = getJstDateKey(now);
       let store = readEveningDeliveryStore();
       let todayDay = store[todayKey];
-      let pendingDay = getPendingEveningDeliveryDay(now);
+      let pendingDay =
+        getPendingEveningDeliveryDay(now) ??
+        getUnresolvedEveningDeliveryChoiceDay(now);
 
       if (!pendingDay) {
         const repaired = repairMissingEveningDeliveryTarget(
@@ -141,11 +148,18 @@ export function useEveningDelivery({
           );
           store = readEveningDeliveryStore();
           todayDay = store[todayKey];
-          pendingDay = getPendingEveningDeliveryDay(now);
+          pendingDay =
+            getPendingEveningDeliveryDay(now) ??
+            getUnresolvedEveningDeliveryChoiceDay(now);
           setRefreshToken((value) => value + 1);
         }
       }
       const recipientCatId = pendingDay?.targetCatId ?? activeCatId;
+      const isChoiceReconciliation = Boolean(
+        pendingDay?.deliveryBundleId &&
+          pendingDay.deliveredPhotos &&
+          pendingDay.deliveredPhotos.length > 1,
+      );
       const traceBase = buildEveningDeliveryTraceBase({
         activeCatId,
         now,
@@ -156,6 +170,7 @@ export function useEveningDelivery({
 
       if (
         pendingDay?.targetOwnPhotoId &&
+        !isChoiceReconciliation &&
         now >= getJstAutoOpenTime(pendingDay.dateKey)
       ) {
         const expiredAt = getJstAutoOpenTime(pendingDay.dateKey);
@@ -368,7 +383,6 @@ export function useEveningDelivery({
                   (photo) => photo.id === result.selectedPhotoId,
                 ) ?? null
               : null;
-          const previousDay = readEveningDeliveryStore()[pendingDay.dateKey];
           let didPersistCanonicalPhoto = false;
           let didApplyCanonicalResolution = false;
 
@@ -379,9 +393,30 @@ export function useEveningDelivery({
               resolvedAt,
               bundleMetadata,
             );
-            didApplyCanonicalResolution = Boolean(
-              didPersistCanonicalPhoto && keepExchangePhoto(canonicalPhoto),
-            );
+            const [canonicalAlbumSave] = await Promise.all([
+              keepExchangePhotoDurably(canonicalPhoto),
+              waitForEveningResolutionFallbackPersistence().catch(
+                () => undefined,
+              ),
+            ]);
+            didApplyCanonicalResolution = didPersistCanonicalPhoto;
+            if (
+              !didPersistCanonicalPhoto ||
+              !canonicalAlbumSave.persisted
+            ) {
+              trackProductEvent(
+                "evening_delivery_choice_local_persistence_degraded",
+                {
+                  delivery_date_key: pendingDay.dateKey,
+                  delivery_bundle_id: result.bundleId,
+                  reconciliation: true,
+                  delivery_state_saved: didPersistCanonicalPhoto,
+                  local_album_saved: canonicalAlbumSave.persisted,
+                  photo_id: canonicalPhoto.id,
+                },
+                { localCatId: recipientCatId },
+              );
+            }
           } else {
             // A skipped/expired bundle, or a kept photo that is now reported or
             // hidden, must finish without restoring an unavailable photo.
@@ -390,16 +425,6 @@ export function useEveningDelivery({
                 pendingDay.dateKey,
                 resolvedAt,
               );
-          }
-
-          if (
-            !didApplyCanonicalResolution &&
-            didPersistCanonicalPhoto &&
-            previousDay
-          ) {
-            const store = readEveningDeliveryStore();
-            store[pendingDay.dateKey] = previousDay;
-            writeEveningDeliveryStore(store);
           }
 
           if (!didApplyCanonicalResolution) {
@@ -423,6 +448,12 @@ export function useEveningDelivery({
             },
             { localCatId: recipientCatId },
           );
+          return;
+        }
+
+        if (isChoiceReconciliation && result.photo) {
+          clearAutomaticRetry(pendingDay.dateKey);
+          setCheckStatus({ state: "idle", dateKey: null });
           return;
         }
 

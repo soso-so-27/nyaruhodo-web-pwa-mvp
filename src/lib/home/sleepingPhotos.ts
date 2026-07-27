@@ -156,6 +156,7 @@ export const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 const KEPT_EXCHANGE_PHOTO_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
 const EXCHANGE_PHOTO_OFFLINE_CACHE_STORAGE_KEY =
   "neteruneko_exchange_photo_offline_cache";
+let inMemoryKeptExchangePhotos: ExchangePhoto[] = [];
 const DISMISSED_EXCHANGE_PHOTO_STORAGE_KEY =
   "nyaruhodo_exchange_dismissed_photos";
 const REPORTED_EXCHANGE_PHOTO_STORAGE_KEY =
@@ -799,6 +800,7 @@ export function readAllKeptExchangePhotos() {
   return mergeExchangePhotos(
     [],
     [
+      ...inMemoryKeptExchangePhotos,
       ...readStorageArray<ExchangePhoto>(KEPT_EXCHANGE_PHOTO_STORAGE_KEY),
       ...readCachedPhotoHistoryEntries<ExchangePhoto>("kept"),
     ],
@@ -871,46 +873,24 @@ export function readKeptExchangePhotoStorageDebug(): KeptExchangePhotoStorageDeb
 }
 
 export function keepExchangePhoto(photo: ExchangePhoto) {
-  const persistentPhoto = sanitizeExchangePhotoForPersistence(photo);
-
-  if (!persistentPhoto) {
+  const write = prepareKeptExchangePhotoWrite(photo);
+  if (!write) {
     return false;
   }
 
+  rememberKeptExchangePhotoInMemory(write.photoToStore);
+
   try {
-    const existingPhotos = readAllKeptExchangePhotos();
-    const contentDuplicate = existingPhotos.find((savedPhoto) =>
-      hasMatchingPhotoContent(savedPhoto, persistentPhoto),
-    );
-    const photoToStore = contentDuplicate
-      ? mergeExchangePhotoVersions(contentDuplicate, persistentPhoto)
-      : persistentPhoto;
-    const saved = existingPhotos.filter(
-      (savedPhoto) =>
-        savedPhoto.id !== photoToStore.id &&
-        (!photoToStore.sourcePhotoId ||
-          savedPhoto.sourcePhotoId !== photoToStore.sourcePhotoId) &&
-        !hasMatchingPhotoContent(savedPhoto, photoToStore),
-    );
     const savedPhotos = writeStorageArrayWithFallback(
       KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
-      [photoToStore, ...saved],
+      write.nextPhotos,
       [50, 30, 20, 12, 6, 1],
     );
-    void upsertPhotoHistoryEntries("kept", [photoToStore]).catch(
+    void upsertPhotoHistoryEntries("kept", [write.photoToStore]).catch(
       () => undefined,
     );
 
-    if (
-      savedPhotos.some(
-        (savedPhoto) =>
-          savedPhoto.id === photoToStore.id ||
-          Boolean(
-            photoToStore.sourcePhotoId &&
-              savedPhoto.sourcePhotoId === photoToStore.sourcePhotoId,
-          ),
-      )
-    ) {
+    if (hasStoredExchangePhoto(savedPhotos, write.photoToStore)) {
       dispatchBoxPhotoStorageEvent();
       return true;
     }
@@ -919,6 +899,104 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
   }
 
   return false;
+}
+
+export async function keepExchangePhotoDurably(photo: ExchangePhoto) {
+  const write = prepareKeptExchangePhotoWrite(photo);
+  if (!write) {
+    return {
+      availableInSession: false,
+      persisted: false,
+      savedToLocalCache: false,
+      savedToDurableLedger: false,
+    };
+  }
+
+  rememberKeptExchangePhotoInMemory(write.photoToStore);
+  const savedPhotos = writeStorageArrayWithFallback(
+    KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
+    write.nextPhotos,
+    [50, 30, 20, 12, 6, 1],
+  );
+  const savedToLocalCache = hasStoredExchangePhoto(
+    savedPhotos,
+    write.photoToStore,
+  );
+  let savedToDurableLedger = false;
+
+  try {
+    await upsertPhotoHistoryEntries("kept", [write.photoToStore]);
+    savedToDurableLedger = true;
+  } catch {
+    // The local cache can still keep the photo when IndexedDB is unavailable.
+  }
+
+  return {
+    availableInSession: true,
+    persisted: savedToLocalCache || savedToDurableLedger,
+    savedToLocalCache,
+    savedToDurableLedger,
+  };
+}
+
+export function clearInMemoryKeptExchangePhotos() {
+  inMemoryKeptExchangePhotos = [];
+}
+
+function prepareKeptExchangePhotoWrite(photo: ExchangePhoto) {
+  const persistentPhoto = sanitizeExchangePhotoForPersistence(photo);
+  if (!persistentPhoto) {
+    return null;
+  }
+
+  const existingPhotos = readAllKeptExchangePhotos()
+    .map(sanitizeExchangePhotoForPersistence)
+    .filter((savedPhoto): savedPhoto is ExchangePhoto => Boolean(savedPhoto));
+  const contentDuplicate = existingPhotos.find((savedPhoto) =>
+    hasMatchingPhotoContent(savedPhoto, persistentPhoto),
+  );
+  const mergedPhoto = contentDuplicate
+    ? mergeExchangePhotoVersions(contentDuplicate, persistentPhoto)
+    : persistentPhoto;
+  const photoToStore = sanitizeExchangePhotoForPersistence(mergedPhoto);
+  if (!photoToStore) {
+    return null;
+  }
+
+  const saved = existingPhotos.filter(
+    (savedPhoto) =>
+      savedPhoto.id !== photoToStore.id &&
+      (!photoToStore.sourcePhotoId ||
+        savedPhoto.sourcePhotoId !== photoToStore.sourcePhotoId) &&
+      !hasMatchingPhotoContent(savedPhoto, photoToStore),
+  );
+
+  return {
+    photoToStore,
+    nextPhotos: [photoToStore, ...saved],
+  };
+}
+
+function hasStoredExchangePhoto(
+  photos: ExchangePhoto[],
+  target: ExchangePhoto,
+) {
+  return photos.some(
+    (photo) =>
+      photo.id === target.id ||
+      Boolean(
+        target.sourcePhotoId &&
+          photo.sourcePhotoId === target.sourcePhotoId,
+      ),
+  );
+}
+
+function rememberKeptExchangePhotoInMemory(photo: ExchangePhoto) {
+  inMemoryKeptExchangePhotos = mergeExchangePhotos(
+    [],
+    [photo, ...inMemoryKeptExchangePhotos],
+  ).slice(0, 50);
+  dispatchBoxPhotoStorageEvent();
 }
 
 export function updateKeptExchangePhotoDataUrl(
@@ -1004,11 +1082,18 @@ export function updateKeptExchangePhotoDimensions(
     width: size.width,
     height: size.height,
   };
+  const persistentUpdatedPhoto =
+    sanitizeExchangePhotoForPersistence(updatedPhoto);
+  if (!persistentUpdatedPhoto) {
+    return false;
+  }
   const nextPhotos = saved.map((savedPhoto, index) =>
-    index === targetIndex ? updatedPhoto : savedPhoto,
+    index === targetIndex ? persistentUpdatedPhoto : savedPhoto,
   );
 
-  void upsertPhotoHistoryEntries("kept", [updatedPhoto]).catch(() => undefined);
+  void upsertPhotoHistoryEntries("kept", [persistentUpdatedPhoto]).catch(
+    () => undefined,
+  );
   writeStorageArrayWithFallback(
     KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
     nextPhotos,
@@ -1109,13 +1194,14 @@ export function sanitizeExchangePhotoForPersistence(
     return null;
   }
 
+  const { offlineSrc: _offlineSrc, ...persistentPhoto } = photo;
+
   return completePhotoSourceSet({
-    ...photo,
+    ...persistentPhoto,
     src: persistentSrc,
     thumbnailSrc: normalizePersistentExchangePhotoSrc(photo.thumbnailSrc),
     displaySrc: normalizePersistentExchangePhotoSrc(photo.displaySrc),
     originalSrc: normalizePersistentExchangePhotoSrc(photo.originalSrc),
-    offlineSrc: normalizePersistentExchangePhotoSrc(photo.offlineSrc),
   });
 }
 
@@ -1224,6 +1310,9 @@ export function hideKeptExchangePhoto(
     const photos = readAllKeptExchangePhotos();
     const targetPhoto = photos.find((photo) => photo.id === photoId);
     const nextPhotos = photos.filter((photo) => photo.id !== photoId);
+    inMemoryKeptExchangePhotos = inMemoryKeptExchangePhotos.filter(
+      (photo) => photo.id !== photoId,
+    );
 
     writeStorageArray(KEPT_EXCHANGE_PHOTO_STORAGE_KEY, nextPhotos);
 
@@ -1516,10 +1605,11 @@ function compactDuplicatePhotoSources<T>(value: T): T {
   }
 
   const compact = { ...(value as Record<string, unknown>) };
+  delete compact.offlineSrc;
   const src = compact.src;
 
   if (typeof src !== "string") {
-    return value;
+    return compact as T;
   }
 
   for (const key of ["thumbnailSrc", "displaySrc", "originalSrc"] as const) {

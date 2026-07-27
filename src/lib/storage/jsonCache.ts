@@ -160,6 +160,7 @@ const RECREATABLE_STORAGE_KEYS = new Set([
   "analytics_event_queue",
   "analytics_session",
   "neteruneko_admin_evening_delivery_trace",
+  "neteruneko_exchange_photo_offline_cache",
   "neteruneko_mainichi_seen_photo_keys",
   "neteruneko_onboarding_photo_debug",
 ]);

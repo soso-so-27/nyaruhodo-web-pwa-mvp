@@ -92,6 +92,7 @@ import {
   skipEveningDeliverySelection,
   shouldShowGuidanceCopy,
   updateEveningDeliveredPhotoDataUrl,
+  waitForEveningResolutionFallbackPersistence,
   writeEveningDeliveryStore,
   type EveningHomeState,
 } from "../../lib/home/eveningDelivery";
@@ -104,6 +105,7 @@ import {
   BOX_PHOTO_STORAGE_EVENT,
   dismissExchangePhoto,
   keepExchangePhoto,
+  keepExchangePhotoDurably,
   readBlockedExchangePhotoIds,
   readAllOwnSleepingPhotos,
   readKeptExchangePhotoCount,
@@ -2237,24 +2239,20 @@ export function HomeInput({
       (candidate) => candidate.id === canonicalPhoto.id,
     );
     const selectedPosition = selectedIndex >= 0 ? selectedIndex + 1 : null;
-    const previousDay = readEveningDeliveryStore()[deliveryState.dateKey];
     const wasSelectionPersisted = selectEveningDeliveredPhoto(
       deliveryState.dateKey,
       canonicalPhoto.id,
       Date.now(),
     );
-    const wasSaved =
-      wasSelectionPersisted && keepExchangePhoto(canonicalPhoto);
+    const [albumSave] = await Promise.all([
+      keepExchangePhotoDurably(canonicalPhoto),
+      waitForEveningResolutionFallbackPersistence().catch(() => undefined),
+    ]);
+    const wasSaved = albumSave.availableInSession;
 
-    if (!wasSelectionPersisted || !wasSaved) {
-      let rollbackSucceeded: boolean | null = null;
-      if (wasSelectionPersisted && previousDay) {
-        const store = readEveningDeliveryStore();
-        store[deliveryState.dateKey] = previousDay;
-        rollbackSucceeded = writeEveningDeliveryStore(store);
-      }
+    if (!wasSelectionPersisted || !albumSave.persisted) {
       trackProductEvent(
-        "evening_delivery_choice_save_failed",
+        "evening_delivery_choice_local_persistence_degraded",
         {
           delivery_date_key: deliveryState.dateKey,
           delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
@@ -2270,13 +2268,13 @@ export function HomeInput({
           photo_id: canonicalPhoto.id,
           requested_photo_id: photo.id,
           server_conflict: canonical.conflict,
-          error_code: wasSelectionPersisted
-            ? "album_write_failed"
-            : "delivery_state_write_failed",
-          rollback_succeeded: rollbackSucceeded,
+          delivery_state_saved: wasSelectionPersisted,
+          local_album_saved: albumSave.persisted,
         },
         { localCatId: activeCatId },
       );
+    }
+    if (!wasSelectionPersisted || !albumSave.availableInSession) {
       return null;
     }
 
@@ -2300,7 +2298,9 @@ export function HomeInput({
         delivery_photo_id: canonicalPhoto.id,
         requested_photo_id: photo.id,
         server_conflict: canonical.conflict,
-        save_succeeded: true,
+        save_succeeded: wasSaved,
+        local_album_persisted: albumSave.persisted,
+        delivery_state_saved: wasSelectionPersisted,
       },
       { localCatId: activeCatId },
     );
@@ -2362,20 +2362,31 @@ export function HomeInput({
       if (!canonicalPhoto) {
         return null;
       }
-      const previousDay = readEveningDeliveryStore()[deliveryState.dateKey];
       const wasSelectionPersisted = selectEveningDeliveredPhoto(
         deliveryState.dateKey,
         canonicalPhoto.id,
         Date.now(),
       );
-      const wasSaved =
-        wasSelectionPersisted && keepExchangePhoto(canonicalPhoto);
-      if (!wasSaved) {
-        if (wasSelectionPersisted && previousDay) {
-          const store = readEveningDeliveryStore();
-          store[deliveryState.dateKey] = previousDay;
-          writeEveningDeliveryStore(store);
-        }
+      const [albumSave] = await Promise.all([
+        keepExchangePhotoDurably(canonicalPhoto),
+        waitForEveningResolutionFallbackPersistence().catch(() => undefined),
+      ]);
+      if (!wasSelectionPersisted || !albumSave.persisted) {
+        trackProductEvent(
+          "evening_delivery_choice_local_persistence_degraded",
+          {
+            delivery_date_key: deliveryState.dateKey,
+            delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
+            requested_operation: "skip",
+            photo_id: canonicalPhoto.id,
+            server_conflict: canonical.conflict,
+            delivery_state_saved: wasSelectionPersisted,
+            local_album_saved: albumSave.persisted,
+          },
+          { localCatId: activeCatId },
+        );
+      }
+      if (!wasSelectionPersisted || !albumSave.availableInSession) {
         return null;
       }
       setCollectionRefreshTick((value) => value + 1);
@@ -4670,9 +4681,6 @@ export function EveningDeliveryFourChoice({
                           variant === "main" ? "detail" : "list",
                         )}
                         loading="eager"
-                        onStorageDataUrl={(dataUrl) =>
-                          onStorageDataUrl(photo, dataUrl)
-                        }
                         onError={() => handleChoicePhotoError(photo)}
                         style={
                           variant === "main"
