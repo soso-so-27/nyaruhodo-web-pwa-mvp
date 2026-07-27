@@ -200,9 +200,6 @@ function OnboardingContinueContent({
       <div style={styles.container}>
         <WordmarkHeader style={styles.header} />
         <AppCard variant="section" padding="lg" style={styles.card}>
-          <p style={styles.eyebrow}>
-            ブラウザの引き継ぎ
-          </p>
           <h1 style={styles.title}>
             {shouldShowEmbeddedGuide
               ? isIntroHandoff
@@ -212,15 +209,19 @@ function OnboardingContinueContent({
                 ? getTerminalRestoreHeading(restoreErrorCode)
                 : getRestoreHeading(status, isIntroHandoff)}
           </h1>
-          <p style={styles.body}>
-            {shouldShowEmbeddedGuide
-              ? isIntroHandoff
-                ? "下のURLをコピーし、SafariやChromeのアドレス欄に貼り付けてください。"
-                : "写真と入力内容を引き継ぐには、URLをコピーして、ChromeやSafari、またはホーム画面アプリでひらいてください。"
-              : hasTerminalRestoreError
-                ? getTerminalRestoreBody(restoreErrorCode, isIntroHandoff)
-                : getRestoreBody(status, isIntroHandoff)}
-          </p>
+          {shouldShowEmbeddedGuide ||
+          hasTerminalRestoreError ||
+          (status !== "restoring" && !message) ? (
+            <p style={styles.body}>
+              {shouldShowEmbeddedGuide
+                ? isIntroHandoff
+                  ? "下のURLをコピーし、SafariやChromeのアドレス欄に貼り付けてください。"
+                  : "写真と入力内容を引き継ぐには、URLをコピーして、ChromeやSafari、またはホーム画面アプリでひらいてください。"
+                : hasTerminalRestoreError
+                  ? getTerminalRestoreBody(restoreErrorCode, isIntroHandoff)
+                  : getRestoreBody(status, isIntroHandoff)}
+            </p>
+          ) : null}
 
           {shouldShowEmbeddedGuide ? (
             <div style={styles.urlBox}>
@@ -283,7 +284,7 @@ function OnboardingContinueContent({
                     : "引き継いでいます..."
                   : status === "restored"
                     ? isIntroHandoff
-                      ? "4匹に会ってみる"
+                      ? "4匹を見る"
                       : "ホームへ"
                     : status === "error"
                       ? "引き継ぎをもう一度試す"
@@ -537,12 +538,6 @@ const styles = {
   card: {
     display: "grid",
     gap: 16,
-  },
-  eyebrow: {
-    margin: 0,
-    color: "#9f786f",
-    fontSize: 12,
-    letterSpacing: "0.12em",
   },
   title: {
     margin: 0,

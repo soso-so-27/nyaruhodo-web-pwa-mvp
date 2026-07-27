@@ -362,6 +362,7 @@ test.describe("20時便の4枚選択", () => {
       .click();
     const preview = page.getByTestId("evening-four-choice-preview");
     await expect(preview).toBeVisible();
+    await expect(preview).toHaveAttribute("data-tone", "dark");
     await expect(
       preview.getByTestId("evening-four-choice-preview-thumbnail"),
     ).toHaveCount(4);

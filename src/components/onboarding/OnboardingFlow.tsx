@@ -84,7 +84,6 @@ import {
 } from "../home/homeInputHelpers";
 import { AppButton } from "../ui/AppButton";
 import { CatChoicePreview } from "../ui/CatChoicePreview";
-import { LockIcon } from "../ui/AppIcons";
 import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { WordmarkHeader } from "../ui/AppHeader";
@@ -216,6 +215,13 @@ export function OnboardingFlow() {
   const selectedDeliveryPhoto =
     deliveredPhotos.find((photo) => photo.id === selectedDeliveryPhotoId) ??
     null;
+  const receivingDeliveryPhoto =
+    savingStage === "receiving_letter"
+      ? (selectedDeliveryPhoto ?? deliveredPhoto)
+      : null;
+  const deliveryWaitingPhotoSrc = receivingDeliveryPhoto
+    ? getExchangePhotoDisplaySrc(receivingDeliveryPhoto)
+    : selectedPhotoSrc;
   const completedDeliveryPhoto = isDeliveredPhotoKept
     ? (selectedDeliveryPhoto ?? deliveredPhoto)
     : null;
@@ -872,10 +878,13 @@ export function OnboardingFlow() {
       );
 
       if (!isValidPreview || !result?.bundleId) {
+        const hasTemporaryFailure = Boolean(
+          result?.error ||
+            (typeof result?.httpStatus === "number" &&
+              result.httpStatus >= 400),
+        );
         setDeliveryIssue(
-          result?.error || result?.httpStatus
-            ? "temporary_error"
-            : "no_candidate",
+          hasTemporaryFailure ? "temporary_error" : "no_candidate",
         );
         setState("empty");
         trackProductEvent("onboarding_preview_failed", {
@@ -1433,7 +1442,7 @@ export function OnboardingFlow() {
     window.location.assign("/home");
   }
 
-  function continueToOwnCatAfterJoining() {
+  function continueToNekodayoriAfterJoining() {
     if (isContinuingRef.current) {
       return;
     }
@@ -1442,7 +1451,7 @@ export function OnboardingFlow() {
     setIsContinuing(true);
     markOnboardingAlbumCompletionReady();
     markOnboardingAlbumCreated(getEffectiveEntrySource());
-    window.location.assign("/cats?onboarding=1");
+    window.location.assign("/collection");
   }
 
   async function resumePreviewCommit(progress: OnboardingProgress) {
@@ -2432,7 +2441,6 @@ export function OnboardingFlow() {
 
         {shouldShowExternalBrowserGuide ? (
           <ExternalBrowserGuide
-            source={entrySource}
             isPreparing={isPreparingExternalBrowserHandoff}
             errorMessage={externalBrowserHandoffError}
             onOpenExternalBrowser={() => {
@@ -2492,14 +2500,15 @@ export function OnboardingFlow() {
                   data-onboarding-lead="true"
                   data-testid="onboarding-exchange-explanation"
                 >
-                  4匹から気になる1匹を選べます。
-                  <br />
-                  受け取りには、うちの子の写真が1枚必要です。
+                  うちの子の写真1枚で、猫と交換できます。
                 </p>
               </>
             ) : null}
             {state === "saving" || state === "choice_loading" ? (
-              <DeliveryWaiting photoSrc={selectedPhotoSrc} stage={savingStage} />
+              <DeliveryWaiting
+                photoSrc={deliveryWaitingPhotoSrc}
+                stage={savingStage}
+              />
             ) : null}
             {state === "intro" ? (
               <>
@@ -2517,7 +2526,7 @@ export function OnboardingFlow() {
                   }}
                   data-onboarding-cta="true"
                 >
-                  4匹に会ってみる
+                  4匹を見る
                 </AppButton>
               </>
             ) : null}
@@ -2583,20 +2592,13 @@ export function OnboardingFlow() {
                 >
                   {state === "choice"
                     ? "気になる子は、どの子？"
-                    : "最初のねこだより"}
+                    : "保存する猫を選んでください"}
                 </p>
                 <span
                   style={styles.onboardingDeliveredMastheadRule}
                   aria-hidden="true"
                 />
               </div>
-              <p style={styles.onboardingFourChoiceLead}>
-                {state === "choice" ? (
-                  "写真をタップすると、大きく見られます。"
-                ) : (
-                  "「ねこだより」に保存する猫を選んでください"
-                )}
-              </p>
               <div
                 role="group"
                 aria-label="届いた猫を大きく見る"
@@ -2688,12 +2690,13 @@ export function OnboardingFlow() {
                     );
                   }}
                   confirmLabel={
-                    state === "choice" ? "この猫を選ぶ" : "この猫を保存"
+                    state === "choice" ? "この猫にする" : "この猫を保存"
                   }
                   confirmBusyLabel="保存しています…"
                   confirmDisabled={isFinalizingDeliveryChoice}
                   isConfirming={isFinalizingDeliveryChoice}
                   errorMessage={deliveryChoiceError}
+                  tone="paper"
                   manageHistory
                   testId="onboarding-four-choice-preview"
                   confirmTestId="onboarding-four-choice-save"
@@ -2722,7 +2725,7 @@ export function OnboardingFlow() {
                   }}
                   data-testid="onboarding-preview-skip"
                 >
-                  今回は見るだけ
+                  やめる
                 </AppButton>
               ) : state === "delivered" ? (
                 <AppButton
@@ -2753,73 +2756,65 @@ export function OnboardingFlow() {
               data-testid="onboarding-photo-prompt"
               data-onboarding-result="true"
           >
-            <div
-              style={styles.onboardingPromptPhotoFrame}
-              data-onboarding-prompt-photo="true"
-            >
-              <StoredPhotoImage
-                src={getExchangePhotoDisplaySrc(selectedDeliveryPhoto)}
-                fallbackSrcs={getExchangePhotoFallbackSrcs(
-                  selectedDeliveryPhoto,
-                )}
-                alt=""
-                storageVariant="display"
-                loading="eager"
-                style={styles.onboardingPromptPhoto}
-              />
-            </div>
+            {!message ? (
+              <div
+                style={styles.onboardingPromptPhotoFrame}
+                data-onboarding-prompt-photo="true"
+              >
+                <StoredPhotoImage
+                  src={getExchangePhotoDisplaySrc(selectedDeliveryPhoto)}
+                  fallbackSrcs={getExchangePhotoFallbackSrcs(
+                    selectedDeliveryPhoto,
+                  )}
+                  alt=""
+                  storageVariant="display"
+                  loading="eager"
+                  style={styles.onboardingPromptPhoto}
+                />
+              </div>
+            ) : null}
             <h2
               style={styles.subTitle}
               data-onboarding-subtitle="true"
             >
               {message
                 ? "写真を読み込めませんでした"
-                : "この猫を受け取りますか？"}
+                : "この猫と交換しますか？"}
             </h2>
             {message ? (
-              <p role="alert" style={styles.message}>
+              <p role="alert" style={styles.onboardingPromptNote}>
                 {message}
               </p>
             ) : (
-              <>
-                <p
-                  style={styles.onboardingPromptActionText}
-                  data-onboarding-result-copy="true"
-                >
-                  うちの子の写真1枚と交換します。
-                </p>
-                <p style={styles.privacyNote}>
-                  <span aria-hidden="true" style={styles.privacyNoteIcon}>
-                    <LockIcon size={14} />
-                  </span>
-                  <span>
-                    確認後、写真だけが匿名で
-                    <br />
-                    ほかの人に届くことがあります
-                  </span>
-                </p>
-              </>
+              <p
+                style={styles.onboardingPromptNote}
+                data-onboarding-result-copy="true"
+              >
+                選んだ写真は匿名で交換に使われます。
+              </p>
             )}
-            <AppButton
-              type="button"
-              variant="accent"
-              data-testid="onboarding-photo-invite"
-              onClick={() => {
-                void handleSelectSleepingPhoto();
-              }}
-              fullWidth
-              style={styles.onboardingPromptCta}
-            >
-              {message ? "別の写真を選ぶ" : "うちの子の写真を選ぶ"}
-            </AppButton>
-            <AppButton
-              type="button"
-              variant="quiet"
-              size="md"
-              onClick={handleSkipPreviewAndGoHome}
-            >
-              今回はやめる
-            </AppButton>
+            <div style={styles.onboardingPromptActions}>
+              <AppButton
+                type="button"
+                variant="accent"
+                data-testid="onboarding-photo-invite"
+                onClick={() => {
+                  void handleSelectSleepingPhoto();
+                }}
+                fullWidth
+                style={styles.onboardingPromptCta}
+              >
+                {message ? "別の写真を選ぶ" : "写真を選んで交換する"}
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="quiet"
+                size="md"
+                onClick={handleSkipPreviewAndGoHome}
+              >
+                やめる
+              </AppButton>
+            </div>
           </section>
         ) : null}
 
@@ -2903,13 +2898,7 @@ export function OnboardingFlow() {
               ) : null}
               <p style={styles.onboardingDeliveredNote}>
                 {isDeliveredPhotoKept ? (
-                  <>
-                    あなたの猫の写真は「うちのこ」に、
-                    <br />
-                    <span style={styles.onboardingDeliveredSavedPhrase}>
-                      選んだ猫は「ねこだより」に残りました
-                    </span>
-                  </>
+                  "「ねこだより」に保存しました"
                 ) : (
                   "この写真を保存しています。"
                 )}
@@ -2939,7 +2928,9 @@ export function OnboardingFlow() {
             aria-label={
               pendingOwnPhoto
                 ? "猫を受け取れませんでした"
-                : "4匹を読み込めませんでした"
+                : deliveryIssue === "no_candidate"
+                  ? "いま選べる猫がいません"
+                  : "猫を表示できませんでした"
             }
             data-delivery-issue={deliveryIssue ?? undefined}
           >
@@ -2949,7 +2940,9 @@ export function OnboardingFlow() {
             >
               {pendingOwnPhoto
                 ? "猫を受け取れませんでした"
-                : "4匹を読み込めませんでした"}
+                : deliveryIssue === "no_candidate"
+                  ? "いま選べる猫がいません"
+                  : "猫を表示できませんでした"}
             </h2>
             <p
               style={styles.resultText}
@@ -2960,32 +2953,11 @@ export function OnboardingFlow() {
                   ? "候補の確認で止まりました。テスト用に、ここで候補を追加できます。"
                   : "とどく候補がまだありません。テスト用に、ここで候補を追加できます。"
                 : pendingOwnPhoto
-                  ? "写真を選び直さず、そのまま再試行できます。"
+                  ? "写真は「うちのこ」に保存済みです。"
                   : deliveryIssue === "no_candidate"
                     ? "少し時間をおいて、もう一度お試しください。"
                     : "通信を確認して、もう一度お試しください。"}
             </p>
-            {pendingOwnPhoto && selectedPhotoSrc ? (
-              <div
-                style={styles.onboardingOwnPhotoSummary}
-                data-onboarding-own-photo-summary="true"
-                data-testid="onboarding-recovery-own-photo"
-              >
-                <img
-                  src={selectedPhotoSrc}
-                  alt=""
-                  style={styles.onboardingOwnPhotoThumbnail}
-                />
-                <span style={styles.onboardingOwnPhotoSummaryCopy}>
-                  <span style={styles.onboardingOwnPhotoSummaryTitle}>
-                    「うちのこ」に保存済み
-                  </span>
-                  <span style={styles.onboardingOwnPhotoSummaryMeta}>
-                    写真は残っています
-                  </span>
-                </span>
-              </div>
-            ) : null}
             {canShowTestTools ? (
               <AppButton
                 type="button"
@@ -3035,13 +3007,6 @@ export function OnboardingFlow() {
             data-onboarding-result="true"
           >
             {completedDeliveryPhoto ? (
-              <p style={styles.onboardingCompletionBadge}>
-                交換できました
-              </p>
-            ) : (
-              <p style={styles.kicker}>写真を残しました</p>
-            )}
-            {completedDeliveryPhoto ? (
               <div
                 style={styles.onboardingCompletionPhotoFrame}
                 data-onboarding-completion-photo="true"
@@ -3071,59 +3036,28 @@ export function OnboardingFlow() {
               data-onboarding-subtitle="true"
             >
               {completedDeliveryPhoto
-                ? "選んだ猫が届きました"
+                ? "この猫が届きました"
                 : "写真を保存しました"}
             </h2>
             {completedDeliveryPhoto ? (
-              <>
-                <p
-                  style={styles.resultText}
-                  data-onboarding-result-copy="true"
-                >
-                  「ねこだより」に保存しました
-                </p>
-                {selectedPhotoSrc ? (
-                  <div
-                    style={styles.onboardingOwnPhotoSummary}
-                    data-onboarding-own-photo-summary="true"
-                    data-testid="onboarding-joined-own-photo"
-                  >
-                    <img
-                      src={selectedPhotoSrc}
-                      alt=""
-                      style={styles.onboardingOwnPhotoThumbnail}
-                    />
-                    <span style={styles.onboardingOwnPhotoSummaryCopy}>
-                      <span style={styles.onboardingOwnPhotoSummaryTitle}>
-                        写真は「うちのこ」に保存済み
-                      </span>
-                      <span style={styles.onboardingOwnPhotoSummaryMeta}>
-                        選ばれたらお知らせします
-                      </span>
-                    </span>
-                  </div>
-                ) : null}
-              </>
+              <p
+                style={styles.resultText}
+                data-onboarding-result-copy="true"
+              >
+                「ねこだより」に保存しました
+              </p>
             ) : (
               <p
                 style={styles.resultText}
                 data-onboarding-result-copy="true"
               >
-                あなたの猫の写真は「うちのこ」に残りました。
-                {isDeliveredPhotoKept ? (
-                <>
-                  <br />
-                  選んだ猫は「ねこだより」に残りました。
-                  <br />
-                  送った写真が、ほかのおうちで選ばれたときも分かります。
-                </>
-                ) : null}
+                「うちのこ」に保存しました
               </p>
             )}
             <AppButton
               type="button"
               variant="accent"
-              onClick={continueToOwnCatAfterJoining}
+              onClick={continueToNekodayoriAfterJoining}
               disabled={isContinuing}
               fullWidth
               style={{
@@ -3131,7 +3065,7 @@ export function OnboardingFlow() {
                 ...styles.onboardingPrimaryCta,
               }}
             >
-              {isContinuing ? "準備しています…" : "うちのこを見る"}
+              {isContinuing ? "準備しています…" : "ねこだよりを見る"}
             </AppButton>
           </section>
         ) : null}
@@ -3142,16 +3076,11 @@ export function OnboardingFlow() {
             aria-label="最初の体験が完了しました"
             data-onboarding-result="true"
           >
-            <p style={styles.kicker}>準備ができました</p>
             <h2 style={styles.subTitle}>
-              あなたの猫の写真は
-              <br />
-              「うちのこ」に残りました
+              写真を保存しました
             </h2>
             <p style={styles.resultText}>
-              ほかの猫をえらんだときは、
-              <br />
-              「ねこだより」に残ります。
+              「うちのこ」に保存しました
             </p>
             <AppButton
               type="button"
@@ -3195,6 +3124,12 @@ function DeliveryWaiting({
   photoSrc: string;
   stage: OnboardingSavingStage;
 }) {
+  const statusLabel =
+    stage === "loading_choices"
+      ? "4匹を読み込んでいます"
+      : stage === "saving_photo"
+        ? "写真を保存しています"
+        : "猫を受け取っています";
   const {
     frameStyle,
     handleNaturalSize,
@@ -3206,7 +3141,12 @@ function DeliveryWaiting({
   });
 
   return (
-    <div style={styles.deliveryWaiting} aria-live="polite" role="status">
+    <div
+      style={styles.deliveryWaiting}
+      aria-live="polite"
+      aria-label={statusLabel}
+      role="status"
+    >
       {stage === "loading_choices" ? (
         <span
           style={styles.deliveryWaitingChoiceSkeleton}
@@ -3252,37 +3192,22 @@ function DeliveryWaiting({
           )}
         </span>
       )}
-      <span style={styles.deliveryWaitingStatus}>
-        <span style={styles.deliveryWaitingLine} aria-hidden="true">
-          <span style={styles.deliveryWaitingDot} />
-        </span>
-        <span style={styles.deliveryWaitingText}>
-          {stage === "loading_choices"
-            ? "4枚の写真を準備しています"
-            : stage === "saving_photo"
-              ? "うちのこに残しています"
-              : "ねこだよりに届けています"}
-        </span>
-      </span>
     </div>
   );
 }
 
 function ExternalBrowserGuide({
-  source,
   isPreparing,
   errorMessage,
   onOpenExternalBrowser,
   onContinue,
 }: {
-  source: OnboardingSource;
   isPreparing: boolean;
   errorMessage: string;
   onOpenExternalBrowser: () => void;
   onContinue: () => void;
 }) {
   const catIllustrations = useCatIllustrationAssets();
-  const kicker = source === "referral" ? "紹介リンク" : "アプリ内ブラウザ";
 
   return (
     <section style={styles.externalBrowserGuide} aria-label="ブラウザでひらく案内">
@@ -3296,9 +3221,8 @@ function ExternalBrowserGuide({
           }
         />
       </div>
-      <p style={styles.kicker}>{kicker}</p>
       <h1 style={styles.title}>
-        このまま試せます
+        このブラウザで試せます
       </h1>
       {errorMessage ? (
         <p style={styles.externalBrowserCopiedText} role="alert">
@@ -3317,7 +3241,7 @@ function ExternalBrowserGuide({
             ...styles.onboardingPrimaryCta,
           }}
         >
-          このまま進む
+          はじめる
         </AppButton>
         <AppButton
           type="button"
@@ -4087,33 +4011,6 @@ const styles = {
     lineHeight: 1.75,
     letterSpacing: 0,
   },
-  privacyNote: {
-    display: "grid",
-    gridTemplateColumns: "18px minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "8px",
-    width: "100%",
-    maxWidth: "286px",
-    margin: "1px 0 0",
-    padding: "9px 11px",
-    border: "1px solid rgba(120,108,94,0.1)",
-    borderRadius: "var(--radius-lg)",
-    background: "rgba(255,253,248,0.42)",
-    color: "#82786c",
-    fontFamily: UI_FONT,
-    fontSize: "11px",
-    fontWeight: 400,
-    lineHeight: 1.55,
-    letterSpacing: 0,
-    textAlign: "left",
-    boxSizing: "border-box",
-  },
-  privacyNoteIcon: {
-    display: "inline-grid",
-    placeItems: "center",
-    flex: "0 0 auto",
-    color: "#8a7667",
-  },
   deliveryWaiting: {
     display: "grid",
     justifyItems: "center",
@@ -4127,6 +4024,9 @@ const styles = {
     display: "block",
     width: "min(100%, 240px, calc(100dvh - 300px))",
     aspectRatio: "1 / 1",
+    border: 0,
+    background: "transparent",
+    boxShadow: "none",
   },
   deliveryWaitingPhoto: {
     ...deliveredLetterStyles.photo,
@@ -4155,57 +4055,6 @@ const styles = {
     boxShadow: "0 4px 14px rgba(70, 50, 30, 0.05)",
     animation: "onboardingSkeleton 1.4s ease-in-out infinite",
   },
-  deliveryWaitingStatus: {
-    display: "grid",
-    justifyItems: "center",
-    gap: "8px",
-    minWidth: "210px",
-    padding: "4px 18px 5px",
-    border: "none",
-    background: "transparent",
-    boxShadow: "none",
-  },
-  deliveryWaitingLine: {
-    position: "relative",
-    width: "112px",
-    height: "2px",
-    borderRadius: "var(--radius-full)",
-    overflow: "hidden",
-    background:
-      "repeating-linear-gradient(90deg, rgba(142,128,110,0.24) 0 4px, transparent 4px 10px)",
-  },
-  deliveryWaitingDot: {
-    position: "absolute",
-    top: "-2px",
-    left: "50%",
-    width: "6px",
-    height: "6px",
-    borderRadius: "var(--radius-full)",
-    background: "rgba(154,134,107,0.7)",
-    animation: "onboardingDots 1.1s ease-in-out infinite alternate",
-  },
-  deliveryWaitingText: {
-    color: "#746a5f",
-    fontFamily: UI_FONT,
-    fontSize: "13px",
-    fontWeight: 400,
-    lineHeight: 1.45,
-    letterSpacing: 0,
-  },
-  embeddedBrowserNotice: {
-    margin: "2px 0 -2px",
-    width: "min(100%, 286px)",
-    boxSizing: "border-box",
-    border: "1px solid rgba(120,108,94,0.1)",
-    borderRadius: "16px",
-    background: "rgba(255,253,248,0.54)",
-    color: "#7a7065",
-    fontFamily: UI_FONT,
-    fontSize: "11px",
-    fontWeight: 400,
-    lineHeight: 1.7,
-    padding: "9px 11px",
-  },
   onboardingCta: {
     width: "min(100%, 280px)",
     marginTop: "14px",
@@ -4217,12 +4066,17 @@ const styles = {
     boxShadow: "0 9px 20px rgba(112,55,48,0.16)",
   },
   onboardingPromptCta: {
-    width: "min(100%, 280px)",
-    marginTop: "4px",
+    width: "100%",
     border: "1px solid #98493f",
     background: "#a65349",
     color: "#fffaf2",
     boxShadow: "0 9px 20px rgba(112,55,48,0.16)",
+  },
+  onboardingPromptActions: {
+    width: "min(100%, 280px)",
+    display: "grid",
+    justifyItems: "center",
+    gap: "2px",
   },
   onboardingCtaLink: {
     width: "min(100%, 280px)",
@@ -4357,15 +4211,6 @@ const styles = {
     minWidth: 0,
     boxSizing: "border-box",
   },
-  onboardingFourChoiceLead: {
-    margin: "12px 0 14px",
-    color: "var(--ink-soft)",
-    fontFamily: UI_FONT,
-    fontSize: "13px",
-    fontWeight: 400,
-    lineHeight: 1.65,
-    textAlign: "center",
-  },
   onboardingFourChoiceGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
@@ -4377,7 +4222,7 @@ const styles = {
     aspectRatio: "1 / 1",
     padding: 0,
     overflow: "hidden",
-    border: "2px solid color-mix(in srgb, var(--line) 82%, transparent)",
+    border: 0,
     borderRadius: "16px",
     background: "var(--paper-warm)",
     boxShadow: "0 4px 14px rgba(70, 50, 30, 0.10)",
@@ -4448,31 +4293,16 @@ const styles = {
     display: "block",
     objectFit: "cover",
   },
-  onboardingPromptActionText: {
-    width: "min(100%, 310px)",
+  onboardingPromptNote: {
+    width: "min(100%, 286px)",
     margin: 0,
-    color: "#5f554b",
+    color: "#6f6757",
     fontFamily: UI_FONT,
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1.65,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.6,
     letterSpacing: 0,
-  },
-  onboardingCompletionBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    minHeight: "28px",
-    margin: 0,
-    padding: "5px 12px",
-    border: "1px solid color-mix(in srgb, var(--seal) 15%, transparent)",
-    borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--seal) 7%, transparent)",
-    color: "var(--seal)",
-    fontFamily: UI_FONT,
-    fontSize: "11px",
-    fontWeight: 500,
-    lineHeight: 1,
-    letterSpacing: "0.04em",
+    textAlign: "center",
   },
   onboardingCompletionPhotoFrame: {
     width: "min(100%, 238px)",
@@ -4488,48 +4318,6 @@ const styles = {
     height: "100%",
     display: "block",
     objectFit: "cover",
-  },
-  onboardingOwnPhotoSummary: {
-    display: "grid",
-    gridTemplateColumns: "54px minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "10px",
-    width: "min(100%, 286px)",
-    padding: "9px 12px",
-    border: "1px solid rgba(120,108,94,0.13)",
-    borderRadius: "var(--radius-xl)",
-    background: "rgba(255,253,248,0.6)",
-    boxShadow: "0 6px 18px rgba(90,76,60,0.04)",
-    boxSizing: "border-box",
-    textAlign: "left",
-  },
-  onboardingOwnPhotoThumbnail: {
-    display: "block",
-    width: "54px",
-    height: "54px",
-    objectFit: "cover",
-    borderRadius: "var(--radius-lg)",
-  },
-  onboardingOwnPhotoSummaryCopy: {
-    display: "grid",
-    gap: "2px",
-    minWidth: 0,
-  },
-  onboardingOwnPhotoSummaryTitle: {
-    color: "#5f554b",
-    fontFamily: UI_FONT,
-    fontSize: "12px",
-    fontWeight: 500,
-    lineHeight: 1.5,
-    letterSpacing: 0,
-  },
-  onboardingOwnPhotoSummaryMeta: {
-    color: "#6f6757",
-    fontFamily: UI_FONT,
-    fontSize: "10.5px",
-    fontWeight: 400,
-    lineHeight: 1.45,
-    letterSpacing: 0,
   },
   onboardingDeliveredLetter: {
     ...deliveredLetterStyles.sheet,
@@ -4559,10 +4347,6 @@ const styles = {
   },
   onboardingDeliveredNote: {
     ...deliveredLetterStyles.note,
-  },
-  onboardingDeliveredSavedPhrase: {
-    ...deliveredLetterStyles.savedPhrase,
-    whiteSpace: "normal",
   },
   onboardingDeliveredContinue: {
     ...deliveredLetterStyles.action,

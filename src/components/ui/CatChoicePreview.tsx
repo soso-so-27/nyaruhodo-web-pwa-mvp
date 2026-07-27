@@ -32,6 +32,7 @@ export function CatChoicePreview({
   errorMessage = "",
   onSecondaryAction,
   secondaryActionLabel,
+  tone = "dark",
   manageHistory = false,
   testId = "cat-choice-preview",
   confirmTestId = "cat-choice-preview-confirm",
@@ -53,6 +54,7 @@ export function CatChoicePreview({
   errorMessage?: string;
   onSecondaryAction?: () => void;
   secondaryActionLabel?: string;
+  tone?: "dark" | "paper";
   manageHistory?: boolean;
   testId?: string;
   confirmTestId?: string;
@@ -68,6 +70,7 @@ export function CatChoicePreview({
   const activeIndex = items.findIndex((item) => item.id === activeId);
   const currentIndex = activeIndex >= 0 ? activeIndex : 0;
   const currentItem = items[currentIndex] ?? null;
+  const isPaperTone = tone === "paper";
 
   useEffect(() => {
     const root = document.documentElement;
@@ -150,7 +153,11 @@ export function CatChoicePreview({
       data-testid={testId}
       data-photo-id={currentItem.id}
       data-position={currentIndex + 1}
-      style={styles.overlay}
+      data-tone={tone}
+      style={{
+        ...styles.overlay,
+        ...(isPaperTone ? styles.overlayPaper : {}),
+      }}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={handleKeyDown}
     >
@@ -161,16 +168,22 @@ export function CatChoicePreview({
             data-testid={`${testId}-back`}
             disabled={isConfirming}
             onClick={requestModalClose}
-            style={styles.backButton}
+            style={{
+              ...styles.backButton,
+              ...(isPaperTone ? styles.backButtonPaper : {}),
+            }}
           >
             <span aria-hidden="true">‹</span>
             <span>一覧</span>
           </button>
-          <p id={`${testId}-title`} style={styles.title}>
-            ねこだより
+          <p id={`${testId}-title`} style={styles.visuallyHidden}>
+            猫を大きく見る
           </p>
           <p
-            style={styles.position}
+            style={{
+              ...styles.position,
+              ...(isPaperTone ? styles.positionPaper : {}),
+            }}
             aria-label={`${currentIndex + 1}枚目`}
             aria-live="polite"
           >
@@ -209,7 +222,11 @@ export function CatChoicePreview({
                   onClick={() => onActiveChange(item.id, index)}
                   style={{
                     ...styles.thumbnailButton,
+                    ...(isPaperTone ? styles.thumbnailButtonPaper : {}),
                     ...(isActive ? styles.thumbnailButtonActive : {}),
+                    ...(isPaperTone && isActive
+                      ? styles.thumbnailButtonActivePaper
+                      : {}),
                     ...(item.disabled ? styles.thumbnailButtonDisabled : {}),
                   }}
                 >
@@ -220,7 +237,13 @@ export function CatChoicePreview({
           </div>
 
           {errorMessage ? (
-            <p role="alert" style={styles.error}>
+            <p
+              role="alert"
+              style={{
+                ...styles.error,
+                ...(isPaperTone ? styles.errorPaper : {}),
+              }}
+            >
               {errorMessage}
             </p>
           ) : null}
@@ -243,7 +266,10 @@ export function CatChoicePreview({
               type="button"
               disabled={isConfirming}
               onClick={onSecondaryAction}
-              style={styles.secondaryButton}
+              style={{
+                ...styles.secondaryButton,
+                ...(isPaperTone ? styles.secondaryButtonPaper : {}),
+              }}
             >
               {secondaryActionLabel}
             </button>
@@ -263,12 +289,18 @@ const styles: Record<string, CSSProperties> = {
     width: "100vw",
     height: "100dvh",
     overflow: "hidden",
-    background:
-      "linear-gradient(180deg, rgba(41, 37, 34, 0.99), rgba(26, 23, 21, 0.995))",
+    background: "linear-gradient(180deg, #292522, #1a1715)",
     color: "#fffaf2",
     fontFamily: "var(--font-ui)",
     outline: "none",
     WebkitTapHighlightColor: "transparent",
+  },
+  overlayPaper: {
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
+    color: "var(--ink)",
   },
   shell: {
     width: "min(100%, 760px)",
@@ -303,14 +335,19 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 400,
     cursor: "pointer",
   },
-  title: {
-    margin: 0,
-    color: "#fffaf2",
-    fontSize: "15px",
-    fontWeight: 500,
-    lineHeight: 1.4,
-    textAlign: "center",
-    letterSpacing: "0.04em",
+  backButtonPaper: {
+    color: "var(--ink)",
+  },
+  visuallyHidden: {
+    position: "absolute",
+    width: "1px",
+    height: "1px",
+    padding: 0,
+    margin: "-1px",
+    overflow: "hidden",
+    clip: "rect(0, 0, 0, 0)",
+    whiteSpace: "nowrap",
+    border: 0,
   },
   position: {
     margin: 0,
@@ -321,6 +358,9 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.4,
     textAlign: "right",
     fontVariantNumeric: "tabular-nums",
+  },
+  positionPaper: {
+    color: "var(--ink-soft)",
   },
   photoStage: {
     minHeight: 0,
@@ -368,10 +408,16 @@ const styles: Record<string, CSSProperties> = {
     transition:
       "border-color 140ms ease, opacity 140ms ease, transform 140ms ease",
   },
+  thumbnailButtonPaper: {
+    background: "var(--paper-warm)",
+  },
   thumbnailButtonActive: {
     borderColor: "#c77769",
     opacity: 1,
     transform: "translateY(-1px)",
+  },
+  thumbnailButtonActivePaper: {
+    borderColor: "var(--seal)",
   },
   thumbnailButtonDisabled: {
     opacity: 0.28,
@@ -394,6 +440,9 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 400,
     cursor: "pointer",
   },
+  secondaryButtonPaper: {
+    color: "var(--ink-soft)",
+  },
   error: {
     margin: 0,
     color: "#f0aaa0",
@@ -401,5 +450,8 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 400,
     lineHeight: 1.5,
     textAlign: "center",
+  },
+  errorPaper: {
+    color: "var(--danger)",
   },
 };
