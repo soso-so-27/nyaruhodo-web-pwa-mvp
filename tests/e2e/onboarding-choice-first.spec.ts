@@ -28,13 +28,15 @@ test.describe("choice-first onboarding", () => {
     ).toHaveText("気になる子は、どの子？");
     await expect(
       page.getByTestId("onboarding-exchange-explanation"),
-    ).toHaveText("まずは、4匹のねこに会ってみてください。");
+    ).toHaveText(
+      "4匹から気になる1匹を選べます。受け取りには、うちの子の写真が1枚必要です。",
+    );
     await page.getByRole("button", { name: "4匹に会ってみる" }).click();
 
     const choices = page.getByTestId("onboarding-four-choice-option");
     await expect(choices).toHaveCount(4);
     await expect(
-      page.getByRole("button", { name: "見るだけで終わる" }),
+      page.getByRole("button", { name: "今回は見るだけ" }),
     ).toBeVisible();
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({
@@ -59,19 +61,19 @@ test.describe("choice-first onboarding", () => {
     await preview.getByRole("button", { name: "この猫を選ぶ" }).click();
 
     const prompt = page.getByTestId("onboarding-photo-prompt");
-    await expect(prompt).toContainText("気になる1匹を選びました");
+    await expect(prompt).toContainText("この猫を受け取りますか？");
     await expect(prompt).toContainText(
-      "保存するには、あなたの猫の写真を1枚送ります。",
+      "うちの子の写真1枚と交換します。",
     );
     await expect(prompt).toContainText(
-      "送った写真は、運営確認後、ほかのおうちへ届く候補になります。公開一覧には出ません",
+      "確認後、写真だけが匿名でほかの人に届くことがあります",
     );
 
     const photoInvite = page.getByRole("button", {
-      name: "写真を選んで保存する",
+      name: "うちの子の写真を選ぶ",
     });
     const leaveWithoutExchange = page.getByRole("button", {
-      name: "保存しない",
+      name: "今回はやめる",
     });
     await page.setViewportSize({ width: 320, height: 568 });
     for (const action of [photoInvite, leaveWithoutExchange]) {
@@ -89,8 +91,12 @@ test.describe("choice-first onboarding", () => {
 
     await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect(page.getByTestId("onboarding-joined")).toContainText(
-      "写真を保存しました",
+      "選んだ猫が届きました",
     );
+    await expect(
+      page.getByTestId("onboarding-joined-delivered-photo"),
+    ).toHaveAttribute("data-photo-id", "onboarding-preview-choice-2");
+    await expect(page.getByTestId("onboarding-joined-own-photo")).toBeVisible();
     expect(requests).toHaveLength(2);
     expect(requests[1]).toMatchObject({
       mode: "onboarding",
@@ -124,7 +130,7 @@ test.describe("choice-first onboarding", () => {
     expect(exchangeCalls).toBe(1);
 
     await page
-      .getByRole("button", { name: "保存しない" })
+      .getByRole("button", { name: "今回はやめる" })
       .click();
     await expect(page).toHaveURL(/\/home$/);
     await expect

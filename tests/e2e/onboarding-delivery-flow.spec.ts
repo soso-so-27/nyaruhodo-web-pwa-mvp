@@ -339,7 +339,7 @@ test.describe("onboarding delivery flow", () => {
     const introCopy = page.getByTestId("onboarding-exchange-explanation");
     await expect(introCopy).toBeVisible();
     await expect(introCopy).toHaveText(
-      "まずは、4匹のねこに会ってみてください。",
+      "4匹から気になる1匹を選べます。受け取りには、うちの子の写真が1枚必要です。",
     );
     await expect(page.getByTestId("onboarding-privacy-note")).toHaveCount(0);
     await expect(
@@ -360,7 +360,7 @@ test.describe("onboarding delivery flow", () => {
       name: "とどく候補を追加する",
     });
     await expect(addCandidateButton).toBeVisible();
-    await expect(page.getByLabel("猫を読み込めませんでした")).toHaveAttribute(
+    await expect(page.getByLabel("4匹を読み込めませんでした")).toHaveAttribute(
       "data-delivery-issue",
       "temporary_error",
     );
@@ -430,7 +430,7 @@ test.describe("onboarding delivery flow", () => {
       ).length;
     });
     expect(eveningDeliveryDays).toBe(1);
-    await page.getByRole("button", { name: "保存した写真を見る" }).click();
+    await page.getByRole("button", { name: "うちのこを見る" }).click();
     await continuePastOptionalOnboardingNamePrompt(page);
     await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
@@ -732,7 +732,7 @@ test.describe("onboarding delivery flow", () => {
 
       releaseExchange();
       await expect(page.getByTestId("onboarding-joined")).toBeVisible();
-      await page.getByRole("button", { name: "保存した写真を見る" }).click();
+      await page.getByRole("button", { name: "うちのこを見る" }).click();
       await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     } finally {
       releaseExchange();
@@ -874,7 +874,7 @@ test.describe("onboarding delivery flow", () => {
       await expectOnboardingLayoutWithinViewport(page);
       await captureAndroidOnboardingStep(page, "joined");
 
-      await page.getByRole("button", { name: "保存した写真を見る" }).click();
+      await page.getByRole("button", { name: "うちのこを見る" }).click();
       await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     } finally {
       releaseExchange();
@@ -889,6 +889,12 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForLoadState("networkidle");
     await page.getByRole("button", { name: "4匹に会ってみる" }).click();
     await expect(page.getByText("4匹を読み込んでいます")).toBeVisible();
+    await expect(
+      page.getByTestId("onboarding-choice-loading-skeleton"),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("onboarding-choice-loading-skeleton-item"),
+    ).toHaveCount(4);
     await expect(page.getByTestId("onboarding-four-choice-option")).toHaveCount(
       4,
       { timeout: 4000 },
@@ -939,7 +945,7 @@ test.describe("onboarding delivery flow", () => {
     });
     await routeDelayedOnboardingDelivery(page);
     await page.goto("/onboarding?source=instagram_bio");
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await expect(page.getByTestId("onboarding-four-choice-option")).toHaveCount(
       4,
@@ -989,7 +995,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
-    await page.getByRole("button", { name: "保存した写真を見る" }).click();
+    await page.getByRole("button", { name: "うちのこを見る" }).click();
     await continuePastOptionalOnboardingNamePrompt(page);
     await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
@@ -1256,9 +1262,9 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
     await expect(
-      page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
+      page.getByRole("heading", { name: "このまま試せます" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
@@ -1267,7 +1273,7 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await expect(page.getByTestId("onboarding-joined")).toBeVisible();
-    await page.getByRole("button", { name: "保存した写真を見る" }).click();
+    await page.getByRole("button", { name: "うちのこを見る" }).click();
     await expect(page).toHaveURL(/\/cats\?onboarding=1$/);
     await expect(page).not.toHaveURL(/\/account\/create/);
   });
@@ -1289,7 +1295,7 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(page.getByTestId("onboarding-joined")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "保存した写真を見る" }),
+      page.getByRole("button", { name: "うちのこを見る" }),
     ).toBeVisible();
     await expect(
       page.getByTestId("onboarding-second-photo-invitation"),
@@ -1353,7 +1359,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=line");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "sleeping-cat.png",
@@ -1922,14 +1928,14 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=referral&ref=LINE234");
     await expect(
-      page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
+      page.getByRole("heading", { name: "このまま試せます" }),
     ).toBeVisible();
     await expect(page.getByText("紹介リンク")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toHaveCount(0);
 
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await expect(
       page.getByRole("button", { name: "4匹に会ってみる" }),
     ).toBeVisible();
@@ -1950,9 +1956,9 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_dm");
     await expect(
-      page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
+      page.getByRole("heading", { name: "このまま試せます" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-photo.jpg",
@@ -1996,7 +2002,7 @@ test.describe("onboarding delivery flow", () => {
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_dm");
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-filereader-photo.jpg",
@@ -2046,7 +2052,7 @@ test.describe("onboarding delivery flow", () => {
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_dm");
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-large-photo.jpg",
@@ -2111,7 +2117,7 @@ test.describe("onboarding delivery flow", () => {
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_dm");
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-transient-photo.jpg",
@@ -2160,7 +2166,7 @@ test.describe("onboarding delivery flow", () => {
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding?source=instagram_dm");
-    await page.getByRole("button", { name: "このブラウザで試す" }).click();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await openChoiceFirstPhotoPicker(page);
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-native-decoder-fallback.jpg",
@@ -2256,7 +2262,7 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await expect(page.getByTestId("onboarding-delivery-retry")).toBeVisible();
-    await expect(page.getByLabel("ねがおを保存しました")).toHaveAttribute(
+    await expect(page.getByLabel("猫を受け取れませんでした")).toHaveAttribute(
       "data-delivery-issue",
       "temporary_error",
     );
@@ -2345,10 +2351,16 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(
       page.getByText(
-        "写真を読み込めませんでした。JPEGやPNGなどの写真で、もう一度試してください。",
+        "JPEGやPNGなどの写真を選んでください。",
       ),
     ).toBeVisible();
-    await expect(page.getByTestId("onboarding-photo-invite")).toBeVisible();
+    await expect(page.getByTestId("onboarding-photo-prompt")).toHaveAttribute(
+      "aria-label",
+      "写真を読み込めませんでした",
+    );
+    await expect(page.getByTestId("onboarding-photo-invite")).toHaveText(
+      "別の写真を選ぶ",
+    );
   });
 
   test("allows another selection after rejecting a renamed non-image", async ({
@@ -2443,9 +2455,11 @@ test.describe("onboarding delivery flow", () => {
     await clickOnboardingHandoffPrimary(page);
 
     await expect(
-      page.getByRole("heading", { name: "引き継げませんでした" }),
+      page.getByRole("heading", { name: "リンクの期限が切れました" }),
     ).toBeVisible();
-    await expect(page.getByText(/期限が切れました/)).toBeVisible();
+    await expect(
+      page.getByText("このブラウザではじめから試せます。"),
+    ).toBeVisible();
     await expect(page.getByTestId("onboarding-handoff-restart")).toHaveAttribute(
       "href",
       "/onboarding?reset_onboarding=1",
@@ -2469,7 +2483,7 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/onboarding/continue");
 
     await expect(
-      page.getByRole("heading", { name: "引き継げませんでした" }),
+      page.getByRole("heading", { name: "引き継ぎ情報が見つかりません" }),
     ).toBeVisible();
     await expect(page.getByTestId("onboarding-handoff-restart")).toBeVisible();
     await expect(page.getByRole("button", { name: "URLをコピー" })).toHaveCount(
@@ -2575,9 +2589,9 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?source=instagram_bio");
     await expect(
-      page.getByRole("heading", { name: "このブラウザで すぐ試せます" }),
+      page.getByRole("heading", { name: "このまま試せます" }),
     ).toBeVisible();
-    await expect(page.getByText("アプリの中でひらいています")).toBeVisible();
+    await expect(page.getByText("アプリ内ブラウザ")).toBeVisible();
     await expect(
       page.locator(
         'img[src$="/illustrations/candidates/theme-e5-direction/muted.webp"]',
@@ -3677,10 +3691,12 @@ test.describe("onboarding delivery flow", () => {
     await clickOnboardingHandoffPrimary(page);
 
     await expect(
-      page.getByText("この引き継ぎリンクは使用済みです。"),
+      page.getByText(
+        "引き継いだブラウザで開くか、ここからはじめ直してください。",
+      ),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "引き継げませんでした" }),
+      page.getByRole("heading", { name: "このリンクは使用済みです" }),
     ).toBeVisible();
     await expect(page.getByTestId("onboarding-handoff-restart")).toBeVisible();
     await expect(page.getByTestId("onboarding-handoff-primary")).toHaveCount(0);

@@ -208,14 +208,18 @@ function OnboardingContinueContent({
               ? isIntroHandoff
                 ? "SafariやChromeで つづけます"
                 : "ホーム画面アプリで つづけます"
-              : getRestoreHeading(status, isIntroHandoff)}
+              : hasTerminalRestoreError
+                ? getTerminalRestoreHeading(restoreErrorCode)
+                : getRestoreHeading(status, isIntroHandoff)}
           </h1>
           <p style={styles.body}>
             {shouldShowEmbeddedGuide
               ? isIntroHandoff
                 ? "下のURLをコピーし、SafariやChromeのアドレス欄に貼り付けてください。"
                 : "写真と入力内容を引き継ぐには、URLをコピーして、ChromeやSafari、またはホーム画面アプリでひらいてください。"
-              : getRestoreBody(status, isIntroHandoff)}
+              : hasTerminalRestoreError
+                ? getTerminalRestoreBody(restoreErrorCode, isIntroHandoff)
+                : getRestoreBody(status, isIntroHandoff)}
           </p>
 
           {shouldShowEmbeddedGuide ? (
@@ -224,7 +228,7 @@ function OnboardingContinueContent({
             </div>
           ) : null}
 
-          {message ? (
+          {message && !hasTerminalRestoreError ? (
             <p
               style={styles.message}
               role={status === "error" ? "alert" : "status"}
@@ -250,6 +254,7 @@ function OnboardingContinueContent({
                 href={restartHref}
                 variant="accent"
                 fullWidth
+                style={styles.primaryAction}
                 data-testid="onboarding-handoff-restart"
               >
                 {isIntroHandoff
@@ -362,6 +367,47 @@ function getRestoreErrorMessage(errorMessage: string) {
   return "写真と入力内容を引き継げませんでした。通信を確認してもう一度試すか、このブラウザではじめからお試しください。";
 }
 
+function getTerminalRestoreHeading(errorCode: string | null) {
+  if (errorCode === "handoff_expired") {
+    return "リンクの期限が切れました";
+  }
+
+  if (errorCode === "handoff_already_used") {
+    return "このリンクは使用済みです";
+  }
+
+  if (errorCode === "handoff_missing") {
+    return "引き継ぎ情報が見つかりません";
+  }
+
+  return "引き継げませんでした";
+}
+
+function getTerminalRestoreBody(
+  errorCode: string | null,
+  isIntroHandoff: boolean,
+) {
+  if (isIntroHandoff) {
+    return errorCode === "handoff_already_used"
+      ? "このブラウザではじめから試せます。"
+      : "写真や記録はまだ作成されていません。";
+  }
+
+  if (errorCode === "handoff_expired" || errorCode === "handoff_missing") {
+    return "このブラウザではじめから試せます。";
+  }
+
+  if (errorCode === "handoff_already_used") {
+    return "引き継いだブラウザで開くか、ここからはじめ直してください。";
+  }
+
+  if (errorCode === "handoff_local_storage_failed") {
+    return "空き容量を確認し、もう一度お試しください。";
+  }
+
+  return "通信を確認し、もう一度お試しください。";
+}
+
 function getRestoreHeading(status: RestoreStatus, isIntroHandoff: boolean) {
   if (isIntroHandoff) {
     if (status === "ready") {
@@ -408,7 +454,7 @@ function getRestoreBody(status: RestoreStatus, isIntroHandoff: boolean) {
       return "このブラウザで、4匹のねこに会えます。";
     }
 
-    return "引き継ぎ情報を確認できませんでした。";
+    return "引き継ぎ情報を確認できませんでした。写真や記録はまだ作成されていません。";
   }
 
   if (status === "ready") {
@@ -535,5 +581,11 @@ const styles = {
   actions: {
     display: "grid",
     gap: 10,
+  },
+  primaryAction: {
+    border: "1px solid #98493f",
+    background: "#a65349",
+    color: "#fffaf2",
+    boxShadow: "0 9px 20px rgba(112,55,48,0.16)",
   },
 } satisfies Record<string, CSSProperties>;
