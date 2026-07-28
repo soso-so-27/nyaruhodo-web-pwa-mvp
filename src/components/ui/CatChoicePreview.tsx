@@ -25,8 +25,11 @@ export function CatChoicePreview({
   onBack,
   onConfirm,
   renderPhoto,
+  heading,
   confirmLabel,
   confirmBusyLabel = "処理しています…",
+  supportingText,
+  confirmStyle,
   confirmDisabled = false,
   isConfirming = false,
   errorMessage = "",
@@ -47,8 +50,11 @@ export function CatChoicePreview({
     index: number,
     variant: "main" | "thumbnail",
   ) => ReactNode;
+  heading?: string;
   confirmLabel: string;
   confirmBusyLabel?: string;
+  supportingText?: string;
+  confirmStyle?: CSSProperties;
   confirmDisabled?: boolean;
   isConfirming?: boolean;
   errorMessage?: string;
@@ -149,7 +155,9 @@ export function CatChoicePreview({
       role="dialog"
       aria-modal="true"
       aria-busy={isConfirming}
-      aria-labelledby={`${testId}-title`}
+      aria-labelledby={
+        heading ? `${testId}-heading` : `${testId}-title`
+      }
       data-testid={testId}
       data-photo-id={currentItem.id}
       data-position={currentIndex + 1}
@@ -236,6 +244,12 @@ export function CatChoicePreview({
             })}
           </div>
 
+          {heading ? (
+            <h2 id={`${testId}-heading`} style={styles.heading}>
+              {heading}
+            </h2>
+          ) : null}
+
           {errorMessage ? (
             <p
               role="alert"
@@ -256,10 +270,14 @@ export function CatChoicePreview({
             loading={isConfirming}
             loadingLabel={confirmBusyLabel}
             onClick={onConfirm}
-            style={styles.confirmButton}
+            style={{ ...styles.confirmButton, ...confirmStyle }}
           >
             {confirmLabel}
           </AppButton>
+
+          {supportingText ? (
+            <p style={styles.supportingText}>{supportingText}</p>
+          ) : null}
 
           {onSecondaryAction && secondaryActionLabel ? (
             <button
@@ -309,8 +327,8 @@ const styles: Record<string, CSSProperties> = {
     padding:
       "calc(env(safe-area-inset-top, 0px) + 8px) 16px calc(env(safe-area-inset-bottom, 0px) + 12px)",
     display: "grid",
-    gridTemplateRows: "52px minmax(0, 1fr) auto",
-    gap: "10px",
+    gridTemplateRows: "48px minmax(0, 1fr) auto",
+    gap: "8px",
     boxSizing: "border-box",
   },
   header: {
@@ -382,7 +400,7 @@ const styles: Record<string, CSSProperties> = {
     margin: "0 auto",
     display: "grid",
     justifyItems: "center",
-    gap: "9px",
+    gap: "7px",
   },
   thumbnailList: {
     width: "100%",
@@ -428,6 +446,26 @@ const styles: Record<string, CSSProperties> = {
     minHeight: "50px",
     background: "#b9685c",
     color: "#fffaf2",
+  },
+  heading: {
+    margin: "1px 0 -1px",
+    color: "inherit",
+    fontFamily: "var(--font-ui)",
+    fontSize: "18px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.01em",
+    textAlign: "center",
+  },
+  supportingText: {
+    margin: "-2px 0 0",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.55,
+    letterSpacing: 0,
+    textAlign: "center",
   },
   secondaryButton: {
     minHeight: "38px",

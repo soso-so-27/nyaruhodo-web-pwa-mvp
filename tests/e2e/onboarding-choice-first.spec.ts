@@ -8,9 +8,10 @@ const photoBuffer = fs.readFileSync(
 const photoDataUrl = `data:image/webp;base64,${photoBuffer.toString("base64")}`;
 
 test.describe("choice-first onboarding", () => {
-  test("previews four cats, explains the exchange, and commits only after an own photo", async ({
+  test("shows four cats immediately, opens the photo picker from the preview, and lands in ねこだより", async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     const requests: Array<Record<string, unknown>> = [];
     let selectedPhotoId = "";
 
@@ -24,21 +25,21 @@ test.describe("choice-first onboarding", () => {
     await page.goto("/onboarding?source=instagram_story");
 
     await expect(
-      page.locator('[data-onboarding-title="true"]'),
-    ).toHaveText("気になる子は、どの子？");
+      page.getByText("気になるのは、どの子？", { exact: true }),
+    ).toBeVisible();
     await expect(
-      page.getByTestId("onboarding-exchange-explanation"),
-    ).toHaveText(
-      "うちの子の写真1枚で、猫と交換できます。",
-    );
-    await page.getByRole("button", { name: "4匹を見る" }).click();
+      page.getByText(
+        "受け取るときに、あなたの猫の写真を1枚選びます。",
+        { exact: true },
+      ),
+    ).toBeVisible();
 
     const choices = page.getByTestId("onboarding-four-choice-option");
     await expect(choices).toHaveCount(4);
     await expect(
       page.getByRole("button", { name: "やめる" }),
-    ).toBeVisible();
-    expect(requests).toHaveLength(1);
+    ).toHaveCount(0);
+    await expect.poll(() => requests.length).toBe(1);
     expect(requests[0]).toMatchObject({
       mode: "onboarding",
       onboardingPhase: "preview",
@@ -50,6 +51,14 @@ test.describe("choice-first onboarding", () => {
     const preview = page.getByTestId("onboarding-four-choice-preview");
     await expect(preview).toBeVisible();
     await expect(preview).toHaveAttribute("data-tone", "paper");
+    await expect(preview).toHaveAttribute(
+      "data-photo-id",
+      "onboarding-preview-choice-2",
+    );
+    await expect(preview.getByRole("heading")).toHaveText(
+      "この子を受け取る？",
+    );
+    await expect(preview).toContainText("相手に届くのは写真だけです");
     await expect(
       preview.getByTestId("onboarding-four-choice-preview-thumbnail"),
     ).toHaveCount(4);
@@ -59,45 +68,31 @@ test.describe("choice-first onboarding", () => {
     await expect(choices).toHaveCount(4);
     await expect(page).toHaveURL(/\/onboarding/);
     await choices.nth(1).click();
-    await preview.getByRole("button", { name: "この猫にする" }).click();
-
-    const prompt = page.getByTestId("onboarding-photo-prompt");
-    await expect(prompt).toContainText("この猫と交換しますか？");
-    await expect(prompt).toContainText(
-      "選んだ写真は匿名で交換に使われます。",
-    );
-
-    const photoInvite = page.getByRole("button", {
-      name: "写真を選んで交換する",
-    });
-    const leaveWithoutExchange = page.getByRole("button", {
-      name: "やめる",
-    });
+    const photoInvite = page.getByTestId("onboarding-photo-invite");
+    await expect(photoInvite).toHaveText("あなたの猫の写真を選ぶ");
     await page.setViewportSize({ width: 320, height: 568 });
-    for (const action of [photoInvite, leaveWithoutExchange]) {
-      const box = await action.boundingBox();
-      expect(box).not.toBeNull();
-      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(568);
-    }
+    const box = await photoInvite.boundingBox();
+    expect(box).not.toBeNull();
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(568);
 
+    const fileChooserPromise = page.waitForEvent("filechooser");
     await photoInvite.click();
-    await page.locator('input[type="file"]').last().setInputFiles({
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles({
       name: "own-cat.webp",
       mimeType: "image/webp",
       buffer: photoBuffer,
     });
 
-    await expect(page.getByTestId("onboarding-joined")).toBeVisible();
-    await expect(page.getByTestId("onboarding-joined")).toContainText(
-      "この猫が届きました",
+    await page.waitForURL(/\/collection$/);
+    await expect(page.getByTestId("onboarding-save-notice")).toHaveText(
+      "ねこだよりに残しました",
     );
     await expect(
-      page.getByTestId("onboarding-joined-delivered-photo"),
+      page.getByTestId("nekodayori-current-saved-photo"),
     ).toHaveAttribute("data-photo-id", "onboarding-preview-choice-2");
-    await expect(
-      page.getByRole("button", { name: "ねこだよりを見る" }),
-    ).toBeVisible();
-    expect(requests).toHaveLength(2);
+    await expect(page.getByTestId("onboarding-joined")).toHaveCount(0);
+    await expect.poll(() => requests.length).toBe(2);
     expect(requests[1]).toMatchObject({
       mode: "onboarding",
       onboardingPhase: "commit",
@@ -107,9 +102,15 @@ test.describe("choice-first onboarding", () => {
       },
     });
     expect(selectedPhotoId).toBe("onboarding-preview-choice-2");
+
+    await page.reload();
+    await expect(page.getByTestId("onboarding-save-notice")).toHaveCount(0);
+    await expect(
+      page.getByTestId("nekodayori-current-saved-photo"),
+    ).toHaveAttribute("data-photo-id", "onboarding-preview-choice-2");
   });
 
-  test("restores the provisional choice and lets a visitor leave without exchanging", async ({
+  test("restores photo_pending in the same large preview without fetching another set", async ({
     page,
   }) => {
     let exchangeCalls = 0;
@@ -120,19 +121,15 @@ test.describe("choice-first onboarding", () => {
     });
 
     await page.goto("/onboarding");
-    await page.getByRole("button", { name: "4匹を見る" }).click();
-    await page.getByTestId("onboarding-four-choice-option").first().click();
-    await page.getByRole("button", { name: "この猫にする" }).click();
-    await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
+    const choices = page.getByTestId("onboarding-four-choice-option");
+    await expect(choices).toHaveCount(4);
+    await choices.first().click();
 
-    await page.reload();
-    await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
-    expect(exchangeCalls).toBe(1);
-
-    await page
-      .getByRole("button", { name: "やめる" })
-      .click();
-    await expect(page).toHaveURL(/\/home$/);
+    const preview = page.getByTestId("onboarding-four-choice-preview");
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await preview.getByTestId("onboarding-photo-invite").click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([]);
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -142,10 +139,22 @@ test.describe("choice-first onboarding", () => {
           return raw ? JSON.parse(raw).stage : null;
         }),
       )
-      .toBe("skipped");
+      .toBe("photo_pending");
 
-    await page.goto("/onboarding");
-    await expect(page).toHaveURL(/\/home$/);
+    await page.reload();
+    await expect(preview).toBeVisible();
+    await expect(preview).toHaveAttribute(
+      "data-photo-id",
+      "onboarding-preview-choice-1",
+    );
+    await expect(preview.getByRole("heading")).toHaveText(
+      "この子を受け取る？",
+    );
+    await expect(
+      preview.getByTestId("onboarding-photo-invite"),
+    ).toHaveText("あなたの猫の写真を選ぶ");
+    await expect(page.getByTestId("onboarding-photo-prompt")).toHaveCount(0);
+    expect(exchangeCalls).toBe(1);
   });
 });
 

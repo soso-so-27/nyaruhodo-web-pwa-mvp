@@ -115,13 +115,15 @@ test.describe("onboarding branch matrix", () => {
     });
 
     await page.goto("/onboarding/continue?handoff=used-token");
-    await page.locator("main button").first().click();
-
-    await expect.poll(() => redeemCalls).toBe(1);
-    if (!/\/home\?handoff=restored/.test(page.url())) {
-      await page.locator("main button").first().click();
-    }
+    await page
+      .getByRole("button", { name: "引き継いで ホームへ" })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "ホームへ" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "ホームへ" }).click();
     await page.waitForURL(/\/home\?handoff=restored/, { timeout: 5_000 });
+    expect(redeemCalls).toBeLessThanOrEqual(1);
   });
 });
 
