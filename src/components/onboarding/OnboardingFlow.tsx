@@ -4212,9 +4212,11 @@ const styles = {
     boxSizing: "border-box",
   },
   onboardingFourChoiceGrid: {
+    width: "100%",
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "9px",
+    boxSizing: "border-box",
   },
   onboardingFourChoiceOption: {
     position: "relative",

@@ -391,6 +391,7 @@ test.describe("onboarding delivery flow", () => {
     });
     const choices = page.getByTestId("onboarding-four-choice-option");
     await expect(choices).toHaveCount(4);
+    await expectChoiceOptionsHaveUsableSize(choices);
     await choices.first().click();
     await page.getByTestId("onboarding-four-choice-save").click();
     await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
@@ -4118,9 +4119,30 @@ async function reachChoiceFirstPhotoPrompt(
   await page.getByTestId("onboarding-photo-select").click();
   const choices = page.getByTestId("onboarding-four-choice-option");
   await expect(choices).toHaveCount(4);
+  await expectChoiceOptionsHaveUsableSize(choices);
   await choices.nth(selectedIndex).click();
   await page.getByTestId("onboarding-four-choice-save").click();
   await expect(page.getByTestId("onboarding-photo-prompt")).toBeVisible();
+}
+
+async function expectChoiceOptionsHaveUsableSize(choices: Locator) {
+  await expect
+    .poll(
+      async () => {
+        const sizes = await choices.evaluateAll((options) =>
+          options.map((option) => {
+            const rect = option.getBoundingClientRect();
+            return Math.min(rect.width, rect.height);
+          }),
+        );
+
+        return sizes.length === 4 ? Math.min(...sizes) : 0;
+      },
+      {
+        message: "each onboarding cat choice should have a usable tap target",
+      },
+    )
+    .toBeGreaterThan(100);
 }
 
 async function openChoiceFirstPhotoPicker(
