@@ -1,4 +1,7 @@
-import { readOwnSleepingPhotos } from "../home/sleepingPhotos";
+import {
+  isOnboardingOwnSleepingPhoto,
+  readAllOwnSleepingPhotos,
+} from "../home/sleepingPhotos";
 import { STORAGE_KEYS } from "../storage";
 import { readOnboardingProgress } from "./progress";
 
@@ -27,7 +30,9 @@ export function hasCompletedOnboardingEvidence() {
     return true;
   }
 
-  return readOwnSleepingPhotos().length > 0;
+  return readAllOwnSleepingPhotos().some(
+    (photo) => !isOnboardingOwnSleepingPhoto(photo),
+  );
 }
 
 export function hasCompletedOnboardingState() {

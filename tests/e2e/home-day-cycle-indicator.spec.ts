@@ -344,20 +344,52 @@ test.describe("home desk state cycle", () => {
   }) => {
     const userId = "user-sync-full-history";
     const now = Date.parse("2026-07-08T09:00:00+09:00");
-    const ownPhotos = Array.from({ length: 30 }, (_, index) => ({
-      id: `own-history-${String(index + 1).padStart(2, "0")}`,
-      ownerCatId: "cat-history",
-      catId: "cat-history",
-      src: `storage:${userId}/cat-history/sleeping/own-history-${index + 1}.jpg`,
-      state: "sleeping",
-      visibility: "shared",
-      deliveryStatus: "available",
-      triggerLabel: "sleeping",
-      theme: "sleeping",
-      shared: true,
-      createdAt: now - index * 60_000,
-      captureContext: "daily",
-    }));
+    const insertedOnboardingPhotoId = "onboarding-history-insert";
+    const existingOnboardingPhotoId = "onboarding-history-existing";
+    const ownPhotos = [
+      ...Array.from({ length: 30 }, (_, index) => ({
+        id: `own-history-${String(index + 1).padStart(2, "0")}`,
+        ownerCatId: "cat-history",
+        catId: "cat-history",
+        src: `storage:${userId}/cat-history/sleeping/own-history-${index + 1}.jpg`,
+        state: "sleeping",
+        visibility: "shared",
+        deliveryStatus: "available",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        shared: true,
+        createdAt: now - index * 60_000,
+        captureContext: "daily",
+      })),
+      {
+        id: insertedOnboardingPhotoId,
+        ownerCatId: "cat-history",
+        catId: "cat-history",
+        src: `storage:${userId}/cat-history/sleeping/${insertedOnboardingPhotoId}.jpg`,
+        state: "sleeping",
+        visibility: "shared",
+        deliveryStatus: "available",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        shared: true,
+        createdAt: now + 60_000,
+        captureContext: "onboarding",
+      },
+      {
+        id: existingOnboardingPhotoId,
+        ownerCatId: "cat-history",
+        catId: "cat-history",
+        src: `storage:${userId}/cat-history/sleeping/${existingOnboardingPhotoId}.jpg`,
+        state: "sleeping",
+        visibility: "shared",
+        deliveryStatus: "available",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        shared: true,
+        createdAt: now - 2 * 86_400_000,
+        captureContext: "onboarding",
+      },
+    ];
     const keptPhotos = Array.from({ length: 55 }, (_, index) => ({
       id: `kept-history-${String(index + 1).padStart(2, "0")}`,
       sourcePhotoId: `source-history-${index + 1}`,
@@ -370,6 +402,7 @@ test.describe("home desk state cycle", () => {
     }));
     let insertedMoments: unknown[] = [];
     let insertedDeliveries: unknown[] = [];
+    let updatedMoments: unknown[] = [];
 
     await page.addInitScript(
       ({ accessToken, keptPhotosValue, nowValue, ownPhotosValue, userIdValue }) => {
@@ -441,8 +474,36 @@ test.describe("home desk state cycle", () => {
       const table = url.pathname.split("/").pop() ?? "";
       const method = request.method();
 
+      if (
+        method === "GET" &&
+        table === "cat_moments" &&
+        url.searchParams.get("select") === "local_moment_id,metadata"
+      ) {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify([
+            {
+              local_moment_id: existingOnboardingPhotoId,
+              metadata: {
+                source: "user",
+                pool_kind: "user_shared",
+                onboarding_submission_id: "submission-existing",
+                onboarding_journey_id: "journey-existing",
+              },
+            },
+          ]),
+        });
+        return;
+      }
+
       if (method === "POST" && table === "cat_moments") {
         insertedMoments = JSON.parse(request.postData() ?? "[]") as unknown[];
+      }
+
+      if (method === "PATCH" && table === "cat_moments") {
+        updatedMoments.push(
+          JSON.parse(request.postData() ?? "{}") as unknown,
+        );
       }
 
       if (method === "POST" && table === "cat_moment_deliveries") {
@@ -462,11 +523,37 @@ test.describe("home desk state cycle", () => {
       .poll(() => ({
         deliveries: insertedDeliveries.length,
         moments: insertedMoments.length,
+        updates: updatedMoments.length,
       }))
       .toEqual({
         deliveries: 55,
-        moments: 30,
+        moments: 31,
+        updates: 1,
       });
+
+    expect(insertedMoments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          local_moment_id: insertedOnboardingPhotoId,
+          metadata: expect.objectContaining({
+            capture_context: "onboarding",
+            pool_kind: "user_shared",
+          }),
+        }),
+      ]),
+    );
+    expect(updatedMoments).toEqual([
+      expect.objectContaining({
+        local_moment_id: existingOnboardingPhotoId,
+        metadata: expect.objectContaining({
+          capture_context: "onboarding",
+          onboarding_journey_id: "journey-existing",
+          onboarding_submission_id: "submission-existing",
+          pool_kind: "user_shared",
+          source: "user",
+        }),
+      }),
+    ]);
   });
 
   test("restores all remote sleeping history without applying local display limits", async ({

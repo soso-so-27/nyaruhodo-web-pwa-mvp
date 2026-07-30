@@ -1634,6 +1634,80 @@ test("shows celebrations as current milestones instead of a fixed 50-photo card"
   await expect(celebration).toContainText("誕生日");
 });
 
+test("counts one onboarding record and uses it for the first milestone", async ({
+  page,
+}) => {
+  const now = Date.parse("2026-07-10T12:30:00+09:00");
+  await page.addInitScript(
+    ({ nowValue, sources }) => {
+      (window as typeof window & { __testNow?: number }).__testNow = nowValue;
+      const nowIso = new Date(nowValue).toISOString();
+      window.localStorage.setItem("active_cat_id", "cat-onboarding-record");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-onboarding-record",
+            name: "むぎ",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          },
+        ]),
+      );
+      window.localStorage.removeItem("neteruneko_cat_sleeping_stats");
+      window.localStorage.removeItem("neteruneko_cat_sleeping_milestones");
+      window.localStorage.removeItem("neteruneko_cat_pickup_history");
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "onboarding-record-new",
+            ownerCatId: "cat-onboarding-record",
+            catId: "cat-onboarding-record",
+            src: sources[0],
+            state: "sleeping",
+            visibility: "shared",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: true,
+            createdAt: nowValue,
+            captureContext: "onboarding",
+          },
+          {
+            id: "onboarding-record-stale-duplicate",
+            ownerCatId: "cat-onboarding-record",
+            catId: "cat-onboarding-record",
+            src: sources[1],
+            state: "sleeping",
+            visibility: "shared",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: true,
+            createdAt: nowValue - 60_000,
+            captureContext: "onboarding",
+          },
+        ]),
+      );
+    },
+    { nowValue: now, sources: [photoDataUrl, portraitPhotoDataUrl] },
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  const recordTab = page.getByTestId("cats-section-tab-record");
+  await expect(recordTab).toBeVisible();
+  await recordTab.click();
+
+  const celebration = page
+    .getByRole("heading", { name: "記念" })
+    .locator("xpath=ancestor::section");
+  await expect(celebration).toContainText("1 / 10枚");
+  await expect(page.getByTestId("cats-pickup-section")).toContainText(
+    "はじめてのねがお",
+  );
+});
+
 test("clears the first sleeping photo memory dot after opening it", async ({
   page,
 }) => {
