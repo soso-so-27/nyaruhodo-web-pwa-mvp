@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { OnboardingFlow } from "../../components/onboarding/OnboardingFlow";
 
-const title = "ねてるねこ | 4匹のねこから、気になる1匹を";
+const title =
+  "ねてるねこ | スマホには、撮った写真。ねてるねこには、自分で選んだ写真。";
 const description =
-  "まず4匹のねこから気になる1匹を選び、あなたの猫の写真を1枚送って交換する、静かなWebアプリです。";
+  "うちの子の写真を1枚選んで「うちのこ」に保存。ねこくじで出会う4匹から目にとまった1匹を選ぶと、その日の「ねこだより」になります。猫に目をとめながら、うちの子らしさに気づいていくWebアプリです。";
 const socialImage = "/images/social/onboarding-og.webp";
 
 export const metadata: Metadata = {

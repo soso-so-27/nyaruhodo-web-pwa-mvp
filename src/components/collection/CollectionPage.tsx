@@ -453,6 +453,20 @@ export function CollectionPage() {
       shouldPlayNavEntry =
         window.sessionStorage.getItem(COLLECTION_NAV_ENTRY_STORAGE_KEY) === "1";
       window.sessionStorage.removeItem(COLLECTION_NAV_ENTRY_STORAGE_KEY);
+      if (
+        window.sessionStorage.getItem(
+          STORAGE_KEYS.onboardingCollectionNotice,
+        ) === "1"
+      ) {
+        window.sessionStorage.removeItem(
+          STORAGE_KEYS.onboardingCollectionNotice,
+        );
+        showToast("ねこだよりに残しました");
+        trackProductEvent("onboarding_collection_landed", {
+          source: "onboarding",
+          flow_version: "onboarding_selection_first_v2",
+        });
+      }
     } catch {
       shouldPlayNavEntry = false;
     }
@@ -1791,7 +1805,18 @@ export function CollectionPage() {
           }}
         />
       ) : null}
-      {toastText ? <div style={styles.toast}>{toastText}</div> : null}
+      {toastText ? (
+        <div
+          style={styles.toast}
+          data-testid={
+            toastText === "ねこだよりに残しました"
+              ? "onboarding-save-notice"
+              : "collection-toast"
+          }
+        >
+          {toastText}
+        </div>
+      ) : null}
       <BottomNavigation
         active="collection"
         onActiveItemClick={() => closeOwnPhotoManagement("collection")}

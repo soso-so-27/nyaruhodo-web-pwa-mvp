@@ -3,21 +3,54 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { readOwnSleepingPhotos } from "../lib/home/sleepingPhotos";
+import {
+  isOnboardingOwnSleepingPhoto,
+  readAllOwnSleepingPhotos,
+} from "../lib/home/sleepingPhotos";
 import { hasCompletedOnboardingState } from "../lib/onboarding/completion";
+import {
+  readCurrentOnboardingProgress,
+  readCurrentOnboardingProgressDurably,
+} from "../lib/onboarding/progress";
+import { resolveOnboardingResumeDecision } from "../lib/onboarding/stateMachine";
 import { readCachedJson, STORAGE_KEYS } from "../lib/storage";
 
 export function EntryRouter() {
   const router = useRouter();
 
   useEffect(() => {
-    if (hasCompletedOnboardingState() || hasCredibleExistingAppEvidence()) {
-      router.replace("/home");
-      return;
-    }
+    let isCancelled = false;
 
-    const query = window.location.search;
-    router.replace(`/onboarding${query}`);
+    void (async () => {
+      const progress = await readCurrentOnboardingProgressDurably().catch(() =>
+        readCurrentOnboardingProgress(),
+      );
+      const resumeDecision = resolveOnboardingResumeDecision(progress);
+      const hasResumableOnboarding =
+        resumeDecision.kind !== "intro" && resumeDecision.kind !== "home";
+
+      if (isCancelled) {
+        return;
+      }
+
+      if (hasResumableOnboarding) {
+        const query = window.location.search;
+        router.replace(`/onboarding${query}`);
+        return;
+      }
+
+      if (hasCompletedOnboardingState() || hasCredibleExistingAppEvidence()) {
+        router.replace("/home");
+        return;
+      }
+
+      const query = window.location.search;
+      router.replace(`/onboarding${query}`);
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [router]);
 
   return (
@@ -39,7 +72,11 @@ export function EntryRouter() {
 }
 
 function hasCredibleExistingAppEvidence() {
-  if (readOwnSleepingPhotos().length > 0) {
+  if (
+    readAllOwnSleepingPhotos().some(
+      (photo) => !isOnboardingOwnSleepingPhoto(photo),
+    )
+  ) {
     return true;
   }
 

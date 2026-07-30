@@ -1646,6 +1646,7 @@ async function syncSleepingPhotos(
             source_moment_id: photo.sourceMomentId ?? null,
             metadata: {
               ...SYNC_METADATA,
+              pool_kind: photo.shared ? "user_shared" : "user_private",
               trigger_label: photo.triggerLabel,
               theme: photo.theme,
               shared: photo.shared,
@@ -1660,19 +1661,23 @@ async function syncSleepingPhotos(
 
     if (momentRows.length > 0) {
       const localMomentIds = momentRows.map((row) => row.local_moment_id);
-      const existingMomentIds = await findExistingLocalIds(
+      const existingMomentMetadata = await findExistingCatMomentMetadata(
         supabase,
-        "cat_moments",
         userId,
-        "local_moment_id",
         localMomentIds,
       );
       const momentRowsToInsert = momentRows.filter(
-        (row) => !existingMomentIds.has(row.local_moment_id),
+        (row) => !existingMomentMetadata.has(row.local_moment_id),
       );
-      const momentRowsToUpdate = momentRows.filter((row) =>
-        existingMomentIds.has(row.local_moment_id),
-      );
+      const momentRowsToUpdate = momentRows
+        .filter((row) => existingMomentMetadata.has(row.local_moment_id))
+        .map((row) => ({
+          ...row,
+          metadata: mergeCatMomentMetadata(
+            existingMomentMetadata.get(row.local_moment_id),
+            row.metadata,
+          ),
+        }));
 
       await updateCatMomentRows(supabase, userId, momentRowsToUpdate);
 
@@ -2561,6 +2566,58 @@ async function findExistingLocalIds(
       .map((row) => row[idField])
       .filter((id): id is string => typeof id === "string"),
   );
+}
+
+async function findExistingCatMomentMetadata(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  localMomentIds: string[],
+) {
+  const ids = localMomentIds.filter((id) => id.length > 0);
+  const metadataById = new Map<
+    string,
+    Record<string, unknown> | null
+  >();
+
+  if (ids.length === 0) {
+    return metadataById;
+  }
+
+  const { data, error } = await supabase
+    .from("cat_moments")
+    .select("local_moment_id,metadata")
+    .eq("user_id", userId)
+    .in("local_moment_id", ids);
+
+  if (error) {
+    throw new Error(`Existing cat_moments lookup failed: ${error.message}`);
+  }
+
+  for (const row of (data ?? []) as Array<{
+    local_moment_id: string | null;
+    metadata: Record<string, unknown> | null;
+  }>) {
+    if (typeof row.local_moment_id === "string") {
+      metadataById.set(row.local_moment_id, row.metadata ?? null);
+    }
+  }
+
+  return metadataById;
+}
+
+function mergeCatMomentMetadata(
+  existingMetadata: Record<string, unknown> | null | undefined,
+  nextMetadata: Record<string, unknown>,
+) {
+  const existingSource = existingMetadata?.source;
+
+  return {
+    ...(existingMetadata ?? {}),
+    ...nextMetadata,
+    ...(typeof existingSource === "string"
+      ? { source: existingSource }
+      : {}),
+  };
 }
 
 async function updateCatMomentRows(

@@ -168,7 +168,7 @@ const CAT_SLEEPING_MILESTONES_STORAGE_KEY =
   "neteruneko_cat_sleeping_milestones";
 
 export function readOwnSleepingPhotos(activeCatId: string | null = null) {
-  const photos = readAllOwnSleepingPhotos().filter(isRegularOwnSleepingPhoto);
+  const photos = dedupeOwnSleepingPhotoRecords(readAllOwnSleepingPhotos());
 
   const activeCatPhotos = activeCatId
     ? photos.filter((photo) => photo.ownerCatId === activeCatId)
@@ -178,11 +178,11 @@ export function readOwnSleepingPhotos(activeCatId: string | null = null) {
 }
 
 export function readOwnSleepingPhotosForSync() {
-  return readAllOwnSleepingPhotos().filter(isRegularOwnSleepingPhoto);
+  return dedupeOwnSleepingPhotoRecords(readAllOwnSleepingPhotos());
 }
 
 export function readOwnSleepingPhotosForAlbum(activeCatId: string | null = null) {
-  const photos = dedupeOwnSleepingPhotosForAlbum(readAllOwnSleepingPhotos());
+  const photos = dedupeOwnSleepingPhotoRecords(readAllOwnSleepingPhotos());
 
   const activeCatPhotos = activeCatId
     ? photos.filter((photo) => photo.ownerCatId === activeCatId)
@@ -191,7 +191,7 @@ export function readOwnSleepingPhotosForAlbum(activeCatId: string | null = null)
   return activeCatPhotos.length > 0 ? activeCatPhotos : photos;
 }
 
-function dedupeOwnSleepingPhotosForAlbum(photos: OwnSleepingPhoto[]) {
+function dedupeOwnSleepingPhotoRecords(photos: OwnSleepingPhoto[]) {
   const seenContent = new Map<string, boolean>();
   const seenOnboardingDates = new Set<string>();
 
@@ -199,7 +199,8 @@ function dedupeOwnSleepingPhotosForAlbum(photos: OwnSleepingPhoto[]) {
     const ownerCatId = photo.ownerCatId ?? photo.catId;
     const date = new Date(photo.createdAt + 9 * 60 * 60 * 1000);
     const dateKey = date.toISOString().slice(0, 10);
-    if (photo.captureContext === "onboarding") {
+    const isOnboardingPhoto = isOnboardingOwnSleepingPhoto(photo);
+    if (isOnboardingPhoto) {
       if (seenOnboardingDates.has(dateKey)) {
         return false;
       }
@@ -214,7 +215,6 @@ function dedupeOwnSleepingPhotosForAlbum(photos: OwnSleepingPhoto[]) {
       return true;
     }
 
-    const isOnboardingPhoto = photo.captureContext === "onboarding";
     const matchesOnboardingPhoto = contentKeys.some(
       (key) => seenContent.get(key) === true,
     );
@@ -252,41 +252,20 @@ export function isOnboardingOwnSleepingPhoto(
   return photo.captureContext === "onboarding" || isOnboardingOwnSleepingPhotoId(photo.id);
 }
 
-function isRegularOwnSleepingPhoto(photo: OwnSleepingPhoto) {
-  return !isOnboardingOwnSleepingPhoto(photo);
-}
-
 export function readOwnSleepingPhotoCount(activeCatId: string | null) {
-  const photos = readAllOwnSleepingPhotos();
+  const photos = dedupeOwnSleepingPhotoRecords(readAllOwnSleepingPhotos());
 
   if (activeCatId) {
     return getOwnSleepingPhotoCountForCat(activeCatId, photos);
   }
 
   const stats = readCatSleepingStats();
-  const onboardingCountByCat = photos.reduce<Record<string, number>>(
-    (counts, photo) => {
-      if (isOnboardingOwnSleepingPhoto(photo)) {
-        const catId = photo.ownerCatId ?? photo.catId;
-        counts[catId] = (counts[catId] ?? 0) + 1;
-      }
-      return counts;
-    },
-    {},
-  );
   const statTotal = Object.values(stats).reduce(
     (total, stat) => total + Math.max(0, stat.takenCount ?? 0),
     0,
   );
-  const onboardingTotal = Object.values(onboardingCountByCat).reduce(
-    (total, count) => total + count,
-    0,
-  );
 
-  return Math.max(
-    Math.max(0, statTotal - onboardingTotal),
-    photos.filter(isRegularOwnSleepingPhoto).length,
-  );
+  return Math.max(statTotal, photos.length);
 }
 
 export function readCatSleepingMilestones(
@@ -299,19 +278,15 @@ export function readCatSleepingMilestones(
   const stored = readCatSleepingMilestoneStore()[activeCatId] ?? [];
   const byTarget = new Map<CatSleepingMilestoneTarget, CatSleepingMilestone>();
 
-  const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
-    .filter(isValidOwnSleepingPhoto)
-    .map(normalizeOwnSleepingPhoto)
-    .filter(isRegularOwnSleepingPhoto)
+  const photos = dedupeOwnSleepingPhotoRecords(readAllOwnSleepingPhotos())
     .filter((photo) => photo.ownerCatId === activeCatId)
     .sort((a, b) => a.createdAt - b.createdAt);
-  const regularPhotoIds = new Set(photos.map((photo) => photo.id));
+  const photoIds = new Set(photos.map((photo) => photo.id));
 
   for (const milestone of stored) {
     if (
       isValidCatSleepingMilestone(milestone) &&
-      !isOnboardingOwnSleepingPhotoId(milestone.photoId) &&
-      (regularPhotoIds.size === 0 || regularPhotoIds.has(milestone.photoId))
+      (photoIds.size === 0 || photoIds.has(milestone.photoId))
     ) {
       byTarget.set(milestone.target, milestone);
     }
@@ -387,10 +362,9 @@ export function restoreSyncedSleepingPhotos({
 }
 
 function getValidOwnSleepingPhotoCount(photos: OwnSleepingPhoto[]) {
-  return photos
-    .filter(isValidOwnSleepingPhoto)
-    .map(normalizeOwnSleepingPhoto)
-    .filter(isRegularOwnSleepingPhoto).length;
+  return dedupeOwnSleepingPhotoRecords(
+    photos.filter(isValidOwnSleepingPhoto).map(normalizeOwnSleepingPhoto),
+  ).length;
 }
 
 type CatSleepingStatsStore = Record<string, { takenCount: number }>;
@@ -402,21 +376,14 @@ function getOwnSleepingPhotoCountForCat(
 ) {
   const storedCount =
     readCatSleepingStats()[activeCatId]?.takenCount ?? 0;
-  const normalizedPhotos = photos
-    .filter(isValidOwnSleepingPhoto)
-    .map(normalizeOwnSleepingPhoto);
-  const onboardingCount = normalizedPhotos.filter(
-    (photo) =>
-      (photo.ownerCatId ?? photo.catId) === activeCatId &&
-      isOnboardingOwnSleepingPhoto(photo),
-  ).length;
+  const normalizedPhotos = dedupeOwnSleepingPhotoRecords(
+    photos.filter(isValidOwnSleepingPhoto).map(normalizeOwnSleepingPhoto),
+  );
   const visibleCount = normalizedPhotos.filter(
-    (photo) =>
-      (photo.ownerCatId ?? photo.catId) === activeCatId &&
-      isRegularOwnSleepingPhoto(photo),
+    (photo) => (photo.ownerCatId ?? photo.catId) === activeCatId,
   ).length;
 
-  return Math.max(Math.max(0, storedCount - onboardingCount), visibleCount);
+  return Math.max(storedCount, visibleCount);
 }
 
 function recordOwnSleepingPhotoTaken(
@@ -667,7 +634,7 @@ export async function saveOwnSleepingPhoto({
       wasSavedDurably ||
       savedPhotos.some((photo) => photo.id === normalizedOwnPhoto.id)
     ) {
-      if (!existingPhoto && isRegularOwnSleepingPhoto(normalizedOwnPhoto)) {
+      if (!existingPhoto) {
         recordOwnSleepingPhotoTaken(normalizedOwnPhoto, previousTakenCount + 1);
       }
       dispatchBoxPhotoStorageEvent();

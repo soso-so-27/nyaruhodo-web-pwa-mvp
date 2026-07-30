@@ -21,6 +21,7 @@ export const STORAGE_KEYS = {
   latestHypothesis: "latest_hypothesis",
   legacyCatProfile: "cat_profile",
   onboardingCompleted: "onboarding_completed",
+  onboardingCollectionNotice: "neteruneko_onboarding_collection_notice",
   onboardingJourney: "neteruneko_onboarding_journey",
   onboardingProgress: "neteruneko_onboarding_progress",
   onboardingSource: "neteruneko_onboarding_source",
