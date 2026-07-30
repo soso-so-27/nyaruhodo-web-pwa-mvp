@@ -12,7 +12,7 @@ import styles from "./about.module.css";
 
 const title = "ねてるねこ｜よる8時に、ねこだよりがとどく";
 const description =
-  "まず4匹のねこから気になる1匹を選び、あなたの猫のねがお1枚と交換します。そのあとは、ねがおを残すと次のよる8時ごろに4匹のねこがとどく、静かなWebアプリです。";
+  "自分で選んだ猫の写真を保存し、ねこくじに登場する4匹との似ているところや違うところから、うちの子らしさに気づくWebアプリです。";
 
 export const metadata: Metadata = {
   title,
@@ -67,7 +67,7 @@ const dailySteps = [
     number: "03",
     label: "ひらく",
     title: "きょうも、どこかでよく寝ています。",
-    copy: "4匹から、残したい1匹をえらびます。",
+    copy: "4匹から目にとまった1匹をえらぶと、その日のねこだよりになります。",
     image: "/sample-cats/mugi-portrait.webp",
     imageAlt: "寝具の上でくつろぐ猫",
     kind: "photo",
@@ -98,18 +98,19 @@ export default function AboutPage() {
         </header>
 
         <div className={styles.heroContent}>
-          <p className={styles.eyebrow}>4匹のねこから始まる、ねこだより</p>
+          <p className={styles.eyebrow}>うちの子らしさに気づく、ねこくじ</p>
           <h1 id="about-title">ねてるねこ</h1>
           <p className={styles.heroLead}>
-            まずは、4匹のねこに会ってみる。
+            スマホには、撮った写真。
             <br />
-            気になる1匹を見つけたら、あなたの猫のねがおと交換できます。
+            ねてるねこには、自分で選んだ写真。
           </p>
           <ServiceSiteCta className={styles.heroCta} placement="hero">
-            4匹に会ってみる
+            うちの子の写真を選ぶ
           </ServiceSiteCta>
           <p className={styles.heroNote}>
-            最初の4匹はその場で。次からは、ねがおを残すと次のよる8時ごろに。
+            写真を選ぶと、ねこくじに4匹の猫が登場します。
+            似ているところや違うところから、うちの子らしさが見えてきます。
           </p>
         </div>
 
@@ -303,7 +304,7 @@ export default function AboutPage() {
           </div>
           <div className={styles.betaColumns}>
             <p>
-              いまはβ版です。最初に会う4匹には、あめやむぎがいることもあります。
+              いまはβ版です。最初のねこくじには、あめやむぎがいることもあります。
               とどくねこだよりはひとつずつ確認しながら、少人数で運営しています。
               通知はまだありません。ねこだよりは、よる8時を過ぎるとホームでひらけます。
             </p>
@@ -323,9 +324,9 @@ export default function AboutPage() {
           height={302}
           className={styles.finalEnvelope}
         />
-        <p className={styles.sectionLabel}>最初の4匹から</p>
-        <h2>気になる1匹を、見つけてみませんか。</h2>
-        <p>登録せずに、まず4匹に会えます。あなたの猫の写真を選ぶのは、そのあとです。</p>
+        <p className={styles.sectionLabel}>うちの子の1枚から</p>
+        <h2>うちの子らしさを、見つけてみませんか。</h2>
+        <p>登録せずに始められます。まず、うちの子の写真を1枚選んでください。</p>
         <ServiceSiteCta className={styles.finalCta} placement="footer">
           ねてるねこをはじめる
         </ServiceSiteCta>

@@ -29,6 +29,13 @@ These rules are permanent. Specs do not restate them. If a spec or doc conflicts
 - Never use `一生` or words evoking a cat's death (最期, 見送る, 虹の橋, 天国, etc.) anywhere in the product or its communications.
 - Time notation in user-facing copy is `よる8時` (not `よる8じ`, not `夜8時`).
 
+### Initial onboarding vocabulary exception (owner-approved 2026-07-29)
+
+- Only in the first-time onboarding, use `写真` and `うちの子` when that makes the action understandable to a new visitor. The saved destination remains the feature name `うちのこ`.
+- Do not call the cats shown by the onboarding `ほかの猫` or `よその子`. Refer to the concrete experience instead: `ねこくじで出会う猫`, `4匹`, or `目にとまった1匹`.
+- `ねこくじ` is the temporary act of seeing and choosing. The selected cat becomes that day's `ねこだより`; do not describe it as acquiring or receiving a cat.
+- This exception changes onboarding explanation only. It does not replace the daily `ねがお` product model or rename existing stored data.
+
 ### Product principles (immutable)
 
 - Give-to-receive: taking today's ねがお is what brings tonight's ねこだより. A day without taking simply has no letter tonight — never stage punishment, streak loss, or guilt, and never empty the home screen to pressure the user.
