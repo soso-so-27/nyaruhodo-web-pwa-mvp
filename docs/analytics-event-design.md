@@ -178,6 +178,18 @@ account_create_cta_clicked
 | `collection_target_viewed` | 今日の見つけたい姿表示 | `slot_slug`, `group_id` |
 | `collection_photo_add_started` | 写真追加導線を開く | `slot_slug`, `group_id` |
 | `collection_photo_added` | 写真追加成功 | `slot_slug`, `group_id`, `photo_count_after` |
+
+### 6.6 Cat profile events
+
+プロフィール本文や共有テキストの値そのものはイベントへ入れない。
+
+| Event | When | Properties |
+|---|---|---|
+| `cat_profile_growth_started` | 一問更新または見返しを開く | `field: callName/favoritePlace/favoritePlay/favoriteTouch/dislikes/review` |
+| `cat_profile_share_opened` | 用途選択シートを開く | `source: cat_profile` |
+| `cat_profile_share_purpose_selected` | 共有用途を選ぶ | `purpose: everyday/emergency` |
+| `cat_profile_share_completed` | 端末共有またはコピーが成功 | `purpose`, `method: native_share/clipboard` |
+| `cat_profile_share_cancelled` | 端末共有をキャンセル | `purpose`, `method: native_share` |
 | `collection_pose_found` | 〇〇を見つけた表示 | `slot_slug`, `group_id` |
 | `collection_share_tapped` | share押下 | `slot_slug`, `group_id`, `photo_count` |
 | `collection_share_feed_card_opened` | シェアフィードのカード押下 | `item_type`, `owner_scope`, `slot_slug` |

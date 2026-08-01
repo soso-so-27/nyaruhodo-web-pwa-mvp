@@ -32,6 +32,11 @@ import {
   type CatYearSummary,
 } from "../../lib/cats/yearSummary";
 import {
+  buildCatProfilePresentation,
+  type CatProfileLivingItem,
+  type CatProfilePersonalityQuestionKey,
+} from "../../lib/cats/profilePresentation";
+import {
   acknowledgeCatGalleryIntro,
   CAT_GALLERY_PHOTO_LIMIT,
   deleteCatGalleryPhoto,
@@ -105,6 +110,7 @@ import {
 } from "../ui/StoredPhotoImage";
 import { OmoideMemoryViewer } from "../home/OmoideMemoryViewer";
 import { useModalBehavior } from "../ui/useModalBehavior";
+import { CatProfileShareSheet } from "./CatProfileShareSheet";
 import {
   addCatProfile,
   getActiveCatProfile,
@@ -115,7 +121,10 @@ import {
   saveActiveCatId,
   saveCatProfiles,
 } from "../home/homeInputHelpers";
-import type { CatProfile } from "../home/homeInputHelpers";
+import type {
+  CatPersonalityInfo,
+  CatProfile,
+} from "../home/homeInputHelpers";
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = string;
 type UchinokoLens = "cat" | "all";
@@ -209,7 +218,38 @@ const DEFAULT_COVER_CROP: CatCoverCrop = {
 };
 type CatManageEditSource = "basic" | "manage";
 type CatProfileEditSection = "basic" | "personality" | "care";
-type CatProfileQuickEditField = "favoritePlace";
+type CatProfileQuickEditField = keyof CatPersonalityInfo;
+
+const CAT_PROFILE_QUICK_EDIT_COPY: Record<
+  CatProfileQuickEditField,
+  { title: string; label: string; placeholder: string }
+> = {
+  callName: {
+    title: "よく呼ぶ名前を書く",
+    label: "よく呼ぶ名前",
+    placeholder: "例：むぎちゃん",
+  },
+  favoritePlace: {
+    title: "好きな場所を書く",
+    label: "好きな場所",
+    placeholder: "例：ソファの右端",
+  },
+  favoritePlay: {
+    title: "好きな遊びを書く",
+    label: "好きな遊び",
+    placeholder: "例：ひも、追いかけっこ",
+  },
+  favoriteTouch: {
+    title: "喜ぶなで方を書く",
+    label: "なでると喜ぶ場所",
+    placeholder: "例：あごの下",
+  },
+  dislikes: {
+    title: "苦手なことを書く",
+    label: "苦手なこと",
+    placeholder: "例：掃除機、大きな音",
+  },
+};
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -231,6 +271,7 @@ export function CatsPage() {
     useState<CatProfileEditSection>("basic");
   const [catProfileQuickEditField, setCatProfileQuickEditField] =
     useState<CatProfileQuickEditField | null>(null);
+  const [isProfileShareOpen, setIsProfileShareOpen] = useState(false);
   const [isCoverPhotoSheetOpen, setIsCoverPhotoSheetOpen] = useState(false);
   const [coverCropDraft, setCoverCropDraft] = useState<{
     src: string;
@@ -992,6 +1033,43 @@ export function CatsPage() {
     setIsCatManageOpen(true);
   }
 
+  function getPersonalityQuickEditValue(field: CatProfileQuickEditField) {
+    switch (field) {
+      case "callName":
+        return editCallName;
+      case "favoritePlace":
+        return editFavoritePlace;
+      case "favoritePlay":
+        return editFavoritePlay;
+      case "favoriteTouch":
+        return editFavoriteTouch;
+      case "dislikes":
+        return editDislikes;
+    }
+  }
+
+  function setPersonalityQuickEditValue(
+    field: CatProfileQuickEditField,
+    value: string,
+  ) {
+    switch (field) {
+      case "callName":
+        setEditCallName(value);
+        return;
+      case "favoritePlace":
+        setEditFavoritePlace(value);
+        return;
+      case "favoritePlay":
+        setEditFavoritePlay(value);
+        return;
+      case "favoriteTouch":
+        setEditFavoriteTouch(value);
+        return;
+      case "dislikes":
+        setEditDislikes(value);
+    }
+  }
+
   function cancelEditingCatName() {
     setCatNameInput(catName);
     setMessage("");
@@ -1055,31 +1133,31 @@ export function CatsPage() {
 
       if (shouldSavePersonality) {
         const previousPersonality = previousProfile.basicInfo?.personality;
-        const normalizedFavoritePlace = trimToMax(editFavoritePlace, 40);
-        const hasOtherPersonalityValue = Boolean(
-          previousPersonality &&
-            Object.entries(previousPersonality).some(
-              ([key, value]) =>
-                key !== "favoritePlace" &&
-                typeof value === "string" &&
-                value.length > 0,
-            ),
-        );
-        const nextPersonality =
-          catProfileQuickEditField === "favoritePlace"
-            ? normalizedFavoritePlace || hasOtherPersonalityValue
-              ? {
-                  ...(previousPersonality ?? {}),
-                  favoritePlace: normalizedFavoritePlace || undefined,
-                }
-              : undefined
-            : buildCatPersonalityInfo({
-                callName: editCallName,
-                favoritePlace: editFavoritePlace,
-                favoritePlay: editFavoritePlay,
-                favoriteTouch: editFavoriteTouch,
-                dislikes: editDislikes,
-              });
+        let nextPersonality: CatPersonalityInfo | undefined;
+
+        if (catProfileQuickEditField) {
+          const normalizedQuickValue = trimToMax(
+            getPersonalityQuickEditValue(catProfileQuickEditField),
+            40,
+          );
+          const nextQuickPersonality = {
+            ...(previousPersonality ?? {}),
+            [catProfileQuickEditField]: normalizedQuickValue || undefined,
+          };
+          nextPersonality = Object.values(nextQuickPersonality).some(
+            (value) => typeof value === "string" && value.trim().length > 0,
+          )
+            ? nextQuickPersonality
+            : undefined;
+        } else {
+          nextPersonality = buildCatPersonalityInfo({
+            callName: editCallName,
+            favoritePlace: editFavoritePlace,
+            favoritePlay: editFavoritePlay,
+            favoriteTouch: editFavoriteTouch,
+            dislikes: editDislikes,
+          });
+        }
         nextBasicInfo = {
           ...nextBasicInfo,
           personality: nextPersonality,
@@ -2125,7 +2203,6 @@ export function CatsPage() {
                     profile={activeCatProfile}
                     photo={activeCoverPhoto}
                     familyDuration={familyDuration}
-                    now={clientNow}
                     onEditBasic={() =>
                       openCatManageEditor("basic", "basic")
                     }
@@ -2133,13 +2210,22 @@ export function CatsPage() {
                       openCatManageEditor("basic", "personality")
                     }
                     onEditCare={() => openCatManageEditor("basic", "care")}
-                    onAnswerFavoritePlace={() =>
-                      openCatManageEditor(
-                        "basic",
-                        "personality",
-                        "favoritePlace",
-                      )
-                    }
+                    onGrowProfile={(field) => {
+                      trackProductEvent(
+                        "cat_profile_growth_started",
+                        { field: field ?? "review" },
+                        { localCatId: activeCatProfile.id },
+                      );
+                      openCatManageEditor("basic", "personality", field);
+                    }}
+                    onOpenShare={() => {
+                      trackProductEvent(
+                        "cat_profile_share_opened",
+                        { source: "cat_profile" },
+                        { localCatId: activeCatProfile.id },
+                      );
+                      setIsProfileShareOpen(true);
+                    }}
                   />
                 </AppCard>
                 <section
@@ -2357,12 +2443,27 @@ export function CatsPage() {
           onClose={() => setIsCatScopePickerOpen(false)}
         />
       ) : null}
+      {activeCatProfile ? (
+        <CatProfileShareSheet
+          open={isProfileShareOpen}
+          cat={{
+            localCatId: activeCatProfile.id,
+            name: isCatProfileNameUnset(activeCatProfile)
+              ? "この子"
+              : getCatName(activeCatProfile),
+            photo: activeCoverSrc,
+            basicInfo: activeCatProfile.basicInfo,
+            appearance: activeCatProfile.appearance,
+          }}
+          onClose={() => setIsProfileShareOpen(false)}
+        />
+      ) : null}
       {isCatManageOpen && activeCatProfile ? (
         <AppBottomSheet
           title={
             isCatManageEditing
-              ? catProfileQuickEditField === "favoritePlace"
-                ? "好きな場所を書く"
+              ? catProfileQuickEditField
+                ? CAT_PROFILE_QUICK_EDIT_COPY[catProfileQuickEditField].title
                 : catProfileEditSection === "personality"
                   ? `${
                       catNameInput.trim() ||
@@ -2488,21 +2589,33 @@ export function CatsPage() {
               </div>
             ) : isCatManageEditing ? (
               <div style={styles.catManageEditor}>
-                {catProfileQuickEditField === "favoritePlace" ? (
+                {catProfileQuickEditField ? (
                   <>
                     <section
                       data-testid="cats-profile-quick-edit"
+                      data-profile-field={catProfileQuickEditField}
                       style={styles.catManageNameBlock}
                     >
                       <AppTextField
                         type="text"
-                        label="好きな場所"
-                        value={editFavoritePlace}
+                        label={
+                          CAT_PROFILE_QUICK_EDIT_COPY[catProfileQuickEditField]
+                            .label
+                        }
+                        value={getPersonalityQuickEditValue(
+                          catProfileQuickEditField,
+                        )}
                         maxLength={40}
                         onChange={(event) =>
-                          setEditFavoritePlace(event.target.value)
+                          setPersonalityQuickEditValue(
+                            catProfileQuickEditField,
+                            event.target.value,
+                          )
                         }
-                        placeholder="例：ソファの右端"
+                        placeholder={
+                          CAT_PROFILE_QUICK_EDIT_COPY[catProfileQuickEditField]
+                            .placeholder
+                        }
                         autoFocus
                       />
                     </section>
@@ -3532,30 +3645,26 @@ function CatBasicProfilePanel({
   profile,
   photo,
   familyDuration,
-  now,
   onEditBasic,
   onEditPersonality,
   onEditCare,
-  onAnswerFavoritePlace,
+  onGrowProfile,
+  onOpenShare,
 }: {
   profile: CatProfile;
   photo: LensPhoto | null;
   familyDuration: { primary: string; secondary: string };
-  now: number;
   onEditBasic: () => void;
   onEditPersonality: () => void;
   onEditCare: () => void;
-  onAnswerFavoritePlace: () => void;
+  onGrowProfile: (field: CatProfilePersonalityQuestionKey | null) => void;
+  onOpenShare: () => void;
 }) {
   const catName = isCatProfileNameUnset(profile)
     ? "この子"
     : getCatName(profile);
   const familyDays =
     familyDuration.primary === "未設定" ? "" : familyDuration.primary;
-  const identityFacts = [
-    formatGender(profile.basicInfo?.gender),
-    formatCatAge(profile.basicInfo?.birthDate, now),
-  ].filter(Boolean);
 
   return (
     <div data-testid="cats-profile-panel" style={styles.basicProfilePanel}>
@@ -3595,11 +3704,6 @@ function CatBasicProfilePanel({
               家族になった日を登録できます
             </p>
           )}
-          {identityFacts.length > 0 ? (
-            <p style={styles.profileSummaryFacts}>
-              {identityFacts.join("・")}
-            </p>
-          ) : null}
         </div>
         <button
           type="button"
@@ -3615,7 +3719,8 @@ function CatBasicProfilePanel({
         profile={profile}
         onEditPersonality={onEditPersonality}
         onEditCare={onEditCare}
-        onAnswerFavoritePlace={onAnswerFavoritePlace}
+        onGrowProfile={onGrowProfile}
+        onOpenShare={onOpenShare}
       />
     </div>
   );
@@ -3625,96 +3730,85 @@ function BasicInfoTable({
   profile,
   onEditPersonality,
   onEditCare,
-  onAnswerFavoritePlace,
+  onGrowProfile,
+  onOpenShare,
 }: {
   profile: CatProfile;
   onEditPersonality: () => void;
   onEditCare: () => void;
-  onAnswerFavoritePlace: () => void;
+  onGrowProfile: (field: CatProfilePersonalityQuestionKey | null) => void;
+  onOpenShare: () => void;
 }) {
-  const birthdayDate = formatBasicInfoDate(profile.basicInfo?.birthDate);
-  const importantDateRows = [
-    createBasicInfoRow({
-      label: "家族になった日",
-      value: formatBasicInfoDate(profile.basicInfo?.familySinceDate),
-      valueTone: "numeric",
-    }),
-    createBasicInfoRow({
-      label: "誕生日",
-      value: birthdayDate,
-      valueTone: "numeric",
-    }),
-  ];
-  const appearanceRows = [
-    createBasicInfoRow({
-      label: "性別",
-      value: formatGender(profile.basicInfo?.gender),
-    }),
-    createBasicInfoRow({
-      label: "毛柄",
-      value: profile.appearance?.coat
-        ? getCoatLabel(profile.appearance.coat)
-        : "",
-    }),
-    createBasicInfoRow({
-      label: "猫種",
-      value: profile.basicInfo?.breed,
-    }),
-  ];
-  const personalityRows = [
-    createBasicInfoRow({
-      label: "呼び名",
-      value: profile.basicInfo?.personality?.callName,
-    }),
-    createBasicInfoRow({
-      label: "好きな場所",
-      value: profile.basicInfo?.personality?.favoritePlace,
-    }),
-    createBasicInfoRow({
-      label: "好きな遊び",
-      value: profile.basicInfo?.personality?.favoritePlay,
-    }),
-    createBasicInfoRow({
-      label: "なでると喜ぶ場所",
-      value: profile.basicInfo?.personality?.favoriteTouch,
-    }),
-    createBasicInfoRow({
-      label: "苦手なこと",
-      value: profile.basicInfo?.personality?.dislikes,
-    }),
-  ];
-  const careRows = [
-    createBasicInfoRow({
-      label: "体重",
-      value: formatCareWeight(profile.basicInfo?.care?.weightKg),
-      note: formatCareWeightMeasuredNote(
-        profile.basicInfo?.care?.weightMeasuredDate,
-      ),
-      valueTone: "numeric",
-    }),
-    createBasicInfoRow({
-      label: "かかりつけ",
-      value: profile.basicInfo?.care?.vetClinic,
-    }),
-    createBasicInfoRow({
-      label: "気をつけること",
-      value: profile.basicInfo?.care?.careNote,
-    }),
-    createBasicInfoRow({
-      label: "ワクチンを打った日",
-      value: formatBasicInfoDate(profile.basicInfo?.care?.vaccineDate),
-      note: profile.basicInfo?.care?.vaccineNote,
-      valueTone: "numeric",
-    }),
-  ];
-  const basicRows = [...importantDateRows, ...appearanceRows];
+  const presentation = buildCatProfilePresentation(profile);
+  const lifeRows = presentation.livingItems
+    .filter((item) => item.group === "care")
+    .map(createBasicInfoRowFromLivingItem);
+  const basicRows = presentation.livingItems
+    .filter((item) => item.group !== "care")
+    .map(createBasicInfoRowFromLivingItem);
+  const nextQuestion = presentation.nextQuestion;
 
   return (
     <div style={styles.basicInfoBlock}>
-      <ProfilePersonalitySection
-        rows={personalityRows}
-        onEdit={onEditPersonality}
-        onAnswerFavoritePlace={onAnswerFavoritePlace}
+      <section
+        data-testid="cats-profile-personality-section"
+        style={styles.profilePortraitSection}
+      >
+        <div style={styles.basicInfoSubsectionHeading}>
+          <h2 style={styles.profilePortraitTitle}>{presentation.title}</h2>
+          {presentation.portraitLines.length > 0 ? (
+            <button
+              type="button"
+              style={styles.basicInfoSubsectionEditButton}
+              onClick={onEditPersonality}
+              aria-label={`${presentation.title}を編集`}
+            >
+              編集
+            </button>
+          ) : null}
+        </div>
+        {presentation.portraitParagraph ? (
+          <p
+            data-testid="cats-profile-portrait-copy"
+            style={styles.profilePortraitCopy}
+          >
+            {presentation.portraitParagraph}
+          </p>
+        ) : (
+          <p style={styles.profilePortraitEmpty}>
+            いっしょに過ごすうちに見つけたことを、少しずつ残せます。
+          </p>
+        )}
+      </section>
+
+      <button
+        type="button"
+        data-testid="cats-profile-growth-section"
+        data-profile-question={nextQuestion.key}
+        style={styles.profileGrowthAction}
+        onClick={() =>
+          onGrowProfile(nextQuestion.kind === "question" ? nextQuestion.key : null)
+        }
+        aria-label={`プロフィールを育てる。${nextQuestion.prompt}`}
+      >
+        <span style={styles.profileGrowthText}>
+          <span style={styles.profileGrowthKicker}>プロフィールを育てる</span>
+          <span style={styles.profileGrowthPrompt}>{nextQuestion.prompt}</span>
+        </span>
+        <span style={styles.profileGrowthVerb}>
+          {nextQuestion.kind === "question" ? "答える" : "見返す"}
+        </span>
+        <ChevronRightSmallIcon />
+      </button>
+
+      <BasicInfoSubsection
+        title="暮らしのこと"
+        rows={lifeRows}
+        layout="care"
+        onEdit={onEditCare}
+        emptyActionLabel="書く"
+        emptyMessage="体調や通院など、日々の暮らしで覚えておきたいこと。"
+        testId="cats-profile-life-section"
       />
       {basicRows.some((row) => row.value) ? (
         <BasicInfoSubsection
@@ -3724,16 +3818,42 @@ function BasicInfoTable({
           testId="cats-profile-basic-section"
         />
       ) : null}
-      <BasicInfoSubsection
-        title="ケアのメモ"
-        rows={careRows}
-        layout="care"
-        onEdit={onEditCare}
-        emptyActionLabel="追加"
-        testId="cats-profile-care-section"
-      />
+
+      <section data-testid="cats-profile-share-entry">
+        <button
+          type="button"
+          style={styles.profileShareEntry}
+          onClick={onOpenShare}
+          aria-label="この子のことを伝える"
+        >
+          <span style={styles.profileShareEntryText}>
+            <span style={styles.profileShareEntryTitle}>
+              この子のことを伝える
+            </span>
+            <span style={styles.profileShareEntryHint}>
+              必要なことだけ選んで、端末から共有できます。
+            </span>
+          </span>
+          <span style={styles.profileShareEntryVerb}>選ぶ</span>
+          <ChevronRightSmallIcon />
+        </button>
+      </section>
     </div>
   );
+}
+
+function createBasicInfoRowFromLivingItem(
+  item: CatProfileLivingItem,
+): BasicInfoDisplayRow {
+  return createBasicInfoRow({
+    label: item.label,
+    value: item.value,
+    note: item.note,
+    valueTone:
+      item.valueTone === "measurement" || item.valueTone === "date"
+        ? "numeric"
+        : "text",
+  });
 }
 
 type BasicInfoDisplayRow = {
@@ -3762,88 +3882,13 @@ function createBasicInfoRow({
   };
 }
 
-function ProfilePersonalitySection({
-  rows,
-  onEdit,
-  onAnswerFavoritePlace,
-}: {
-  rows: BasicInfoDisplayRow[];
-  onEdit: () => void;
-  onAnswerFavoritePlace: () => void;
-}) {
-  const visibleRows = rows.filter((row) => row.value);
-
-  return (
-    <section
-      data-testid="cats-profile-personality-section"
-      style={styles.profilePersonalitySection}
-    >
-      <div style={styles.basicInfoSubsectionHeading}>
-        <p style={styles.profilePersonalityTitle}>この子らしさ</p>
-        {visibleRows.length > 0 ? (
-          <button
-            type="button"
-            style={styles.basicInfoSubsectionEditButton}
-            onClick={onEdit}
-            aria-label="この子らしさを編集"
-          >
-            編集
-          </button>
-        ) : null}
-      </div>
-      {visibleRows.length > 0 ? (
-        <div
-          data-testid="cats-profile-personality-card"
-          style={styles.profilePersonalityTable}
-        >
-          {visibleRows.map((row, index) => (
-            <div
-              key={row.label}
-              data-testid="cats-profile-personality-row"
-              style={
-                index === 0
-                  ? {
-                      ...styles.profilePersonalityRow,
-                      ...styles.profilePersonalityRowFirst,
-                    }
-                  : styles.profilePersonalityRow
-              }
-            >
-              <span style={styles.profilePersonalityLabel}>{row.label}</span>
-              <span style={styles.profilePersonalityValue}>{row.value}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <button
-          type="button"
-          data-testid="cats-profile-optional-question"
-          style={styles.profileOptionalQuestion}
-          onClick={onAnswerFavoritePlace}
-          aria-label="好きな場所を書く"
-        >
-          <span style={styles.profileOptionalQuestionText}>
-            <span style={styles.profileOptionalQuestionLabel}>
-              好きな場所は？
-            </span>
-            <span style={styles.profileOptionalQuestionHint}>
-              思い出したときに、ひとつだけ。
-            </span>
-          </span>
-          <span style={styles.profileOptionalQuestionAction}>書く</span>
-          <ChevronRightSmallIcon />
-        </button>
-      )}
-    </section>
-  );
-}
-
 function BasicInfoSubsection({
   title,
   rows,
   layout = "facts",
   onEdit,
   emptyActionLabel = "編集",
+  emptyMessage,
   testId,
 }: {
   title: string;
@@ -3851,6 +3896,7 @@ function BasicInfoSubsection({
   layout?: "facts" | "care";
   onEdit?: () => void;
   emptyActionLabel?: string;
+  emptyMessage?: string;
   testId?: string;
 }) {
   const visibleRows = rows.filter((row) => row.value);
@@ -3938,6 +3984,8 @@ function BasicInfoSubsection({
             </div>
           ))}
         </div>
+      ) : emptyMessage ? (
+        <p style={styles.profileInfoEmpty}>{emptyMessage}</p>
       ) : null}
     </section>
   );
@@ -8592,19 +8640,6 @@ const styles = {
     lineHeight: 1.55,
     letterSpacing: CATS_META_TRACKING,
   },
-  profileSummaryFacts: {
-    minWidth: 0,
-    margin: "3px 0 0",
-    overflow: "hidden",
-    color: CATS_TEXT,
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.45,
-    letterSpacing: CATS_META_TRACKING,
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
   profileSummaryEditButton: {
     gridColumn: 2,
     justifySelf: "start",
@@ -8700,11 +8735,11 @@ const styles = {
   profileCareSurface: {
     background: "color-mix(in srgb, var(--paper-warm) 44%, transparent)",
   },
-  profilePersonalitySection: {
+  profilePortraitSection: {
     display: "grid",
-    gap: "10px",
+    gap: "12px",
     minWidth: 0,
-    padding: "16px 16px 10px 18px",
+    padding: "18px 18px 20px",
     borderRadius: "0 20px 20px 0",
     borderLeft:
       "2px solid color-mix(in srgb, var(--seal) 48%, var(--line))",
@@ -8726,7 +8761,7 @@ const styles = {
     lineHeight: 1.45,
     letterSpacing: CATS_BODY_TRACKING,
   },
-  profilePersonalityTitle: {
+  profilePortraitTitle: {
     margin: 0,
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
@@ -8734,6 +8769,77 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.45,
     letterSpacing: CATS_TITLE_TRACKING,
+  },
+  profilePortraitCopy: {
+    minWidth: 0,
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "16px",
+    fontWeight: 400,
+    lineHeight: 1.95,
+    letterSpacing: CATS_BODY_TRACKING,
+    whiteSpace: "pre-wrap" as const,
+    overflowWrap: "anywhere" as const,
+    textWrap: "pretty" as const,
+  },
+  profilePortraitEmpty: {
+    minWidth: 0,
+    margin: 0,
+    color: CATS_PROFILE_META,
+    fontFamily: CATS_UI,
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.75,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  profileGrowthAction: {
+    width: "100%",
+    minHeight: "78px",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto auto",
+    alignItems: "center",
+    gap: "10px",
+    padding: "14px 14px 14px 16px",
+    border: "1px solid color-mix(in srgb, var(--seal) 32%, var(--line))",
+    borderRadius: "18px",
+    background: "color-mix(in srgb, var(--paper-card) 46%, transparent)",
+    color: CATS_TEXT,
+    textAlign: "left" as const,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  profileGrowthText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "4px",
+  },
+  profileGrowthKicker: {
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: "0.055em",
+  },
+  profileGrowthPrompt: {
+    minWidth: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.55,
+    letterSpacing: CATS_BODY_TRACKING,
+    overflowWrap: "anywhere" as const,
+  },
+  profileGrowthVerb: {
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: CATS_META_TRACKING,
+    whiteSpace: "nowrap" as const,
   },
   basicInfoSubsectionEditButton: {
     minWidth: "44px",
@@ -8824,6 +8930,61 @@ const styles = {
     lineHeight: 1.55,
     letterSpacing: CATS_META_TRACKING,
   },
+  profileInfoEmpty: {
+    margin: 0,
+    color: CATS_PROFILE_META,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.7,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  profileShareEntry: {
+    width: "100%",
+    minHeight: "76px",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto auto",
+    alignItems: "center",
+    gap: "10px",
+    padding: "14px 14px 14px 16px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
+    borderRadius: "18px",
+    background: "transparent",
+    color: CATS_TEXT,
+    textAlign: "left" as const,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  profileShareEntryText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "3px",
+  },
+  profileShareEntryTitle: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  profileShareEntryHint: {
+    color: CATS_PROFILE_META,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.55,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  profileShareEntryVerb: {
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: CATS_META_TRACKING,
+    whiteSpace: "nowrap" as const,
+  },
   basicInfoNoteRow: {
     display: "grid",
     gap: "5px",
@@ -8848,90 +9009,6 @@ const styles = {
     lineHeight: 1.9,
     letterSpacing: CATS_BODY_TRACKING,
     whiteSpace: "pre-wrap",
-  },
-  profilePersonalityTable: {
-    display: "grid",
-    gap: 0,
-  },
-  profilePersonalityLabel: {
-    color: CATS_PROFILE_META,
-    fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 500,
-    lineHeight: 1.5,
-    letterSpacing: "0.05em",
-  },
-  profilePersonalityValue: {
-    minWidth: 0,
-    color: CATS_TEXT_STRONG,
-    fontFamily: CATS_UI,
-    fontSize: "17px",
-    fontWeight: 400,
-    lineHeight: 1.7,
-    letterSpacing: CATS_BODY_TRACKING,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "break-word",
-    wordBreak: "normal" as const,
-    lineBreak: "strict" as const,
-    textWrap: "pretty" as const,
-  },
-  profilePersonalityRow: {
-    display: "grid",
-    alignItems: "start",
-    gap: "4px",
-    minWidth: 0,
-    padding: "14px 2px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
-  },
-  profilePersonalityRowFirst: {
-    borderTop: "none",
-  },
-  profileOptionalQuestion: {
-    width: "100%",
-    minHeight: "64px",
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto auto",
-    alignItems: "center",
-    gap: "10px",
-    padding: "10px 2px",
-    border: "none",
-    borderTop: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
-    borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
-    background: "transparent",
-    color: CATS_TEXT,
-    textAlign: "left" as const,
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-  },
-  profileOptionalQuestionText: {
-    minWidth: 0,
-    display: "grid",
-    gap: "2px",
-  },
-  profileOptionalQuestionLabel: {
-    color: CATS_TEXT,
-    fontFamily: CATS_UI,
-    fontSize: "15px",
-    fontWeight: 500,
-    lineHeight: 1.45,
-    letterSpacing: CATS_BODY_TRACKING,
-  },
-  profileOptionalQuestionHint: {
-    color: CATS_PROFILE_META,
-    fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.5,
-    letterSpacing: CATS_META_TRACKING,
-  },
-  profileOptionalQuestionAction: {
-    color: "var(--seal)",
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 500,
-    lineHeight: 1,
-    letterSpacing: CATS_META_TRACKING,
-    whiteSpace: "nowrap",
   },
   basicInfoMissing: {
     color: CATS_FAINT,

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
@@ -1275,7 +1275,7 @@ test("keeps stored representative photo data without showing an unused setting",
   await expect(page.getByTestId("cats-cover-photo-button")).toHaveCount(0);
 });
 
-test("shows every populated profile group without hiding saved information", async ({
+test("shows the new populated profile hierarchy without repeating legacy rows", async ({
   page,
 }) => {
   await page.clock.setFixedTime(new Date("2026-07-25T12:00:00+09:00"));
@@ -1285,11 +1285,16 @@ test("shows every populated profile group without hiding saved information", asy
       birthDate: "2022-07-10",
       gender: "male",
       personality: {
+        callName: "むー",
+        favoritePlace: "窓辺のクッション",
+        favoritePlay: "羽のおもちゃ",
         favoriteTouch: "あごの下",
+        dislikes: "掃除機の音",
       },
       care: {
         weightKg: 4.8,
         weightMeasuredDate: "2026-07-20",
+        vetClinic: "ねこの病院",
         careNote: "爪切りはふたりで",
       },
     },
@@ -1303,11 +1308,10 @@ test("shows every populated profile group without hiding saved information", asy
   await expect(profileTab).toBeVisible();
   await profileTab.click();
 
+  const profile = page.getByTestId("cats-profile-panel");
   const summary = page.getByTestId("cats-profile-summary-card");
   await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
-  await expect(summary).not.toContainText("むぎ");
   await expect(summary).toContainText("いっしょに暮らして");
-  await expect(summary).toContainText("男の子・4歳");
   await expect(page.getByTestId("cats-profile-summary-photo")).toBeVisible();
   await expect(
     page.getByTestId("cats-profile-summary-photo").locator("img"),
@@ -1327,33 +1331,88 @@ test("shows every populated profile group without hiding saved information", asy
   );
   await expect(page.getByText("家族と共有", { exact: true })).toHaveCount(0);
   await expect(
+    profile.getByText("むぎは、こんな子", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByTestId("cats-profile-life-section")
+      .getByText("暮らしのこと", { exact: true }),
+  ).toBeVisible();
+  await expect(
     page
       .getByTestId("cats-profile-basic-section")
       .getByText("基本情報", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("2022年9月22日")).toBeVisible();
-  await expect(page.getByText("2022年7月10日")).toBeVisible();
-  const personalitySection = page.getByTestId(
-    "cats-profile-personality-section",
-  );
   await expect(
-    personalitySection.getByText("この子らしさ", { exact: true }),
-  ).toHaveCSS("font-size", "18px");
-  await expect(personalitySection).toHaveCSS("border-left-width", "2px");
-  await expect(page.getByText("たいせつな日", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("見た目", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("その他のプロフィール", { exact: true })).toHaveCount(
-    0,
-  );
-  await expect(page.getByText("毛柄")).toBeVisible();
-  await expect(page.getByText("ケアのメモ", { exact: true })).toBeVisible();
-  await expect(page.getByText("4.8 kg")).toBeVisible();
-  await expect(page.getByText("爪切りはふたりで")).toBeVisible();
+    page
+      .getByTestId("cats-profile-growth-section")
+      .getByText("プロフィールを育てる", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByTestId("cats-profile-share-entry")
+      .getByText("この子のことを伝える", { exact: true }),
+  ).toBeVisible();
+
+  for (const savedValue of [
+    "むー",
+    "窓辺のクッション",
+    "羽のおもちゃ",
+    "あごの下",
+    "掃除機の音",
+    "ねこの病院",
+    "爪切りはふたりで",
+    "2022年9月22日",
+    "2022年7月10日",
+    "男の子",
+  ]) {
+    await expect
+      .poll(() => countTextOccurrences(profile, savedValue))
+      .toBe(1);
+  }
+
+  for (const legacyLabel of [
+    "この子らしさ",
+    "呼び名",
+    "好きな場所",
+    "好きな遊び",
+    "なでると喜ぶ場所",
+    "苦手なこと",
+    "ケアのメモ",
+  ]) {
+    await expect(
+      profile.getByText(legacyLabel, { exact: true }),
+    ).toHaveCount(0);
+  }
+
+  await expect(
+    page.getByTestId("cats-profile-life-section"),
+  ).toContainText("4.8 kg");
+  await expect(
+    page.getByTestId("cats-profile-basic-section"),
+  ).toContainText("茶トラ");
   await expect(page.getByText("ワクチンを打った日")).toHaveCount(0);
   await expect(page.getByText("未登録")).toHaveCount(0);
-  await expect(page.getByText("なでると喜ぶ場所")).toBeVisible();
-  await expect(page.getByText("あごの下")).toBeVisible();
   await expect(page.getByText("7月10日は「むぎの日」")).toHaveCount(0);
+
+  const visibleGroupOrder = await profile.evaluate((element) => {
+    const testIds = [
+      "cats-profile-growth-section",
+      "cats-profile-life-section",
+      "cats-profile-basic-section",
+      "cats-profile-share-entry",
+    ];
+    return testIds.map((testId) => {
+      const target = element.querySelector<HTMLElement>(
+        `[data-testid="${testId}"]`,
+      );
+      return target?.getBoundingClientRect().top ?? -1;
+    });
+  });
+  expect(visibleGroupOrder.every((position) => position >= 0)).toBe(true);
+  expect(visibleGroupOrder).toEqual(
+    [...visibleGroupOrder].sort((a, b) => a - b),
+  );
 
   await page.getByTestId("cats-basic-info-edit-button").click();
   const editor = page.getByRole("dialog", { name: "むぎの基本情報" });
@@ -1389,7 +1448,7 @@ test("shows every populated profile group without hiding saved information", asy
     });
 });
 
-test("stacks populated personality details without squeezing or fading their labels", async ({
+test("keeps populated profile stories and actions readable at mobile widths", async ({
   page,
 }) => {
   const favoritePlay = "鳥の羽がついたオモチャを追いかけること";
@@ -1427,7 +1486,6 @@ test("stacks populated personality details without squeezing or fading their lab
   await profileTab.click();
 
   const profile = page.getByTestId("cats-profile-panel");
-  const personalityCard = page.getByTestId("cats-profile-personality-card");
 
   for (const viewport of [
     { width: 320, height: 568 },
@@ -1435,34 +1493,6 @@ test("stacks populated personality details without squeezing or fading their lab
   ]) {
     await page.setViewportSize(viewport);
 
-    const rowLayouts = await personalityCard
-      .locator(":scope > div")
-      .evaluateAll((rows) =>
-        rows.map((row) => {
-          const [label, value] = Array.from(row.children) as HTMLElement[];
-          const rowRect = row.getBoundingClientRect();
-          const labelRect = label.getBoundingClientRect();
-          const valueRect = value.getBoundingClientRect();
-
-          return {
-            labelAboveValue: valueRect.top >= labelRect.bottom - 1,
-            valueInsideRow:
-              valueRect.left >= rowRect.left - 1 &&
-              valueRect.right <= rowRect.right + 1,
-            noHorizontalOverflow: row.scrollWidth <= row.clientWidth + 1,
-          };
-        }),
-      );
-
-    expect(rowLayouts.length).toBe(5);
-    expect(
-      rowLayouts.every(
-        (layout) =>
-          layout.labelAboveValue &&
-          layout.valueInsideRow &&
-          layout.noHorizontalOverflow,
-      ),
-    ).toBe(true);
     await expect
       .poll(() =>
         profile.evaluate(
@@ -1470,34 +1500,42 @@ test("stacks populated personality details without squeezing or fading their lab
         ),
       )
       .toBe(true);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+        ),
+      )
+      .toBe(true);
+
+    for (const testId of [
+      "cats-profile-life-section",
+      "cats-profile-basic-section",
+      "cats-profile-growth-section",
+      "cats-profile-share-entry",
+    ]) {
+      const section = page.getByTestId(testId);
+      await expect(section).toBeVisible();
+      await expect
+        .poll(() =>
+          section.evaluate(
+            (element) => element.scrollWidth <= element.clientWidth + 1,
+          ),
+        )
+        .toBe(true);
+    }
   }
 
-  await expect(page.getByText(favoritePlay, { exact: true })).toBeVisible();
-  await expect(page.getByText(favoriteTouch, { exact: true })).toBeVisible();
-  await expect(page.getByText("2022年9月22日", { exact: true })).toBeVisible();
-  await expect(page.getByText("5.5 kg", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("鼻がつまっていないか毎日見る", { exact: true }),
-  ).toBeVisible();
-
-  for (const labelText of ["好きな遊び", "家族になった日", "体重"]) {
-    const colors = await page
-      .getByText(labelText, { exact: true })
-      .first()
-      .evaluate((label) => {
-        const faintProbe = document.createElement("span");
-        faintProbe.style.color = "var(--ink-faint)";
-        document.body.append(faintProbe);
-        const faint = getComputedStyle(faintProbe).color;
-        faintProbe.remove();
-
-        return {
-          actual: getComputedStyle(label).color,
-          faint,
-        };
-      });
-
-    expect(colors.actual).not.toBe(colors.faint);
+  for (const savedValue of [
+    favoritePlay,
+    favoriteTouch,
+    "2022年9月22日",
+    "5.5 kg",
+    "鼻がつまっていないか毎日見る",
+  ]) {
+    await expect
+      .poll(() => countTextOccurrences(profile, savedValue))
+      .toBe(1);
   }
 
   await page.screenshot({
@@ -1506,23 +1544,9 @@ test("stacks populated personality details without squeezing or fading their lab
     caret: "hide",
     style: "nextjs-portal { display: none !important; }",
   });
-
-  for (const editor of [
-    { button: "基本情報を編集", dialog: "むぎの基本情報" },
-    { button: "この子らしさを編集", dialog: "むぎらしさ" },
-    { button: "ケアのメモを編集", dialog: "むぎのケアのメモ" },
-  ]) {
-    const trigger = page.getByRole("button", { name: editor.button });
-    await trigger.scrollIntoViewIfNeeded();
-    await trigger.click();
-    const dialog = page.getByRole("dialog", { name: editor.dialog });
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "キャンセル" }).click();
-    await expect(dialog).toBeHidden();
-  }
 });
 
-test("scrolls the final cat management action above the fixed navigation safe area", async ({
+test("keeps profile actions clear of horizontal overflow and the safe-area navigation", async ({
   page,
 }) => {
   await seedCatsBasicProfile(page, {
@@ -1554,43 +1578,88 @@ test("scrolls the final cat management action above the fixed navigation safe ar
   await cdp.send("Emulation.setSafeAreaInsetsOverride", {
     insets: { top: 47, right: 0, bottom: 34, left: 0 },
   });
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/cats");
   const profileTab = page.getByTestId("cats-section-tab-basic");
   await expect(profileTab).toBeVisible();
   await profileTab.click();
 
   const scroller = page.getByTestId("cats-tab-scroll");
+  const shareEntry = page.getByTestId("cats-profile-share-entry");
   const manage = page.getByRole("button", { name: "猫を追加・管理" });
   const nav = page.locator("[data-app-bottom-nav]");
-  await scroller.evaluate((element) => {
-    element.scrollTop = element.scrollHeight;
-  });
 
-  await expect(manage).toBeInViewport();
-  const metrics = await Promise.all([
-    manage.boundingBox(),
-    nav.boundingBox(),
-    nav.evaluate((element) =>
-      Number.parseFloat(getComputedStyle(element).bottom),
-    ),
-  ]);
-  const [manageBox, navBox, navSafeOffset] = metrics;
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
 
-  expect(manageBox).not.toBeNull();
-  expect(navBox).not.toBeNull();
-  expect(navSafeOffset).toBeGreaterThanOrEqual(34);
-  expect((manageBox?.y ?? 0) + (manageBox?.height ?? 0)).toBeLessThan(
-    navBox?.y ?? 0,
-  );
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+        ),
+      )
+      .toBe(true);
+    await expect
+      .poll(() =>
+        scroller.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth + 1,
+        ),
+      )
+      .toBe(true);
+
+    for (const action of [shareEntry, manage]) {
+      await action.scrollIntoViewIfNeeded();
+      const [initialActionBox, initialNavBox] = await Promise.all([
+        action.boundingBox(),
+        nav.boundingBox(),
+      ]);
+      const overlap =
+        (initialActionBox?.y ?? 0) + (initialActionBox?.height ?? 0) -
+        (initialNavBox?.y ?? 0);
+      if (overlap >= 0) {
+        await scroller.evaluate(
+          (element, scrollAmount) => {
+            element.scrollTop += scrollAmount;
+          },
+          overlap + 12,
+        );
+      }
+      await expect(action).toBeInViewport();
+      const [actionBox, navBox, navSafeOffset] = await Promise.all([
+        action.boundingBox(),
+        nav.boundingBox(),
+        nav.evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).bottom),
+        ),
+      ]);
+
+      expect(actionBox).not.toBeNull();
+      expect(navBox).not.toBeNull();
+      expect(navSafeOffset).toBeGreaterThanOrEqual(34);
+      expect((actionBox?.y ?? 0) + (actionBox?.height ?? 0)).toBeLessThanOrEqual(
+        navBox?.y ?? 0,
+      );
+    }
+  }
 });
 
-test("starts an empty profile with one optional question instead of an empty form", async ({
+test("starts an empty personality with one focused growth question", async ({
   page,
 }) => {
   await seedCatsBasicProfile(page, {
-    basicInfo: {},
-    appearance: {},
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+      gender: "male",
+      care: {
+        weightKg: 4.8,
+      },
+    },
+    appearance: {
+      coat: "orange_tabby",
+    },
   });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/cats");
@@ -1600,14 +1669,29 @@ test("starts an empty profile with one optional question instead of an empty for
 
   const profile = page.getByTestId("cats-profile-panel");
   await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
-  await expect(profile.getByText("むぎ", { exact: true })).toHaveCount(0);
+  await expect(
+    profile.getByText("むぎは、こんな子", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("未登録")).toHaveCount(0);
-  await expect(page.getByTestId("cats-profile-basic-section")).toHaveCount(0);
-  await expect(page.getByTestId("cats-profile-care-section")).toBeVisible();
+  await expect(page.getByTestId("cats-profile-basic-section")).toBeVisible();
+  await expect(page.getByTestId("cats-profile-life-section")).toBeVisible();
 
-  const question = page.getByTestId("cats-profile-optional-question");
-  await expect(question).toContainText("好きな場所は？");
-  await expect(question).toContainText("思い出したときに、ひとつだけ。");
+  const growth = page.getByTestId("cats-profile-growth-section");
+  await expect(
+    growth.getByText("プロフィールを育てる", { exact: true }),
+  ).toBeVisible();
+  const question = growth;
+  await expect(question).toHaveCount(1);
+  await expect(question).toHaveAttribute("data-profile-question", "callName");
+  await expect(question).toContainText("いつも、なんと呼んでいますか？");
+  for (const laterQuestion of [
+    "好きな場所は？",
+    "好きな遊びは？",
+    "なでると喜ぶ場所は？",
+    "苦手なことは？",
+  ]) {
+    await expect(growth.getByText(laterQuestion, { exact: true })).toHaveCount(0);
+  }
   await expect
     .poll(() =>
       profile.evaluate(
@@ -1617,28 +1701,168 @@ test("starts an empty profile with one optional question instead of an empty for
     .toBe(true);
 
   await question.click();
-  const quickDialog = page.getByRole("dialog", { name: "好きな場所を書く" });
-  await expect(quickDialog.getByLabel("好きな場所")).toBeVisible();
+  const quickDialog = page.getByRole("dialog", { name: "よく呼ぶ名前を書く" });
+  const callNameInput = quickDialog.getByLabel("よく呼ぶ名前");
+  await expect(callNameInput).toBeVisible();
+  await expect(callNameInput).toBeFocused();
+  await expect(quickDialog.getByLabel("好きな場所")).toHaveCount(0);
   await expect(quickDialog.getByLabel("好きな遊び")).toHaveCount(0);
   await expect(quickDialog.getByLabel("この子の名前")).toHaveCount(0);
   await expect(quickDialog.getByLabel("体重（kg）")).toHaveCount(0);
-  await quickDialog.getByLabel("好きな場所").fill("窓辺");
+  await callNameInput.fill("むぎちゃん");
   await quickDialog.getByRole("button", { name: "保存する" }).click();
 
   await expect(quickDialog).toBeHidden();
-  await expect(page.getByTestId("cats-profile-personality-card")).toContainText(
-    "窓辺",
-  );
+  await expect(profile).toContainText("むぎちゃん");
+  await expect(question).toContainText("好きな場所は？");
   await expect
     .poll(() =>
       page.evaluate(() => {
         const [profile] = JSON.parse(
           window.localStorage.getItem("cat_profiles") ?? "[]",
         );
-        return profile?.basicInfo?.personality?.favoritePlace ?? "";
+        return profile?.basicInfo?.personality?.callName ?? "";
       }),
     )
-    .toBe("窓辺");
+    .toBe("むぎちゃん");
+});
+
+test("previews both profile share purposes and treats native-share cancellation quietly", async ({
+  page,
+}) => {
+  await seedCatsBasicProfile(page, {
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+      birthDate: "2022-07-10",
+      gender: "male",
+      personality: {
+        callName: "むー",
+        favoritePlace: "窓辺",
+        dislikes: "掃除機の音",
+      },
+      care: {
+        vetClinic: "ねこの病院",
+        careNote: "爪切りはふたりで",
+      },
+    },
+    appearance: {
+      coat: "orange_tabby",
+    },
+  });
+  await page.addInitScript(() => {
+    const state = window as typeof window & {
+      __profileShareCalls?: Array<{
+        title?: string;
+        text?: string;
+        url?: string;
+      }>;
+      __cancelNextProfileShare?: boolean;
+    };
+    state.__profileShareCalls = [];
+    state.__cancelNextProfileShare = false;
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async (payload: ShareData) => {
+        state.__profileShareCalls?.push({
+          title: payload.title,
+          text: payload.text,
+          url: payload.url,
+        });
+        if (state.__cancelNextProfileShare) {
+          state.__cancelNextProfileShare = false;
+          throw new DOMException("Share canceled", "AbortError");
+        }
+      },
+    });
+  });
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.getByTestId("cats-section-tab-basic").click();
+  const shareEntry = page.getByTestId("cats-profile-share-entry");
+  await shareEntry
+    .getByRole("button", { name: "この子のことを伝える" })
+    .click();
+
+  const shareDialogRoot = page.getByTestId("cats-profile-share-dialog");
+  await expect(shareDialogRoot).toHaveCount(1);
+  const shareDialog = shareDialogRoot.getByRole("dialog", {
+    name: "プロフィールを共有",
+  });
+  const everydayPurpose = page.getByTestId(
+    "cats-profile-share-purpose-everyday",
+  );
+  const emergencyPurpose = page.getByTestId(
+    "cats-profile-share-purpose-emergency",
+  );
+  await expect(shareDialog).toBeVisible();
+  await expect(
+    shareDialog.getByText("プロフィールを共有", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    everydayPurpose.getByText("お世話をお願いする", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    emergencyPurpose.getByText("もしものために保存", { exact: true }),
+  ).toBeVisible();
+
+  await everydayPurpose.click();
+  const preview = page.getByTestId("cats-profile-share-preview");
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText("むぎのお世話メモ");
+  await expect(preview).toContainText("名前：むぎ");
+  await expect(preview).not.toContainText("2022年9月22日");
+  await expect(preview).not.toContainText("茶トラ");
+  const submit = page.getByTestId("cats-profile-share-submit");
+  await expect(submit).toHaveText("共有する");
+  await submit.click();
+
+  await expect
+    .poll(() => readProfileShareCalls(page))
+    .toHaveLength(1);
+  const [sharedPayload] = await readProfileShareCalls(page);
+  expect(sharedPayload.title).toBe("むぎのお世話メモ");
+  expect(sharedPayload.text).toMatch(
+    /^むぎのお世話メモ（お世話をお願いする）\n\n名前：むぎ/,
+  );
+  expect(sharedPayload.url).toBeUndefined();
+  await expect(shareDialogRoot).toHaveCount(0);
+  await page.evaluate(() => {
+    (
+      window as typeof window & { __cancelNextProfileShare?: boolean }
+    ).__cancelNextProfileShare = true;
+  });
+  await shareEntry
+    .getByRole("button", { name: "この子のことを伝える" })
+    .click();
+  await emergencyPurpose.click();
+  await expect(preview).toContainText(
+    "むぎのプロフィール（もしものために保存）",
+  );
+  await expect(preview).toContainText("2022年9月22日");
+  await expect(preview).toContainText("茶トラ");
+  await submit.click();
+
+  await expect
+    .poll(() => readProfileShareCalls(page))
+    .toHaveLength(2);
+  const cancelPayload = (await readProfileShareCalls(page))[1];
+  expect(cancelPayload.title).toBe("むぎのプロフィール");
+  expect(cancelPayload.text).toMatch(
+    /^むぎのプロフィール（もしものために保存）\n\n名前：むぎ/,
+  );
+  expect(cancelPayload.url).toBeUndefined();
+  await expect(shareDialogRoot).toHaveCount(0);
+  await expect(
+    page.getByText(/共有できませんでした|エラーが発生しました/),
+  ).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
 });
 
 test("quick personality edit preserves newer basic and care information", async ({
@@ -1650,6 +1874,9 @@ test("quick personality edit preserves newer basic and care information", async 
       birthDate: "2022-07-10",
       gender: "male",
       breed: "ミックス",
+      personality: {
+        callName: "むー",
+      },
       care: {
         weightKg: 4.8,
         vetClinic: "いつもの病院",
@@ -1664,7 +1891,7 @@ test("quick personality edit preserves newer basic and care information", async 
   const profileTab = page.getByTestId("cats-section-tab-basic");
   await expect(profileTab).toBeVisible();
   await profileTab.click();
-  await page.getByTestId("cats-profile-optional-question").click();
+  await page.getByTestId("cats-profile-growth-section").click();
 
   await page.evaluate(() => {
     const profiles = JSON.parse(
@@ -1784,7 +2011,7 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await basicDialog.getByRole("button", { name: "保存する" }).click();
   await expect(basicDialog).toBeHidden();
 
-  await page.getByRole("button", { name: "ケアのメモを編集" }).click();
+  await page.getByRole("button", { name: "暮らしのことを編集" }).click();
   const careDialog = page.getByRole("dialog", { name: "むぎのケアのメモ" });
   await expect(careDialog.getByLabel("毛柄")).toHaveCount(0);
   await careDialog.getByLabel("体重（kg）").fill("21");
@@ -1803,7 +2030,11 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await expect(page.getByText("ミックス")).toBeVisible();
   await expect(page.getByText("5.5 kg")).toBeVisible();
   await expect(page.getByText("2026年7月2日")).toBeVisible();
-  await expect(page.getByText("ワクチンを打った日")).toBeVisible();
+  await expect(
+    page
+      .getByTestId("cats-profile-life-section")
+      .getByText("ワクチン", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("2026年6月1日")).toBeVisible();
   await expect(page.getByText("3種混合")).toBeVisible();
   await expect(page.getByText("最後に測った日")).toHaveCount(0);
@@ -1862,7 +2093,7 @@ test("uses the JST date as the profile input limit at the start of a month", asy
   );
   await basicDialog.getByRole("button", { name: "キャンセル" }).click();
 
-  await page.getByRole("button", { name: "ケアのメモを編集" }).click();
+  await page.getByRole("button", { name: "暮らしのことを編集" }).click();
   const careDialog = page.getByRole("dialog", { name: "むぎのケアのメモ" });
   await expect(careDialog.getByLabel("はかった日")).toHaveAttribute(
     "max",
@@ -2752,6 +2983,28 @@ async function seedMultipleCatsProfile(page: Page, now: number) {
       );
     },
     { nowValue: now, src: photoDataUrl },
+  );
+}
+
+async function countTextOccurrences(locator: Locator, value: string) {
+  return locator.evaluate((element, expectedValue) => {
+    const text = element.textContent ?? "";
+    return text.split(expectedValue).length - 1;
+  }, value);
+}
+
+async function readProfileShareCalls(page: Page) {
+  return page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __profileShareCalls?: Array<{
+            title?: string;
+            text?: string;
+            url?: string;
+          }>;
+        }
+      ).__profileShareCalls ?? [],
   );
 }
 
