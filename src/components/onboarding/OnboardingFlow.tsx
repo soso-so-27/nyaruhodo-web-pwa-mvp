@@ -812,6 +812,7 @@ export function OnboardingFlow() {
     });
     trackProductEvent("onboarding_intro_view", {
       source,
+      flow_version: "onboarding_own_photo_first_v3",
     });
   }
 
@@ -824,6 +825,10 @@ export function OnboardingFlow() {
         : "onboarding_delivery_choice_selected",
       {
         source: getEffectiveEntrySource(),
+        flow_version:
+          state === "choice"
+            ? "onboarding_selection_first_v2"
+            : "onboarding_own_photo_first_v3",
         delivery_bundle_id: deliveryBundleId,
         photo_id: photo.id,
         selected_position: index + 1,
@@ -1142,6 +1147,7 @@ export function OnboardingFlow() {
     });
     trackProductEvent("onboarding_kuji_intro_view", {
       source: getEffectiveEntrySource(),
+      flow_version: "onboarding_own_photo_first_v3",
     });
   }
 
@@ -1512,6 +1518,9 @@ export function OnboardingFlow() {
         trackProductEvent("onboarding_photo_submitted", {
           catId,
           source: getEffectiveEntrySource(),
+          flow_version: isPreviewCommit
+            ? "onboarding_selection_first_v2"
+            : "onboarding_own_photo_first_v3",
           submission_id: submissionId,
           delivery_date_key: onboardingDateKey,
           file_acceptance: acceptedBy,
@@ -1843,6 +1852,7 @@ export function OnboardingFlow() {
       if (canonical?.state === "skipped") {
         trackProductEvent("onboarding_delivery_choice_skipped", {
           source: getEffectiveEntrySource(),
+          flow_version: "onboarding_own_photo_first_v3",
           delivery_bundle_id: deliveryBundleId,
           delivery_date_key: deliveryDateKey,
           candidate_count: deliveredPhotos.length,
@@ -1869,6 +1879,7 @@ export function OnboardingFlow() {
         deliveredPhotos.findIndex((photo) => photo.id === selectedPhoto.id) + 1;
       trackProductEvent("onboarding_delivery_choice_saved", {
         source: getEffectiveEntrySource(),
+        flow_version: "onboarding_own_photo_first_v3",
         delivery_bundle_id: deliveryBundleId,
         delivery_date_key: deliveryDateKey,
         photo_id: selectedPhoto.id,

@@ -41,6 +41,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test analytics reader pagination
+        run: npm run test:analytics-reader
+
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v2
         with:

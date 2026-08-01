@@ -131,6 +131,93 @@ test.describe("admin analytics logic", () => {
     });
   });
 
+  test("measures the current photo-first onboarding separately from the legacy preview", () => {
+    const photoFirstEvents = (
+      actorId: string,
+      startAt: number,
+      completion: "shown" | "selected" | "saved" | "skipped",
+    ) => {
+      const bundleId = `bundle-${actorId}`;
+      const events = [
+        event(actorId, "onboarding_intro_view", startAt),
+        event(actorId, "onboarding_kuji_intro_view", startAt + 1, {
+          metadata: { flow_version: "onboarding_own_photo_first_v3" },
+        }),
+        event(actorId, "onboarding_photo_submitted", startAt + 2, {
+          submissionId: `submission-${actorId}`,
+        }),
+        event(actorId, "onboarding_preview_shown", startAt + 3, {
+          submissionId: `submission-${actorId}`,
+          metadata: {
+            delivery_bundle_id: bundleId,
+            candidate_count: 4,
+            flow_version: "onboarding_own_photo_first_v3",
+          },
+        }),
+      ];
+
+      if (completion === "selected" || completion === "saved") {
+        events.push(
+          event(actorId, "onboarding_delivery_choice_selected", startAt + 4, {
+            metadata: {
+              delivery_bundle_id: bundleId,
+              candidate_count: 4,
+            },
+          }),
+        );
+      }
+      if (completion === "saved") {
+        events.push(
+          event(actorId, "onboarding_delivery_choice_saved", startAt + 5, {
+            metadata: {
+              delivery_bundle_id: bundleId,
+              candidate_count: 4,
+            },
+          }),
+        );
+      }
+      if (completion === "skipped") {
+        events.push(
+          event(actorId, "onboarding_delivery_choice_skipped", startAt + 4, {
+            metadata: {
+              delivery_bundle_id: bundleId,
+              candidate_count: 4,
+            },
+          }),
+        );
+      }
+
+      return events;
+    };
+    const events = [
+      event("saved", "onboarding_photo_submitted", -1, {
+        submissionId: "legacy-submission-saved",
+      }),
+      ...photoFirstEvents("saved", 0, "saved"),
+      ...photoFirstEvents("selected", 10, "selected"),
+      ...photoFirstEvents("shown", 20, "shown"),
+      ...photoFirstEvents("skipped", 30, "skipped"),
+      event("intro-only", "onboarding_intro_view", 40, {
+        metadata: { flow_version: "onboarding_own_photo_first_v3" },
+      }),
+    ];
+
+    const result = buildAdminAnalytics(events);
+
+    expect(result.photoFirstOnboarding.funnel.map((step) => step.users)).toEqual([
+      4, 4, 4, 2, 1,
+    ]);
+    expect(result.photoFirstOnboarding.funnel[1]).toMatchObject({
+      events: 4,
+      users: 4,
+    });
+    expect(result.photoFirstOnboarding.skipped).toMatchObject({
+      users: 1,
+      events: 1,
+    });
+    expect(result.previewOnboarding.funnel[3]).toMatchObject({ users: 0 });
+  });
+
   test("counts one saved photo once across related events", () => {
     const events = [
       event("actor-a", "onboarding_photo_submitted", 0, {
@@ -575,6 +662,39 @@ test.describe("admin analytics logic", () => {
     expect(issues.incidents.actionable).toHaveLength(1);
     expect(issues.incidents.actionable[0]).toMatchObject({
       eventName: "onboarding_delivery_failure",
+    });
+    expect(result.overview.find((item) => item.key === "needs_attention")).toMatchObject({
+      users: 1,
+      events: 1,
+    });
+  });
+
+  test("treats completed reentry as expected and an original retry as recovered", () => {
+    const events = [
+      event("completed-user", "onboarding_completed_reentry_blocked", 0),
+      event("recovered-original", "photo_original_preservation_failed", 1, {
+        errorCode: "storage_upload_failed",
+      }),
+      event("recovered-original", "photo_original_preserved", 1.25),
+      event("unresolved-original", "photo_original_preservation_failed", 2, {
+        errorCode: "storage_upload_failed",
+      }),
+    ];
+
+    const issues = classifyAnalyticsIssues(events);
+    const result = buildAdminAnalytics(events);
+
+    expect(issues.expected).toHaveLength(1);
+    expect(issues.expected[0]).toMatchObject({
+      event_name: "onboarding_completed_reentry_blocked",
+    });
+    expect(issues.incidents.recovered).toHaveLength(1);
+    expect(issues.incidents.recovered[0]).toMatchObject({
+      eventName: "photo_original_preservation_failed",
+    });
+    expect(issues.incidents.actionable).toHaveLength(1);
+    expect(issues.incidents.actionable[0]).toMatchObject({
+      eventName: "photo_original_preservation_failed",
     });
     expect(result.overview.find((item) => item.key === "needs_attention")).toMatchObject({
       users: 1,

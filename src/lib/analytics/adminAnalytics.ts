@@ -165,6 +165,40 @@ const PREVIEW_ONBOARDING_FUNNEL_STEPS: readonly EventDefinition[] = [
   },
 ];
 
+const PHOTO_FIRST_ONBOARDING_FUNNEL_STEPS: readonly EventDefinition[] = [
+  {
+    key: "photo_first_intro",
+    label: "ねこくじの説明を見た",
+    eventNames: ["onboarding_kuji_intro_view"],
+  },
+  {
+    key: "photo_first_photo_submitted",
+    label: "うちのこの写真を保存した",
+    eventNames: ["onboarding_photo_submitted"],
+  },
+  {
+    key: "photo_first_choices_shown",
+    label: "4匹を表示した",
+    eventNames: ["onboarding_preview_shown"],
+  },
+  {
+    key: "photo_first_choice_selected",
+    label: "気になる1匹を選んだ",
+    eventNames: ["onboarding_delivery_choice_selected"],
+  },
+  {
+    key: "photo_first_choice_saved",
+    label: "選んだ1匹をねこだよりにした",
+    eventNames: ["onboarding_delivery_choice_saved"],
+  },
+];
+
+const PHOTO_FIRST_ONBOARDING_SKIPPED_METRIC: EventDefinition = {
+  key: "photo_first_choice_skipped",
+  label: "選ばずに完了した",
+  eventNames: ["onboarding_delivery_choice_skipped"],
+};
+
 const PREVIEW_ONBOARDING_SKIPPED_METRIC: EventDefinition = {
   key: "preview_skipped",
   label: "プレビューを見送った",
@@ -372,6 +406,7 @@ export function buildAdminAnalytics(
     ],
     funnel: buildOrderedFunnel(events),
     newOnboardingFunnel: buildOrderedFunnel(events, LAUNCH_FUNNEL_STEPS),
+    photoFirstOnboarding: buildPhotoFirstOnboarding(events),
     previewOnboarding: buildPreviewOnboarding(events),
     returningFunnel: buildReturningFunnel(events),
     handoffFunnel: buildHandoffFunnel(events),
@@ -532,6 +567,10 @@ export function isInternalAnalyticsEvent(
 }
 
 function isExpectedOperationalEvent(event: AdminAnalyticsEvent) {
+  if (event.event_name === "onboarding_completed_reentry_blocked") {
+    return true;
+  }
+
   if (
     event.event_name === "app_error" &&
     event.error_message
@@ -771,6 +810,10 @@ function getRecoveryEventNames(eventName: string) {
     ];
   }
 
+  if (eventName === "photo_original_preservation_failed") {
+    return ["photo_original_preserved"];
+  }
+
   if (eventName === "evening_delivery_reservation_failed") {
     return ["evening_delivery_reserved"];
   }
@@ -868,6 +911,48 @@ function buildOrderedFunnel(
         startUsers > 0 ? Math.round((users / startUsers) * 1000) / 10 : null,
     };
   });
+}
+
+function buildPhotoFirstOnboarding(events: AdminAnalyticsEvent[]) {
+  const startedAtByActor = new Map<string, number>();
+
+  for (const event of events) {
+    if (event.event_name !== "onboarding_kuji_intro_view") {
+      continue;
+    }
+
+    const actorId = getActorId(event);
+    if (!actorId) {
+      continue;
+    }
+
+    const occurredAt = readEventTime(event);
+    const currentStartedAt = startedAtByActor.get(actorId);
+    if (currentStartedAt === undefined || occurredAt < currentStartedAt) {
+      startedAtByActor.set(actorId, occurredAt);
+    }
+  }
+
+  const photoFirstEvents = events.filter((event) => {
+    const actorId = getActorId(event);
+    if (!actorId) {
+      return false;
+    }
+
+    const startedAt = startedAtByActor.get(actorId);
+    return startedAt !== undefined && readEventTime(event) >= startedAt;
+  });
+
+  return {
+    funnel: buildOrderedFunnel(
+      photoFirstEvents,
+      PHOTO_FIRST_ONBOARDING_FUNNEL_STEPS,
+    ),
+    skipped: buildMetric(
+      photoFirstEvents,
+      PHOTO_FIRST_ONBOARDING_SKIPPED_METRIC,
+    ),
+  };
 }
 
 function buildPreviewOnboarding(events: AdminAnalyticsEvent[]) {

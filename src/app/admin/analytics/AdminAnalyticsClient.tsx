@@ -50,6 +50,11 @@ type PreviewOnboardingAnalytics = {
   };
 };
 
+type PhotoFirstOnboardingAnalytics = {
+  funnel: FunnelStep[];
+  skipped: Metric;
+};
+
 type AnalyticsResponse = {
   period: AnalyticsPeriodKey;
   audience: AnalyticsAudience;
@@ -60,6 +65,7 @@ type AnalyticsResponse = {
   overview: Metric[];
   funnel: FunnelStep[];
   newOnboardingFunnel: FunnelStep[];
+  photoFirstOnboarding?: PhotoFirstOnboardingAnalytics;
   previewOnboarding?: PreviewOnboardingAnalytics;
   returningFunnel: FunnelStep[];
   handoffFunnel: FunnelStep[];
@@ -419,6 +425,30 @@ export default function AdminAnalyticsClient() {
             <FunnelTable steps={data.newOnboardingFunnel ?? data.funnel} />
           </section>
 
+          {data.photoFirstOnboarding ? (
+            <section
+              style={styles.section}
+              aria-labelledby="photo-first-onboarding-title"
+            >
+              <SectionHeading
+                id="photo-first-onboarding-title"
+                title="現行ねこくじオンボ"
+                note="ねこくじの説明から、自分の写真保存、4匹の表示・選択・確定まで進んだ記録"
+              />
+              <FunnelTable steps={data.photoFirstOnboarding.funnel} />
+              <AnalyticsTable
+                columns={["結果", "識別ID", "イベント"]}
+                rows={[
+                  [
+                    data.photoFirstOnboarding.skipped.label,
+                    `${data.photoFirstOnboarding.skipped.users} ID`,
+                    `${data.photoFirstOnboarding.skipped.events} イベント`,
+                  ],
+                ]}
+              />
+            </section>
+          ) : null}
+
           {data.previewOnboarding ? (
             <section
               style={styles.section}
@@ -426,7 +456,7 @@ export default function AdminAnalyticsClient() {
             >
               <SectionHeading
                 id="preview-onboarding-title"
-                title="選択先行オンボ"
+                title="旧・選択先行オンボ"
                 note="先に1匹を選んだ人が、自分の写真保存と選択確定まで進んだか"
               />
               <FunnelTable steps={data.previewOnboarding.funnel} />
@@ -901,6 +931,7 @@ function buildCodexAnalyticsExport(data: AnalyticsResponse) {
     overview: data.overview,
     funnel: data.funnel,
     newOnboardingFunnel: data.newOnboardingFunnel,
+    photoFirstOnboarding: data.photoFirstOnboarding,
     previewOnboarding: data.previewOnboarding,
     returningFunnel: data.returningFunnel,
     handoffFunnel: data.handoffFunnel,

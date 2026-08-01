@@ -4,6 +4,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test:analytics-reader": "node --test tests/scripts/read-analytics-event-pages.test.mjs",
     "e2e": "playwright test",
     "e2e:full": "node scripts/run-e2e-full.mjs",
     "e2e:cross-browser": "playwright test -c playwright.cross-browser.config.ts",

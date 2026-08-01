@@ -36,9 +36,19 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
   );
   await expect(page.getByRole("heading", { name: "新規オンボ" })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "選択先行オンボ" }),
+    page.getByRole("heading", { name: "現行ねこくじオンボ" }),
   ).toBeVisible();
-  const previewOnboardingSection = page.getByLabel("選択先行オンボ");
+  const photoFirstOnboardingSection = page.getByLabel("現行ねこくじオンボ");
+  await expect(
+    photoFirstOnboardingSection.getByText("選んだ1匹をねこだよりにした"),
+  ).toBeVisible();
+  await expect(
+    photoFirstOnboardingSection.getByText("選ばずに完了した"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "旧・選択先行オンボ" }),
+  ).toBeVisible();
+  const previewOnboardingSection = page.getByLabel("旧・選択先行オンボ");
   await expect(
     previewOnboardingSection.getByText("気になる1匹を選んだ"),
   ).toBeVisible();
@@ -121,6 +131,15 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
         selectedToPhotoSubmittedRate: 66.7,
         selectedToCommittedRate: 33.3,
       },
+    },
+    photoFirstOnboarding: {
+      funnel: expect.arrayContaining([
+        expect.objectContaining({
+          key: "photo_first_choice_saved",
+          users: 2,
+        }),
+      ]),
+      skipped: expect.objectContaining({ users: 1 }),
     },
     journeyCases: [
       expect.objectContaining({
@@ -249,6 +268,45 @@ const mockAnalyticsResponse = {
       fromStartRate: 90,
     },
   ],
+  photoFirstOnboarding: {
+    funnel: [
+      {
+        ...metric("photo_first_intro", "ねこくじの説明を見た", 5),
+        previousUsers: null,
+        fromPreviousRate: null,
+        fromStartRate: 100,
+      },
+      {
+        ...metric("photo_first_photo_submitted", "うちのこの写真を保存した", 4),
+        previousUsers: 5,
+        fromPreviousRate: 80,
+        fromStartRate: 80,
+      },
+      {
+        ...metric("photo_first_choices_shown", "4匹を表示した", 4),
+        previousUsers: 4,
+        fromPreviousRate: 100,
+        fromStartRate: 80,
+      },
+      {
+        ...metric("photo_first_choice_selected", "気になる1匹を選んだ", 3),
+        previousUsers: 4,
+        fromPreviousRate: 75,
+        fromStartRate: 60,
+      },
+      {
+        ...metric(
+          "photo_first_choice_saved",
+          "選んだ1匹をねこだよりにした",
+          2,
+        ),
+        previousUsers: 3,
+        fromPreviousRate: 66.7,
+        fromStartRate: 40,
+      },
+    ],
+    skipped: metric("photo_first_choice_skipped", "選ばずに完了した", 1),
+  },
   previewOnboarding: {
     funnel: [
       {

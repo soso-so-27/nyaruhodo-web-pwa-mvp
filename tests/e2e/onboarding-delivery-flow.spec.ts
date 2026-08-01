@@ -253,6 +253,13 @@ test.describe("onboarding delivery flow", () => {
     page,
   }) => {
     test.slow();
+    await page.route("**/rest/v1/product_analytics_events*", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 500,
+        body: JSON.stringify({ error: "keep analytics queued for assertions" }),
+      });
+    });
     const originalQueueWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.text().includes("[photo-originals]")) {

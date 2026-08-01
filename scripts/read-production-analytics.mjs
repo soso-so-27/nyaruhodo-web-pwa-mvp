@@ -13,8 +13,12 @@ import {
   readAnalyticsAudience,
   readAnalyticsPeriod,
 } from "../src/lib/analytics/adminAnalytics.ts";
+import {
+  readAnalyticsEventPages,
+  SUPABASE_REST_PAGE_SIZE,
+} from "./lib/read-analytics-event-pages.mjs";
 
-const EVENT_QUERY_LIMIT = 5000;
+const EVENT_QUERY_LIMIT = 20000;
 const DIAGNOSTIC_EVENT_NAMES = [
   "image_load_completed",
   "photo_sw_cache_configured",
@@ -91,7 +95,10 @@ const internalAnonymousIds = await readInternalAnonymousIds(
   supabase,
   adminUser.id,
 );
-const readableEvents = await readEvents(supabase, range);
+const {
+  events: readableEvents,
+  limitReached: eventLimitReached,
+} = await readEvents(supabase, range);
 const internalEvents = readableEvents.filter((event) =>
   isInternalAnalyticsEvent(event, {
     adminUserId: adminUser.id,
@@ -115,7 +122,7 @@ const analytics = {
     to: range.to.toISOString(),
   },
   totalEvents: events.length,
-  eventLimitReached: readableEvents.length >= EVENT_QUERY_LIMIT,
+  eventLimitReached,
   diagnosticEventsExcluded: true,
   audienceCounts: {
     productEvents: productEvents.length,
@@ -199,22 +206,30 @@ async function readInternalAnonymousIds(client, adminUserId) {
 
 async function readEvents(client, range) {
   const diagnosticFilter = `(${DIAGNOSTIC_EVENT_NAMES.map((name) => `"${name}"`).join(",")})`;
-  const { data, error } = await client
-    .from("app_events")
-    .select(
-      "event_name, source, anonymous_id, user_id, session_id, submission_id, route, surface, is_in_app_browser, is_standalone_pwa, error_code, error_message, metadata, created_at",
-    )
-    .gte("created_at", range.from.toISOString())
-    .lt("created_at", range.to.toISOString())
-    .not("event_name", "in", diagnosticFilter)
-    .order("created_at", { ascending: false })
-    .limit(EVENT_QUERY_LIMIT);
+  const { data, error } = await readAnalyticsEventPages({
+    limit: EVENT_QUERY_LIMIT,
+    pageSize: SUPABASE_REST_PAGE_SIZE,
+    fetchPage: ({ from, to }) =>
+      client
+        .from("app_events")
+        .select(
+          "event_name, source, anonymous_id, user_id, session_id, submission_id, route, surface, is_in_app_browser, is_standalone_pwa, error_code, error_message, metadata, created_at",
+        )
+        .gte("created_at", range.from.toISOString())
+        .lt("created_at", range.to.toISOString())
+        .not("event_name", "in", diagnosticFilter)
+        .order("created_at", { ascending: false })
+        .range(from, to),
+  });
 
   if (error) {
     fail(`analytics query failed: ${error.code ?? "unknown"}`);
   }
 
-  return (data ?? []).filter((event) => Boolean(event.event_name));
+  return {
+    events: (data ?? []).filter((event) => Boolean(event.event_name)),
+    limitReached: (data ?? []).length >= EVENT_QUERY_LIMIT,
+  };
 }
 
 function toSafeEvent(event) {
