@@ -168,6 +168,8 @@ const CATS_TEXT = "var(--ink)";
 const CATS_TEXT_STRONG = "var(--ink)";
 const CATS_MUTED = "var(--ink-soft)";
 const CATS_FAINT = "var(--ink-faint)";
+const CATS_PROFILE_META =
+  "color-mix(in srgb, var(--ink) 72%, var(--ink-soft))";
 const CATS_PAPER = "var(--paper)";
 const CATS_UI = "var(--font-ui)";
 const CATS_SERIF = CATS_UI;
@@ -265,6 +267,7 @@ export function CatsPage() {
   const isCatGalleryRestoreCheckRunningRef = useRef(false);
   const catGalleryThumbnailBackfillAttemptedRef = useRef(new Set<string>());
   const tabContentScrollerRef = useRef<HTMLDivElement | null>(null);
+  const [isTabContentScrolled, setIsTabContentScrolled] = useState(false);
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
   const [activeSection, setActiveSection] = useState<UchinokoSection>("photos");
   const [clientNow, setClientNow] = useState(() => getClientNow());
@@ -463,6 +466,7 @@ export function CatsPage() {
   const activeCoverCrop = normalizeCoverCrop(activeCatProfile?.coverCrop);
   useEffect(() => {
     tabContentScrollerRef.current?.scrollTo({ top: 0, left: 0 });
+    setIsTabContentScrolled(false);
   }, [activeCatId, activeLens, activeSection]);
   const allLensPhotos = useMemo(
     () =>
@@ -1882,11 +1886,43 @@ export function CatsPage() {
           >
             {!isFocusedProfileSetup ? (
               <>
-                <header style={styles.profileIdentity}>
+                <header
+                  data-profile-header-state={
+                    isTabContentScrolled ? "compact" : "full"
+                  }
+                  style={
+                    isTabContentScrolled
+                      ? {
+                          ...styles.profileIdentity,
+                          ...styles.profileIdentityScrolled,
+                        }
+                      : styles.profileIdentity
+                  }
+                >
                   <div style={styles.profileIdentityText}>
-                    <p style={styles.profileIdentityKicker}>うちのこ</p>
+                    <p
+                      style={
+                        isTabContentScrolled
+                          ? {
+                              ...styles.profileIdentityKicker,
+                              ...styles.profileIdentityKickerHidden,
+                            }
+                          : styles.profileIdentityKicker
+                      }
+                    >
+                      うちのこ
+                    </p>
                     {shouldShowCatScopePicker ? (
-                      <h1 style={styles.profileIdentityName}>
+                      <h1
+                        style={
+                          isTabContentScrolled
+                            ? {
+                                ...styles.profileIdentityName,
+                                ...styles.profileIdentityNameScrolled,
+                              }
+                            : styles.profileIdentityName
+                        }
+                      >
                         <button
                           type="button"
                           data-testid="cats-scope-picker-button"
@@ -1913,7 +1949,14 @@ export function CatsPage() {
                     ) : (
                       <h1
                         data-testid="cats-active-cat-name"
-                        style={styles.profileIdentityName}
+                        style={
+                          isTabContentScrolled
+                            ? {
+                                ...styles.profileIdentityName,
+                                ...styles.profileIdentityNameScrolled,
+                              }
+                            : styles.profileIdentityName
+                        }
                       >
                         {headerCatScopeName}
                       </h1>
@@ -2064,37 +2107,47 @@ export function CatsPage() {
             ref={tabContentScrollerRef}
             data-testid="cats-tab-scroll"
             style={styles.tabContentScroller}
+            onScroll={(event) => {
+              setIsTabContentScrolled(event.currentTarget.scrollTop > 20);
+            }}
           >
             {activeCatProfile &&
             !isOnboardingCompletionView &&
             activeSection === "basic" ? (
-              <AppCard
-                as="section"
-                variant="section"
-                padding="md"
-                style={styles.basicInfoPanel}
-              >
-                <CatBasicProfilePanel
-                  profile={activeCatProfile}
-                  photo={activeCoverPhoto}
-                  familyDuration={familyDuration}
-                  now={clientNow}
-                  onEditBasic={() =>
-                    openCatManageEditor("basic", "basic")
-                  }
-                  onEditPersonality={() =>
-                    openCatManageEditor("basic", "personality")
-                  }
-                  onEditCare={() => openCatManageEditor("basic", "care")}
-                  onAnswerFavoritePlace={() =>
-                    openCatManageEditor(
-                      "basic",
-                      "personality",
-                      "favoritePlace",
-                    )
-                  }
-                />
-                <div style={styles.profileSettings}>
+              <>
+                <AppCard
+                  as="section"
+                  variant="section"
+                  padding="md"
+                  style={styles.basicInfoPanel}
+                >
+                  <CatBasicProfilePanel
+                    profile={activeCatProfile}
+                    photo={activeCoverPhoto}
+                    familyDuration={familyDuration}
+                    now={clientNow}
+                    onEditBasic={() =>
+                      openCatManageEditor("basic", "basic")
+                    }
+                    onEditPersonality={() =>
+                      openCatManageEditor("basic", "personality")
+                    }
+                    onEditCare={() => openCatManageEditor("basic", "care")}
+                    onAnswerFavoritePlace={() =>
+                      openCatManageEditor(
+                        "basic",
+                        "personality",
+                        "favoritePlace",
+                      )
+                    }
+                  />
+                </AppCard>
+                <section
+                  data-testid="cats-profile-management"
+                  style={styles.profileSettings}
+                  aria-label="猫の管理"
+                >
+                  <p style={styles.profileSettingsHeading}>管理</p>
                   <button
                     type="button"
                     style={styles.profileSettingsRow}
@@ -2119,8 +2172,8 @@ export function CatsPage() {
                     </span>
                     <ChevronRightSmallIcon />
                   </button>
-                </div>
-              </AppCard>
+                </section>
+              </>
             ) : null}
 
             {activeCatProfile &&
@@ -2279,10 +2332,17 @@ export function CatsPage() {
         ) : null}
       </div>
       {!isFocusedProfileSetup && !isOnboardingCompletionView ? (
-        <BottomNavigation
-          active="cats"
-          onActiveItemClick={() => setActiveSection("photos")}
-        />
+        <>
+          <div
+            data-testid="cats-bottom-nav-readability-veil"
+            style={styles.bottomNavReadabilityVeil}
+            aria-hidden="true"
+          />
+          <BottomNavigation
+            active="cats"
+            onActiveItemClick={() => setActiveSection("photos")}
+          />
+        </>
       ) : null}
       {isCatScopePickerOpen && activeCatProfile ? (
         <CatScopePickerSheet
@@ -3660,12 +3720,14 @@ function BasicInfoTable({
         <BasicInfoSubsection
           title="基本情報"
           rows={basicRows}
+          layout="facts"
           testId="cats-profile-basic-section"
         />
       ) : null}
       <BasicInfoSubsection
         title="ケアのメモ"
         rows={careRows}
+        layout="care"
         onEdit={onEditCare}
         emptyActionLabel="追加"
         testId="cats-profile-care-section"
@@ -3737,6 +3799,7 @@ function ProfilePersonalitySection({
           {visibleRows.map((row, index) => (
             <div
               key={row.label}
+              data-testid="cats-profile-personality-row"
               style={
                 index === 0
                   ? {
@@ -3746,7 +3809,7 @@ function ProfilePersonalitySection({
                   : styles.profilePersonalityRow
               }
             >
-              <span style={styles.basicInfoLabel}>{row.label}</span>
+              <span style={styles.profilePersonalityLabel}>{row.label}</span>
               <span style={styles.profilePersonalityValue}>{row.value}</span>
             </div>
           ))}
@@ -3778,12 +3841,14 @@ function ProfilePersonalitySection({
 function BasicInfoSubsection({
   title,
   rows,
+  layout = "facts",
   onEdit,
   emptyActionLabel = "編集",
   testId,
 }: {
   title: string;
   rows: BasicInfoDisplayRow[];
+  layout?: "facts" | "care";
   onEdit?: () => void;
   emptyActionLabel?: string;
   testId?: string;
@@ -3795,7 +3860,22 @@ function BasicInfoSubsection({
   }
 
   return (
-    <section data-testid={testId} style={styles.basicInfoSubsection}>
+    <section
+      data-testid={testId}
+      data-profile-layout={layout}
+      style={
+        layout === "care"
+          ? {
+              ...styles.basicInfoSubsection,
+              ...styles.profileInfoSurface,
+              ...styles.profileCareSurface,
+            }
+          : {
+              ...styles.basicInfoSubsection,
+              ...styles.profileInfoSurface,
+            }
+      }
+    >
       <div style={styles.basicInfoSubsectionHeading}>
         <p style={styles.basicInfoSubsectionTitle}>{title}</p>
         {onEdit ? (
@@ -3814,14 +3894,31 @@ function BasicInfoSubsection({
           {visibleRows.map((row, index) => (
             <div
               key={row.label}
+              data-testid={`cats-profile-${layout}-row`}
               style={
-                index === 0
-                  ? { ...styles.basicInfoRow, ...styles.basicInfoRowFirst }
-                  : styles.basicInfoRow
+                layout === "care"
+                  ? index === 0
+                    ? {
+                        ...styles.basicInfoCareRow,
+                        ...styles.basicInfoRowFirst,
+                      }
+                    : styles.basicInfoCareRow
+                  : index === 0
+                    ? { ...styles.basicInfoRow, ...styles.basicInfoRowFirst }
+                    : styles.basicInfoRow
               }
             >
               <span style={styles.basicInfoLabel}>{row.label}</span>
-              <span style={styles.basicInfoValueStack}>
+              <span
+                style={
+                  layout === "care"
+                    ? {
+                        ...styles.basicInfoValueStack,
+                        ...styles.basicInfoCareValueStack,
+                      }
+                    : styles.basicInfoValueStack
+                }
+              >
                 <span
                   style={
                     row.valueTone === "numeric"
@@ -5448,7 +5545,7 @@ function formatCareWeight(weightKg?: number) {
 function formatCareWeightMeasuredNote(measuredDate?: string) {
   const measuredDateCopy = formatBasicInfoDate(measuredDate);
 
-  return measuredDateCopy;
+  return measuredDateCopy ? `${measuredDateCopy}に測定` : "";
 }
 
 function formatEditableWeight(weightKg?: number) {
@@ -7086,6 +7183,18 @@ const styles = {
     background:
       "linear-gradient(to bottom, color-mix(in srgb, var(--paper) 4%, transparent) 0%, transparent 52%, color-mix(in srgb, var(--ink-soft) 3%, transparent) 100%)",
   },
+  bottomNavReadabilityVeil: {
+    position: "fixed" as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 19,
+    height:
+      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 40px)",
+    pointerEvents: "none" as const,
+    background:
+      "linear-gradient(to bottom, transparent 0%, color-mix(in srgb, var(--paper-warm) 74%, transparent) 42%, color-mix(in srgb, var(--paper) 94%, transparent) 100%)",
+  },
   container: {
     position: "relative",
     zIndex: 2,
@@ -7213,6 +7322,12 @@ const styles = {
     gap: "12px",
     minHeight: "48px",
     margin: "0 0 10px",
+    transition:
+      "min-height var(--dur-press-out) var(--ease-gentle), margin var(--dur-press-out) var(--ease-gentle)",
+  },
+  profileIdentityScrolled: {
+    minHeight: "44px",
+    margin: "0 0 4px",
   },
   profileIdentityText: {
     minWidth: 0,
@@ -7221,12 +7336,15 @@ const styles = {
   },
   profileIdentityKicker: {
     margin: 0,
-    color: CATS_MUTED,
+    color: CATS_PROFILE_META,
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 400,
     lineHeight: 1.35,
     letterSpacing: CATS_META_TRACKING,
+  },
+  profileIdentityKickerHidden: {
+    display: "none",
   },
   profileIdentityName: {
     minWidth: 0,
@@ -7240,6 +7358,10 @@ const styles = {
     letterSpacing: CATS_TITLE_TRACKING,
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  profileIdentityNameScrolled: {
+    fontSize: "20px",
+    lineHeight: 1.25,
   },
   profileIdentitySelectorButton: {
     maxWidth: "100%",
@@ -7305,7 +7427,7 @@ const styles = {
     gap: 0,
     boxSizing: "border-box",
     minHeight: "48px",
-    margin: "0 0 14px",
+    margin: "0 0 10px",
     padding: 0,
     borderRadius: 0,
     border: "none",
@@ -8372,14 +8494,14 @@ const styles = {
   },
   basicInfoBlock: {
     display: "grid",
-    gap: "30px",
+    gap: "24px",
   },
   basicProfilePanel: {
     display: "grid",
-    gap: "30px",
+    gap: "24px",
   },
   basicInfoPanel: {
-    marginBottom: "22px",
+    marginBottom: 0,
     background: "transparent",
     boxShadow: "none",
     backdropFilter: "none",
@@ -8506,8 +8628,17 @@ const styles = {
   },
   profileSettings: {
     display: "grid",
-    marginTop: "22px",
-    borderTop: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
+    gap: "8px",
+    margin: "24px 16px 22px",
+  },
+  profileSettingsHeading: {
+    margin: "0 4px",
+    color: CATS_PROFILE_META,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.06em",
   },
   profileSettingsRow: {
     width: "100%",
@@ -8516,11 +8647,10 @@ const styles = {
     gridTemplateColumns: "40px minmax(0, 1fr) auto",
     alignItems: "center",
     gap: "12px",
-    padding: "11px 0",
-    border: "none",
-    borderBottom:
-      "1px solid color-mix(in srgb, var(--line) 42%, transparent)",
-    background: "transparent",
+    padding: "11px 12px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
+    borderRadius: "18px",
+    background: "color-mix(in srgb, var(--paper-card) 42%, transparent)",
     color: CATS_MUTED,
     textAlign: "left" as const,
     cursor: "pointer",
@@ -8561,13 +8691,24 @@ const styles = {
     gap: "10px",
     minWidth: 0,
   },
+  profileInfoSurface: {
+    padding: "16px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 48%, transparent)",
+    borderRadius: "20px",
+    background: "color-mix(in srgb, var(--paper-card) 38%, transparent)",
+  },
+  profileCareSurface: {
+    background: "color-mix(in srgb, var(--paper-warm) 44%, transparent)",
+  },
   profilePersonalitySection: {
     display: "grid",
     gap: "10px",
     minWidth: 0,
-    padding: "2px 0 2px 14px",
+    padding: "16px 16px 10px 18px",
+    borderRadius: "0 20px 20px 0",
     borderLeft:
-      "2px solid color-mix(in srgb, var(--seal) 30%, var(--line))",
+      "2px solid color-mix(in srgb, var(--seal) 48%, var(--line))",
+    background: "color-mix(in srgb, var(--paper-card) 42%, transparent)",
   },
   basicInfoSubsectionHeading: {
     display: "flex",
@@ -8578,9 +8719,9 @@ const styles = {
   },
   basicInfoSubsectionTitle: {
     margin: 0,
-    color: CATS_TEXT,
+    color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
-    fontSize: "15px",
+    fontSize: "16px",
     fontWeight: 500,
     lineHeight: 1.45,
     letterSpacing: CATS_BODY_TRACKING,
@@ -8589,7 +8730,7 @@ const styles = {
     margin: 0,
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
-    fontSize: "17px",
+    fontSize: "18px",
     fontWeight: 500,
     lineHeight: 1.45,
     letterSpacing: CATS_TITLE_TRACKING,
@@ -8623,6 +8764,13 @@ const styles = {
     padding: "13px 2px",
     borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
   },
+  basicInfoCareRow: {
+    display: "grid",
+    gap: "5px",
+    minWidth: 0,
+    padding: "13px 2px",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
+  },
   basicInfoRowFirst: {
     borderTop: "none",
   },
@@ -8630,13 +8778,13 @@ const styles = {
     display: "inline-flex",
     alignItems: "baseline",
     gap: "7px",
-    color: CATS_FAINT,
+    color: CATS_PROFILE_META,
     fontFamily: CATS_UI,
     fontSize: CATS_TINY_SIZE,
     fontWeight: 500,
     lineHeight: 1.55,
     letterSpacing: "0.04em",
-    overflowWrap: "anywhere",
+    overflowWrap: "break-word",
   },
   basicInfoValueStack: {
     display: "flex",
@@ -8646,6 +8794,10 @@ const styles = {
     gap: "4px 9px",
     minWidth: 0,
     textAlign: "right",
+  },
+  basicInfoCareValueStack: {
+    justifyContent: "flex-start",
+    textAlign: "left" as const,
   },
   basicInfoValue: {
     minWidth: 0,
@@ -8665,7 +8817,7 @@ const styles = {
     letterSpacing: CATS_BODY_TRACKING,
   },
   basicInfoValueNote: {
-    color: CATS_FAINT,
+    color: CATS_PROFILE_META,
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 400,
@@ -8700,27 +8852,35 @@ const styles = {
   profilePersonalityTable: {
     display: "grid",
     gap: 0,
-    borderTop: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
+  },
+  profilePersonalityLabel: {
+    color: CATS_PROFILE_META,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.5,
+    letterSpacing: "0.05em",
   },
   profilePersonalityValue: {
     minWidth: 0,
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
-    fontSize: "16px",
+    fontSize: "17px",
     fontWeight: 400,
     lineHeight: 1.7,
     letterSpacing: CATS_BODY_TRACKING,
     whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
+    overflowWrap: "break-word",
+    wordBreak: "normal" as const,
+    lineBreak: "strict" as const,
+    textWrap: "pretty" as const,
   },
   profilePersonalityRow: {
     display: "grid",
-    gridTemplateColumns: "minmax(92px, 40%) minmax(0, 1fr)",
-    alignItems: "baseline",
-    columnGap: "12px",
-    rowGap: "5px",
+    alignItems: "start",
+    gap: "4px",
     minWidth: 0,
-    padding: "13px 2px",
+    padding: "14px 2px",
     borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
   },
   profilePersonalityRowFirst: {
@@ -8757,7 +8917,7 @@ const styles = {
     letterSpacing: CATS_BODY_TRACKING,
   },
   profileOptionalQuestionHint: {
-    color: CATS_FAINT,
+    color: CATS_PROFILE_META,
     fontFamily: CATS_UI,
     fontSize: CATS_TINY_SIZE,
     fontWeight: 400,

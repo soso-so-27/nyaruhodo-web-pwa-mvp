@@ -1299,8 +1299,9 @@ test("shows every populated profile group without hiding saved information", asy
   });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-basic").click();
+  const profileTab = page.getByTestId("cats-section-tab-basic");
+  await expect(profileTab).toBeVisible();
+  await profileTab.click();
 
   const summary = page.getByTestId("cats-profile-summary-card");
   await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
@@ -1337,7 +1338,7 @@ test("shows every populated profile group without hiding saved information", asy
   );
   await expect(
     personalitySection.getByText("この子らしさ", { exact: true }),
-  ).toHaveCSS("font-size", "17px");
+  ).toHaveCSS("font-size", "18px");
   await expect(personalitySection).toHaveCSS("border-left-width", "2px");
   await expect(page.getByText("たいせつな日", { exact: true })).toHaveCount(0);
   await expect(page.getByText("見た目", { exact: true })).toHaveCount(0);
@@ -1388,6 +1389,202 @@ test("shows every populated profile group without hiding saved information", asy
     });
 });
 
+test("stacks populated personality details without squeezing or fading their labels", async ({
+  page,
+}) => {
+  const favoritePlay = "鳥の羽がついたオモチャを追いかけること";
+  const favoriteTouch = "全身をウラオモテくまなくなでてもらうこと";
+  await page.clock.setFixedTime(new Date("2026-07-25T12:00:00+09:00"));
+  await seedCatsBasicProfile(page, {
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+      birthDate: "2022-07-10",
+      gender: "male",
+      breed: "ミックス",
+      personality: {
+        callName: "むー",
+        favoritePlace: "わたしのとなり",
+        favoritePlay,
+        favoriteTouch,
+        dislikes: "雨の日の大きな音",
+      },
+      care: {
+        weightKg: 5.5,
+        weightMeasuredDate: "2026-07-02",
+        careNote: "鼻がつまっていないか毎日見る",
+        vaccineDate: "2025-11-08",
+        vaccineNote: "3種混合",
+      },
+    },
+    appearance: {
+      coat: "orange_tabby",
+    },
+  });
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/cats");
+  const profileTab = page.getByTestId("cats-section-tab-basic");
+  await expect(profileTab).toBeVisible();
+  await profileTab.click();
+
+  const profile = page.getByTestId("cats-profile-panel");
+  const personalityCard = page.getByTestId("cats-profile-personality-card");
+
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+
+    const rowLayouts = await personalityCard
+      .locator(":scope > div")
+      .evaluateAll((rows) =>
+        rows.map((row) => {
+          const [label, value] = Array.from(row.children) as HTMLElement[];
+          const rowRect = row.getBoundingClientRect();
+          const labelRect = label.getBoundingClientRect();
+          const valueRect = value.getBoundingClientRect();
+
+          return {
+            labelAboveValue: valueRect.top >= labelRect.bottom - 1,
+            valueInsideRow:
+              valueRect.left >= rowRect.left - 1 &&
+              valueRect.right <= rowRect.right + 1,
+            noHorizontalOverflow: row.scrollWidth <= row.clientWidth + 1,
+          };
+        }),
+      );
+
+    expect(rowLayouts.length).toBe(5);
+    expect(
+      rowLayouts.every(
+        (layout) =>
+          layout.labelAboveValue &&
+          layout.valueInsideRow &&
+          layout.noHorizontalOverflow,
+      ),
+    ).toBe(true);
+    await expect
+      .poll(() =>
+        profile.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth + 1,
+        ),
+      )
+      .toBe(true);
+  }
+
+  await expect(page.getByText(favoritePlay, { exact: true })).toBeVisible();
+  await expect(page.getByText(favoriteTouch, { exact: true })).toBeVisible();
+  await expect(page.getByText("2022年9月22日", { exact: true })).toBeVisible();
+  await expect(page.getByText("5.5 kg", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("鼻がつまっていないか毎日見る", { exact: true }),
+  ).toBeVisible();
+
+  for (const labelText of ["好きな遊び", "家族になった日", "体重"]) {
+    const colors = await page
+      .getByText(labelText, { exact: true })
+      .first()
+      .evaluate((label) => {
+        const faintProbe = document.createElement("span");
+        faintProbe.style.color = "var(--ink-faint)";
+        document.body.append(faintProbe);
+        const faint = getComputedStyle(faintProbe).color;
+        faintProbe.remove();
+
+        return {
+          actual: getComputedStyle(label).color,
+          faint,
+        };
+      });
+
+    expect(colors.actual).not.toBe(colors.faint);
+  }
+
+  await page.screenshot({
+    path: "artifacts/cats-profile-redesign/iphone-390x844.png",
+    animations: "disabled",
+    caret: "hide",
+    style: "nextjs-portal { display: none !important; }",
+  });
+
+  for (const editor of [
+    { button: "基本情報を編集", dialog: "むぎの基本情報" },
+    { button: "この子らしさを編集", dialog: "むぎらしさ" },
+    { button: "ケアのメモを編集", dialog: "むぎのケアのメモ" },
+  ]) {
+    const trigger = page.getByRole("button", { name: editor.button });
+    await trigger.scrollIntoViewIfNeeded();
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: editor.dialog });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "キャンセル" }).click();
+    await expect(dialog).toBeHidden();
+  }
+});
+
+test("scrolls the final cat management action above the fixed navigation safe area", async ({
+  page,
+}) => {
+  await seedCatsBasicProfile(page, {
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+      birthDate: "2022-07-10",
+      gender: "male",
+      breed: "ミックス",
+      personality: {
+        callName: "むー",
+        favoritePlace: "わたしのとなり",
+        favoritePlay: "鳥の羽がついたオモチャ",
+        favoriteTouch: "全身をウラオモテくまなく",
+        dislikes: "雨の日の大きな音",
+      },
+      care: {
+        weightKg: 5.5,
+        weightMeasuredDate: "2026-07-02",
+        careNote: "鼻がつまっていないか毎日見る",
+        vaccineDate: "2025-11-08",
+        vaccineNote: "3種混合",
+      },
+    },
+    appearance: {
+      coat: "orange_tabby",
+    },
+  });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setSafeAreaInsetsOverride", {
+    insets: { top: 47, right: 0, bottom: 34, left: 0 },
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  const profileTab = page.getByTestId("cats-section-tab-basic");
+  await expect(profileTab).toBeVisible();
+  await profileTab.click();
+
+  const scroller = page.getByTestId("cats-tab-scroll");
+  const manage = page.getByRole("button", { name: "猫を追加・管理" });
+  const nav = page.locator("[data-app-bottom-nav]");
+  await scroller.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+
+  await expect(manage).toBeInViewport();
+  const metrics = await Promise.all([
+    manage.boundingBox(),
+    nav.boundingBox(),
+    nav.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).bottom),
+    ),
+  ]);
+  const [manageBox, navBox, navSafeOffset] = metrics;
+
+  expect(manageBox).not.toBeNull();
+  expect(navBox).not.toBeNull();
+  expect(navSafeOffset).toBeGreaterThanOrEqual(34);
+  expect((manageBox?.y ?? 0) + (manageBox?.height ?? 0)).toBeLessThan(
+    navBox?.y ?? 0,
+  );
+});
+
 test("starts an empty profile with one optional question instead of an empty form", async ({
   page,
 }) => {
@@ -1397,8 +1594,9 @@ test("starts an empty profile with one optional question instead of an empty for
   });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-basic").click();
+  const profileTab = page.getByTestId("cats-section-tab-basic");
+  await expect(profileTab).toBeVisible();
+  await profileTab.click();
 
   const profile = page.getByTestId("cats-profile-panel");
   await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
@@ -1463,8 +1661,9 @@ test("quick personality edit preserves newer basic and care information", async 
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-basic").click();
+  const profileTab = page.getByTestId("cats-section-tab-basic");
+  await expect(profileTab).toBeVisible();
+  await profileTab.click();
   await page.getByTestId("cats-profile-optional-question").click();
 
   await page.evaluate(() => {
@@ -1544,8 +1743,9 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-basic").click();
+  const profileTab = page.getByTestId("cats-section-tab-basic");
+  await expect(profileTab).toBeVisible();
+  await profileTab.click();
 
   await page.getByRole("button", { name: "基本情報を編集" }).click();
   const basicDialog = page.getByRole("dialog", { name: "むぎの基本情報" });
@@ -1933,8 +2133,9 @@ test("keeps the record tab sections in the intended order", async ({ page }) => 
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-record").click();
+  const recordTab = page.getByTestId("cats-section-tab-record");
+  await expect(recordTab).toBeVisible();
+  await recordTab.click();
   await expect(page.locator("#cats-milestones-heading")).toBeVisible();
 
   const sectionOrder = await page
