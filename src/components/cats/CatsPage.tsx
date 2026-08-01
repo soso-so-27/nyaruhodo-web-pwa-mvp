@@ -5,10 +5,6 @@ import type { CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
-  fallBackCatIllustrationImage,
-  useCatIllustrationAssets,
-} from "../../lib/assets/catIllustrationAssets";
-import {
   readImageFileDimensions,
   resizeImageFileToDataUrl,
 } from "../../lib/imageResize";
@@ -214,7 +210,6 @@ type CatProfileEditSection = "basic" | "personality" | "care";
 type CatProfileQuickEditField = "favoritePlace";
 
 export function CatsPage() {
-  const catIllustrations = useCatIllustrationAssets();
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [catNameInput, setCatNameInput] = useState("");
@@ -226,6 +221,7 @@ export function CatsPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [isCatManageOpen, setIsCatManageOpen] = useState(false);
+  const [isCatScopePickerOpen, setIsCatScopePickerOpen] = useState(false);
   const [isCatManageEditing, setIsCatManageEditing] = useState(false);
   const [catManageEditSource, setCatManageEditSource] =
     useState<CatManageEditSource | null>(null);
@@ -345,12 +341,11 @@ export function CatsPage() {
   const isFocusedProfileSetup =
     isOnboardingProfileSetup || isDirectProfileRecovery;
   const canManageCats = !isFocusedProfileSetup && !isOnboardingCompletionView;
-  const shouldShowCatSwitchButton = catProfiles.length > 1 && canManageCats;
-  const shouldShowPhotoLensSwitch =
-    catProfiles.length > 1 &&
-    canManageCats &&
-    !isAddingCat &&
-    !isEditingProfile;
+  const shouldShowCatScopePicker = catProfiles.length > 1 && canManageCats;
+  const headerCatScopeName =
+    activeSection === "photos" && activeLens === "all"
+      ? "ぜんぶ"
+      : catName;
   const localLensPhotos = useMemo(
     () => createLocalLensPhotos(catProfiles),
     [catProfiles, galleryRefreshTick],
@@ -858,17 +853,15 @@ export function CatsPage() {
     setSaveMessage("");
   }
 
-  function handleCycleCat() {
-    if (catProfiles.length <= 1) {
-      return;
-    }
+  function handleCatScopeSelect(catId: string) {
+    handleCatSelect(catId);
+    setActiveLens("cat");
+    setIsCatScopePickerOpen(false);
+  }
 
-    const currentIndex = catProfiles.findIndex(
-      (profile) => profile.id === activeCatId,
-    );
-    const nextIndex =
-      currentIndex >= 0 ? (currentIndex + 1) % catProfiles.length : 0;
-    handleCatSelect(catProfiles[nextIndex].id);
+  function handleAllPhotosScopeSelect() {
+    setActiveLens("all");
+    setIsCatScopePickerOpen(false);
   }
 
   function startAddingCat() {
@@ -1892,46 +1885,51 @@ export function CatsPage() {
                 <header style={styles.profileIdentity}>
                   <div style={styles.profileIdentityText}>
                     <p style={styles.profileIdentityKicker}>うちのこ</p>
-                    <h1
-                      data-testid="cats-active-cat-name"
-                      style={styles.profileIdentityName}
-                    >
-                      {catName}
-                    </h1>
-                  </div>
-                  {isCatProfileNameUnset(activeCatProfile) ||
-                  shouldShowCatSwitchButton ? (
-                    <div style={styles.profileIdentityActions}>
-                      {isCatProfileNameUnset(activeCatProfile) ? (
+                    {shouldShowCatScopePicker ? (
+                      <h1 style={styles.profileIdentityName}>
                         <button
                           type="button"
-                          data-testid="cats-name-registration-button"
-                          style={styles.profileIdentityNameButton}
-                          onClick={() => openCatManageEditor("basic")}
+                          data-testid="cats-scope-picker-button"
+                          style={styles.profileIdentitySelectorButton}
+                          onClick={() => setIsCatScopePickerOpen(true)}
+                          aria-label={`${
+                            activeSection === "photos"
+                              ? "見る写真を切り替える"
+                              : "うちのこを切り替える"
+                          }。現在は${headerCatScopeName}`}
+                          aria-haspopup="dialog"
+                          aria-expanded={isCatScopePickerOpen}
                         >
-                          名前を登録
-                        </button>
-                      ) : null}
-                      {shouldShowCatSwitchButton ? (
-                        <button
-                          type="button"
-                          style={styles.profileIdentitySwitchButton}
-                          onClick={handleCycleCat}
-                          aria-label="次のねこに切り替える"
-                        >
-                          <img
-                            src={catIllustrations.catSwitcherIcon}
-                            alt=""
-                            style={styles.profileCoverSwitchIcon}
-                            onError={(event) =>
-                              fallBackCatIllustrationImage(
-                                event.currentTarget,
-                                "catSwitcherIcon",
-                              )
-                            }
+                          <span data-testid="cats-active-cat-name">
+                            {headerCatScopeName}
+                          </span>
+                          <AppIcon
+                            name="chevronRight"
+                            size={17}
+                            style={styles.profileIdentitySelectorChevron}
                           />
                         </button>
-                      ) : null}
+                      </h1>
+                    ) : (
+                      <h1
+                        data-testid="cats-active-cat-name"
+                        style={styles.profileIdentityName}
+                      >
+                        {headerCatScopeName}
+                      </h1>
+                    )}
+                  </div>
+                  {isCatProfileNameUnset(activeCatProfile) &&
+                  !(activeSection === "photos" && activeLens === "all") ? (
+                    <div style={styles.profileIdentityActions}>
+                      <button
+                        type="button"
+                        data-testid="cats-name-registration-button"
+                        style={styles.profileIdentityNameButton}
+                        onClick={() => openCatManageEditor("basic")}
+                      >
+                        名前を登録
+                      </button>
                     </div>
                   ) : null}
                 </header>
@@ -2139,10 +2137,6 @@ export function CatsPage() {
                 hasAnyTodaySleepingPhoto={hasAnyTodaySleepingPhoto}
                 isRemotePhotoStateSettled={hasRemoteLensPhotosLoaded}
                 emptyCopy="まだ写真はありません。ねがおを とるか、写真を追加すると、ここに並びます。"
-                lensValue={activeLens}
-                onLensChange={
-                  shouldShowPhotoLensSwitch ? setActiveLens : undefined
-                }
                 onAddPhoto={() => {
                   requestAddCatPhoto();
                 }}
@@ -2162,10 +2156,6 @@ export function CatsPage() {
               <AllCatsLensView
                 photos={allLensPhotos}
                 catCount={catProfiles.length}
-                lensValue={activeLens}
-                onLensChange={
-                  shouldShowPhotoLensSwitch ? setActiveLens : undefined
-                }
                 onOpenPhoto={(photo) =>
                   setSelectedRecordPhoto(toRecordPhotoPreview(photo))
                 }
@@ -2292,6 +2282,19 @@ export function CatsPage() {
         <BottomNavigation
           active="cats"
           onActiveItemClick={() => setActiveSection("photos")}
+        />
+      ) : null}
+      {isCatScopePickerOpen && activeCatProfile ? (
+        <CatScopePickerSheet
+          profiles={catProfiles}
+          activeCatId={activeCatId}
+          allowAllPhotos={activeSection === "photos"}
+          allPhotosSelected={
+            activeSection === "photos" && activeLens === "all"
+          }
+          onSelectCat={handleCatScopeSelect}
+          onSelectAllPhotos={handleAllPhotosScopeSelect}
+          onClose={() => setIsCatScopePickerOpen(false)}
         />
       ) : null}
       {isCatManageOpen && activeCatProfile ? (
@@ -2915,6 +2918,111 @@ function PageBackdrop() {
       <div style={styles.ambientHighlight} aria-hidden="true" />
       <div style={styles.backgroundVeil} aria-hidden="true" />
     </>
+  );
+}
+
+function CatScopePickerSheet({
+  profiles,
+  activeCatId,
+  allowAllPhotos,
+  allPhotosSelected,
+  onSelectCat,
+  onSelectAllPhotos,
+  onClose,
+}: {
+  profiles: CatProfile[];
+  activeCatId: string | null;
+  allowAllPhotos: boolean;
+  allPhotosSelected: boolean;
+  onSelectCat: (catId: string) => void;
+  onSelectAllPhotos: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet
+      title={allowAllPhotos ? "写真を見る" : "うちのこを選ぶ"}
+      onClose={onClose}
+    >
+      <div
+        role="group"
+        aria-label={allowAllPhotos ? "見る写真" : "うちのこ"}
+        data-testid="cats-scope-picker"
+        style={styles.catScopePickerList}
+      >
+        {profiles.map((profile) => {
+          const selected = !allPhotosSelected && profile.id === activeCatId;
+          const name = isCatProfileNameUnset(profile)
+            ? "この子"
+            : getCatName(profile);
+
+          return (
+            <button
+              key={profile.id}
+              type="button"
+              aria-pressed={selected}
+              data-testid={`cats-scope-cat-${profile.id}`}
+              style={
+                selected
+                  ? {
+                      ...styles.catScopePickerOption,
+                      ...styles.catScopePickerOptionActive,
+                    }
+                  : styles.catScopePickerOption
+              }
+              onClick={() => onSelectCat(profile.id)}
+            >
+              <span style={styles.catScopePickerIcon} aria-hidden="true">
+                <AppIcon name="cat" size={20} />
+              </span>
+              <span style={styles.catScopePickerLabel}>{name}</span>
+              <span
+                style={
+                  selected
+                    ? {
+                        ...styles.catScopePickerDot,
+                        ...styles.catScopePickerDotActive,
+                      }
+                    : styles.catScopePickerDot
+                }
+                aria-hidden="true"
+              />
+            </button>
+          );
+        })}
+        {allowAllPhotos ? (
+          <button
+            type="button"
+            aria-pressed={allPhotosSelected}
+            data-testid="cats-scope-all-photos"
+            style={
+              allPhotosSelected
+                ? {
+                    ...styles.catScopePickerOption,
+                    ...styles.catScopePickerOptionActive,
+                  }
+                : styles.catScopePickerOption
+            }
+            onClick={onSelectAllPhotos}
+          >
+            <span style={styles.catScopePickerIcon} aria-hidden="true">
+              <AppIcon name="photo" size={20} />
+            </span>
+            <span style={styles.catScopePickerLabel}>ぜんぶの写真</span>
+            <span
+              style={
+                allPhotosSelected
+                  ? {
+                      ...styles.catScopePickerDot,
+                      ...styles.catScopePickerDotActive,
+                    }
+                  : styles.catScopePickerDot
+              }
+              aria-hidden="true"
+            />
+          </button>
+        ) : null}
+      </div>
+    </AppBottomSheet>
   );
 }
 
@@ -3748,8 +3856,6 @@ function UchinokoPhotoSection({
   hasAnyTodaySleepingPhoto,
   isRemotePhotoStateSettled,
   emptyCopy,
-  lensValue,
-  onLensChange,
   onAddPhoto,
   onOpenPhoto,
   isListSettled,
@@ -3763,8 +3869,6 @@ function UchinokoPhotoSection({
   hasAnyTodaySleepingPhoto: boolean;
   isRemotePhotoStateSettled: boolean;
   emptyCopy: string;
-  lensValue: UchinokoLens;
-  onLensChange?: (value: UchinokoLens) => void;
   onAddPhoto: () => void;
   onOpenPhoto: (photo: LensPhoto) => void;
   isListSettled: boolean;
@@ -3869,9 +3973,6 @@ function UchinokoPhotoSection({
             </span>
           </div>
           <div style={styles.lensSectionTitleActions}>
-            {onLensChange ? (
-              <PhotoLensFilter value={lensValue} onChange={onLensChange} />
-            ) : null}
             <button
               type="button"
               data-testid="cats-add-photo-button"
@@ -3969,15 +4070,11 @@ function UchinokoPhotoHighlightCard({
 function AllCatsLensView({
   photos,
   catCount,
-  lensValue,
-  onLensChange,
   onOpenPhoto,
   isListSettled,
 }: {
   photos: LensPhoto[];
   catCount: number;
-  lensValue: UchinokoLens;
-  onLensChange?: (value: UchinokoLens) => void;
   onOpenPhoto: (photo: LensPhoto) => void;
   isListSettled: boolean;
 }) {
@@ -3986,9 +4083,6 @@ function AllCatsLensView({
       <div style={styles.lensSectionHeader}>
         <div style={styles.lensSectionTitleRow}>
           <p style={styles.lensSectionTitle}>ぜんぶの写真</p>
-          {onLensChange ? (
-            <PhotoLensFilter value={lensValue} onChange={onLensChange} />
-          ) : null}
         </div>
         <p style={styles.lensSectionSub}>{catCount}ひきの写真を、日付順に。</p>
       </div>
@@ -4053,52 +4147,6 @@ function UchinokoSectionTabs({
                 />
               ) : null}
             </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function PhotoLensFilter({
-  value,
-  onChange,
-}: {
-  value: UchinokoLens;
-  onChange: (value: UchinokoLens) => void;
-}) {
-  const options: { value: UchinokoLens; label: string }[] = [
-    { value: "cat", label: "この子" },
-    { value: "all", label: "ぜんぶ" },
-  ];
-
-  return (
-    <div
-      role="radiogroup"
-      data-testid="cats-photo-lens-filter"
-      aria-label="写真の見かた"
-      style={styles.photoLensFilter}
-    >
-      {options.map((option) => {
-        const selected = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            data-testid={`cats-photo-lens-${option.value}`}
-            aria-checked={selected}
-            style={
-              selected
-                ? {
-                    ...styles.photoLensFilterButton,
-                    ...styles.photoLensFilterButtonActive,
-                  }
-                : styles.photoLensFilterButton
-            }
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
           </button>
         );
       })}
@@ -4242,28 +4290,34 @@ function LensPhotoGrid({
               frameStyle={styles.lensPhotoTileFrame}
               imageStyle={styles.lensPhotoTile}
             />
-            {photo.ownerFeedback === "selected" ? (
+            {photo.ownerFeedback ? (
               <span
                 aria-hidden="true"
-                title="ねこだよりに のこった"
-                data-testid="cats-photo-selected-mark"
-                style={styles.lensPhotoSelectedMark}
+                title={getSourceOwnerFeedbackListLabel(photo.ownerFeedback)}
+                data-testid="cats-photo-delivery-mark"
+                data-state={photo.ownerFeedback}
+                style={
+                  photo.ownerFeedback === "selected"
+                    ? {
+                        ...styles.lensPhotoDeliveryMark,
+                        ...styles.lensPhotoDeliveryMarkSelected,
+                      }
+                    : styles.lensPhotoDeliveryMark
+                }
               >
-                <AppIcon name="mail" size={13} />
+                <AppIcon name="mail" size={14} />
+                {photo.ownerFeedback === "selected" ? (
+                  <span
+                    data-testid="cats-photo-delivery-seal"
+                    style={styles.lensPhotoDeliverySeal}
+                  />
+                ) : null}
               </span>
             ) : null}
           </div>
           <span style={styles.lensPhotoDate}>
             {formatLensPhotoGridDate(photo.createdAt)}
           </span>
-          {photo.ownerFeedback ? (
-            <span
-              data-testid="cats-photo-owner-feedback-summary"
-              style={styles.lensPhotoOwnerFeedback}
-            >
-              {getSourceOwnerFeedbackListLabel(photo.ownerFeedback)}
-            </span>
-          ) : null}
           {showCatNames && photo.catNames.length > 0 ? (
             <span style={styles.lensPhotoCats}>
               {photo.catNames.join("・")}
@@ -5713,16 +5767,16 @@ function getSourceOwnerFeedbackListLabel(
   feedback: SourceOwnerFeedbackState,
 ) {
   return feedback === "selected"
-    ? "ねこだよりに のこった"
-    : "ねこだよりの候補になった";
+    ? "どこかのおうちの ねこだよりに のこった"
+    : "どこかのおうちへ とどいた";
 }
 
 function getSourceOwnerFeedbackDetailLabel(
   feedback: SourceOwnerFeedbackState,
 ) {
   return feedback === "selected"
-    ? "どこかのおうちの ねこだよりに、この写真が のこりました。"
-    : "この写真が、どこかのおうちの ねこだより候補になりました。";
+    ? "とどいた先の ねこだよりに、この写真が のこりました。"
+    : "この写真が、どこかのおうちへ とどきました。";
 }
 
 function mergeSourceOwnerFeedback(
@@ -7187,6 +7241,29 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+  profileIdentitySelectorButton: {
+    maxWidth: "100%",
+    minHeight: "44px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    margin: 0,
+    padding: 0,
+    overflow: "hidden",
+    border: "none",
+    background: "transparent",
+    color: "inherit",
+    font: "inherit",
+    lineHeight: "inherit",
+    letterSpacing: "inherit",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  profileIdentitySelectorChevron: {
+    flex: "0 0 auto",
+    color: CATS_MUTED,
+    transform: "rotate(90deg)",
+  },
   profileIdentityActions: {
     display: "inline-flex",
     alignItems: "center",
@@ -7206,24 +7283,6 @@ const styles = {
     letterSpacing: CATS_META_TRACKING,
     cursor: "pointer",
     whiteSpace: "nowrap",
-  },
-  profileIdentitySwitchButton: {
-    width: "40px",
-    height: "40px",
-    minWidth: "40px",
-    minHeight: "40px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "7px",
-    borderRadius: "999px",
-    border:
-      "1px solid color-mix(in srgb, var(--control-border) 68%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 64%, transparent)",
-    color: CATS_MUTED,
-    boxShadow: "var(--shadow-e0)",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
   },
   sectionSwitch: {
     margin: "0 0 12px",
@@ -7299,13 +7358,6 @@ const styles = {
     objectPosition: "center",
     transform: "scale(1.04)",
     filter: "saturate(0.72) brightness(0.86)",
-  },
-  profileCoverSwitchIcon: {
-    width: "26px",
-    height: "26px",
-    display: "block",
-    objectFit: "contain",
-    opacity: 0.82,
   },
   profileHero: {
     display: "grid",
@@ -7903,36 +7955,6 @@ const styles = {
     fontSize: "13px",
     fontWeight: 400,
     lineHeight: 1.6,
-  },
-  photoLensFilter: {
-    display: "inline-flex",
-    alignItems: "center",
-    flex: "0 0 auto",
-    gap: "3px",
-    minHeight: "32px",
-    margin: 0,
-    padding: "2px",
-    borderRadius: "999px",
-    background: "color-mix(in srgb, var(--paper-card) 34%, transparent)",
-  },
-  photoLensFilterButton: {
-    minHeight: "28px",
-    padding: "0 9px",
-    border: "none",
-    borderRadius: "999px",
-    background: "transparent",
-    color: CATS_MUTED,
-    fontFamily: CATS_UI,
-    fontSize: "11px",
-    fontWeight: 500,
-    letterSpacing: "0.02em",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-  },
-  photoLensFilterButtonActive: {
-    background: "color-mix(in srgb, var(--paper-card) 76%, transparent)",
-    color: CATS_TEXT_STRONG,
-    boxShadow: "0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent)",
   },
   photoViewerOverlay: {
     position: "fixed",
@@ -8782,6 +8804,64 @@ const styles = {
     letterSpacing: CATS_META_TRACKING,
     cursor: "pointer",
   },
+  catScopePickerList: {
+    display: "grid",
+    gap: "6px",
+  },
+  catScopePickerOption: {
+    width: "100%",
+    minHeight: "52px",
+    display: "grid",
+    gridTemplateColumns: "34px minmax(0, 1fr) 18px",
+    alignItems: "center",
+    gap: "10px",
+    padding: "5px 12px",
+    border: "1px solid transparent",
+    borderRadius: "var(--radius-lg)",
+    background: "transparent",
+    color: CATS_TEXT,
+    textAlign: "left" as const,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  catScopePickerOptionActive: {
+    borderColor: "color-mix(in srgb, var(--line) 72%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 62%, transparent)",
+  },
+  catScopePickerIcon: {
+    width: "34px",
+    height: "34px",
+    display: "inline-grid",
+    placeItems: "center",
+    borderRadius: "var(--radius-full)",
+    background: "color-mix(in srgb, var(--paper-warm) 66%, transparent)",
+    color: CATS_MUTED,
+  },
+  catScopePickerLabel: {
+    minWidth: 0,
+    overflow: "hidden",
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: CATS_BODY_TRACKING,
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  catScopePickerDot: {
+    width: "8px",
+    height: "8px",
+    justifySelf: "center",
+    border: "1px solid color-mix(in srgb, var(--ink-faint) 64%, transparent)",
+    borderRadius: "var(--radius-full)",
+    background: "transparent",
+  },
+  catScopePickerDotActive: {
+    borderColor: "var(--ink-soft)",
+    background: "var(--ink-soft)",
+    boxShadow: "0 0 0 3px color-mix(in srgb, var(--paper) 76%, transparent)",
+  },
   catManageSheet: {
     display: "grid",
     gap: "9px",
@@ -9292,7 +9372,7 @@ const styles = {
     borderRadius: "1px",
     boxShadow: "none",
   },
-  lensPhotoSelectedMark: {
+  lensPhotoDeliveryMark: {
     position: "absolute",
     top: "6px",
     right: "6px",
@@ -9306,9 +9386,23 @@ const styles = {
     borderRadius: "var(--radius-full)",
     background:
       "color-mix(in srgb, var(--paper-card) 88%, transparent)",
-    color: "var(--seal)",
+    color: CATS_MUTED,
     boxShadow: "0 3px 10px rgba(45, 34, 26, 0.14)",
     pointerEvents: "none",
+  },
+  lensPhotoDeliveryMarkSelected: {
+    color: "var(--seal)",
+  },
+  lensPhotoDeliverySeal: {
+    position: "absolute",
+    right: "3px",
+    bottom: "3px",
+    width: "6px",
+    height: "6px",
+    border: "1px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    borderRadius: "var(--radius-full)",
+    background: "var(--seal)",
+    boxShadow: "0 1px 3px rgba(45, 34, 26, 0.18)",
   },
   lensPhotoDate: {
     display: "block",
@@ -9319,17 +9413,6 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.3,
     letterSpacing: CATS_META_TRACKING,
-  },
-  lensPhotoOwnerFeedback: {
-    display: "block",
-    minHeight: "2.7em",
-    margin: "0 2px",
-    color: CATS_TEXT,
-    fontFamily: CATS_UI,
-    fontSize: "11px",
-    fontWeight: 400,
-    lineHeight: 1.35,
-    letterSpacing: "0.01em",
   },
   lensPhotoTodayMarker: {
     position: "absolute",

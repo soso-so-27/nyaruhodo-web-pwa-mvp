@@ -49,11 +49,14 @@ for (const sample of timeSamples) {
   });
 }
 
-test("keeps the cats photo tab clear of the fixed bottom navigation", async ({ page }) => {
+test("keeps the cats photo tab clear of the fixed bottom navigation", async (
+  { page },
+  testInfo,
+) => {
   await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 8);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
+  await expect(page.getByTestId("cats-page")).toBeVisible();
 
   const grid = page.getByTestId("cats-lens-photo-grid");
   const photoItems = grid.locator(":scope > div");
@@ -85,9 +88,22 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({ p
   await expect(page.getByText("16枚", { exact: true })).toBeVisible();
   await expect(photoItems.first().getByText("6/10", { exact: true })).toBeVisible();
   await expect(page.getByTestId("cats-photo-lens-filter")).toHaveCount(0);
+  await expect(page.getByTestId("cats-scope-picker-button")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "写真を追加" })).toBeVisible();
   await expect(photoItems).toHaveCount(16);
   await expect(grid.locator('[data-app-pressable="photo"]')).toHaveCount(16);
+  const [highlightPhotoBox, firstGridPhotoBox] = await Promise.all([
+    page
+      .getByTestId("cats-photo-today-card")
+      .locator('[data-app-pressable="photo"]')
+      .boundingBox(),
+    grid.locator('[data-app-pressable="photo"]').first().boundingBox(),
+  ]);
+  expect(highlightPhotoBox).not.toBeNull();
+  expect(firstGridPhotoBox).not.toBeNull();
+  expect(highlightPhotoBox?.width ?? 0).toBeGreaterThan(
+    (firstGridPhotoBox?.width ?? 0) * 1.25,
+  );
   await expect
     .poll(() =>
       page.evaluate(() => document.documentElement.classList.contains("cats-scrollbar-quiet")),
@@ -131,6 +147,11 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({ p
   expect(gridMetrics.verticalGap).toBeGreaterThanOrEqual(2);
   expect(gridMetrics.verticalPhotoGap).toBeGreaterThan(2);
   expect(gridMetrics.verticalPhotoGap).toBeLessThan(32);
+
+  await testInfo.attach("cats-photo-page-390x844", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
 
   const [tabsBox, navBoxBeforeScroll] = await Promise.all([tabs.boundingBox(), nav.boundingBox()]);
   expect(tabsBox?.height).toBe(48);
@@ -294,9 +315,10 @@ test("changes sharing only from a sleeping photo detail", async ({ page }) => {
   await expect(page.getByTestId("cats-photo-delivery-setting")).toHaveCount(0);
 });
 
-test("shows private non-numeric feedback on an owner's sleeping photo", async ({
-  page,
-}) => {
+test("shows private non-numeric feedback on an owner's sleeping photo", async (
+  { page },
+  testInfo,
+) => {
   const now = Date.parse("2026-07-23T20:30:00+09:00");
   const selectedMomentId = "11111111-1111-4111-8111-111111111111";
   const deliveredMomentId = "22222222-2222-4222-8222-222222222222";
@@ -344,19 +366,31 @@ test("shows private non-numeric feedback on an owner's sleeping photo", async ({
   await page.waitForLoadState("networkidle");
 
   const grid = page.getByTestId("cats-lens-photo-grid");
-  await expect(grid.getByTestId("cats-photo-selected-mark")).toHaveCount(1);
+  const deliveryMarks = grid.getByTestId("cats-photo-delivery-mark");
+  const selectedDeliveryMark = grid.locator(
+    '[data-testid="cats-photo-delivery-mark"]:has([data-testid="cats-photo-delivery-seal"])',
+  );
+  await expect(deliveryMarks).toHaveCount(2);
+  await expect(selectedDeliveryMark).toHaveCount(1);
+  await expect(selectedDeliveryMark).toHaveAttribute("data-state", "selected");
+  await expect(deliveryMarks.nth(1)).toHaveAttribute("data-state", "delivered");
   await expect(
     grid.getByTestId("cats-photo-owner-feedback-summary"),
-  ).toHaveText([
-    "ねこだよりに のこった",
-    "ねこだよりの候補になった",
-  ]);
+  ).toHaveCount(0);
+  await expect(grid.getByText("ねこだよりの候補になった")).toHaveCount(0);
   await expect(grid.getByRole("button").first()).toHaveAccessibleName(
-    "7/23のむぎ、ねこだよりに のこった",
+    "7/23のむぎ、どこかのおうちの ねこだよりに のこった",
   );
+  await expect(grid.getByRole("button").nth(1)).toHaveAccessibleName(
+    "7/22のむぎ、どこかのおうちへ とどいた",
+  );
+  await testInfo.attach("cats-photo-delivery-marks-390x844", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
   await grid.getByRole("button", { name: "7/23のむぎ" }).click();
   await expect(page.getByTestId("cats-photo-owner-feedback")).toHaveText(
-    "どこかのおうちの ねこだよりに、この写真が のこりました。",
+    "とどいた先の ねこだよりに、この写真が のこりました。",
   );
   await expect(page.getByTestId("cats-photo-owner-feedback")).not.toContainText(
     /\d/,
@@ -365,7 +399,10 @@ test("shows private non-numeric feedback on an owner's sleeping photo", async ({
   await page.getByTestId("cats-photo-viewer-close").click();
   await grid.getByRole("button", { name: "7/22のむぎ" }).click();
   await expect(page.getByTestId("cats-photo-owner-feedback")).toHaveText(
-    "この写真が、どこかのおうちの ねこだより候補になりました。",
+    "この写真が、どこかのおうちへ とどきました。",
+  );
+  await expect(page.getByTestId("cats-photo-owner-feedback")).not.toContainText(
+    "候補",
   );
 });
 
@@ -1017,18 +1054,80 @@ test("reflects an added cat gallery photo immediately", async ({ page }) => {
   await expect(grid.locator("img")).toHaveCount(1);
 });
 
-test("shows the photo lens switch only when multiple cats are registered", async ({
-  page,
-}) => {
+test("uses one shared photo scope picker when multiple cats are registered", async (
+  { page },
+  testInfo,
+) => {
   await seedMultipleCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
+  await expect(page.getByTestId("cats-page")).toBeVisible();
   await page.getByTestId("cats-section-tab-photos").click();
 
-  await expect(page.getByTestId("cats-photo-lens-filter")).toBeVisible();
-  await expect(page.getByTestId("cats-photo-lens-cat")).toHaveText("この子");
-  await expect(page.getByTestId("cats-photo-lens-all")).toHaveText("ぜんぶ");
+  const scopeButton = page.getByTestId("cats-scope-picker-button");
+  await expect(page.getByTestId("cats-photo-lens-filter")).toHaveCount(0);
+  await expect(scopeButton).toContainText("むぎ");
+  await expect(scopeButton).toHaveAccessibleName(
+    "見る写真を切り替える。現在はむぎ",
+  );
+  await expect(scopeButton).toHaveAttribute("aria-expanded", "false");
+  expect(
+    await scopeButton.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).height),
+    ),
+  ).toBeGreaterThanOrEqual(44);
+
+  await scopeButton.click();
+  const picker = page.getByTestId("cats-scope-picker");
+  await expect(page.getByRole("dialog", { name: "写真を見る" })).toBeVisible();
+  await expect(picker.getByRole("button")).toHaveText([
+    "むぎ",
+    "こむぎ",
+    "ぜんぶの写真",
+  ]);
+  await expect(page.getByTestId("cats-scope-cat-cat-mugi")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await testInfo.attach("cats-photo-scope-picker-390x844", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+
+  await page.getByTestId("cats-scope-all-photos").click();
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("ぜんぶ");
+  await expect(page.getByText("ぜんぶの写真", { exact: true })).toBeVisible();
+  await expect(
+    page.getByTestId("cats-lens-photo-grid").locator(":scope > div"),
+  ).toHaveCount(2);
+  await expect(
+    page
+      .getByTestId("cats-lens-photo-grid")
+      .getByRole("button", { name: /^6\/10のむぎ$/ }),
+  ).toHaveCount(1);
+  await expect(
+    page
+      .getByTestId("cats-lens-photo-grid")
+      .getByRole("button", { name: /^6\/10のこむぎ$/ }),
+  ).toHaveCount(1);
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem("active_cat_id")))
+    .toBe("cat-mugi");
+
+  await page.getByTestId("cats-scope-picker-button").click();
+  await page.getByTestId("cats-scope-cat-cat-komugi").click();
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("こむぎ");
+  await expect(
+    page.getByTestId("cats-lens-photo-grid").locator(":scope > div"),
+  ).toHaveCount(1);
+  await expect(
+    page
+      .getByTestId("cats-lens-photo-grid")
+      .getByRole("button", { name: /^6\/10のこむぎ$/ }),
+  ).toHaveCount(1);
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem("active_cat_id")))
+    .toBe("cat-komugi");
 });
 
 test("shows a quiet photo grid skeleton while cats photo thumbnails resolve", async ({
@@ -1095,19 +1194,28 @@ test("keeps cat switching in the shared header on every profile tab", async ({ p
   await seedMultipleCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
+  await expect(page.getByTestId("cats-page")).toBeVisible();
 
-  const switchButton = page.getByRole("button", {
-    name: "次のねこに切り替える",
-  });
+  const switchButton = page.getByTestId("cats-scope-picker-button");
 
   await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
   await expect(switchButton).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "次のねこに切り替える" }),
+  ).toHaveCount(0);
 
   await page.getByTestId("cats-section-tab-record").click();
   await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
   await expect(switchButton).toBeVisible();
+  await expect(switchButton).toHaveAccessibleName(
+    "うちのこを切り替える。現在はむぎ",
+  );
   await switchButton.click();
+  await expect(
+    page.getByRole("dialog", { name: "うちのこを選ぶ" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("cats-scope-all-photos")).toHaveCount(0);
+  await page.getByTestId("cats-scope-cat-cat-komugi").click();
 
   await expect
     .poll(() => page.evaluate(() => window.localStorage.getItem("active_cat_id")))
@@ -2423,6 +2531,21 @@ async function seedMultipleCatsProfile(page: Page, now: number) {
             theme: "sleeping",
             shared: true,
             createdAt: nowValue,
+          },
+          {
+            id: "own-sleeping-komugi",
+            ownerCatId: "cat-komugi",
+            catId: "cat-komugi",
+            src,
+            thumbnailSrc: src,
+            displaySrc: src,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: true,
+            createdAt: nowValue - 60_000,
           },
         ]),
       );
