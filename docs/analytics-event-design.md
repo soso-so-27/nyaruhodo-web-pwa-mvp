@@ -185,14 +185,16 @@ account_create_cta_clicked
 
 | Event | When | Properties |
 |---|---|---|
-| `cat_profile_growth_started` | 一問更新または見返しを開く | `field: callName/favoritePlace/favoritePlay/favoriteTouch/dislikes/review` |
-| `cat_profile_share_opened` | 用途選択シートを開く | `source: cat_profile` |
-| `cat_profile_share_purpose_selected` | 共有用途を選ぶ | `purpose: everyday/emergency` |
-| `cat_profile_share_completed` | 端末共有またはコピーが成功 | `purpose`, `method: native_share/clipboard` |
-| `cat_profile_share_cancelled` | 端末共有をキャンセル | `purpose`, `method: native_share` |
+| `cat_profile_growth_started` | 空状態から最初の「この子らしさ」編集を開く | `field` |
+| `cat_profile_share_opened` | 共有メモを開く | `source: cat_profile` |
+| `cat_profile_share_completed` | 端末共有またはコピーが成功 | `method: native_share/clipboard`, `selected_sections_count`, `has_temporary_note` |
+| `cat_profile_share_cancelled` | 端末共有をキャンセル | `method: native_share`, `selected_sections_count`, `has_temporary_note` |
 | `collection_pose_found` | 〇〇を見つけた表示 | `slot_slug`, `group_id` |
 | `collection_share_tapped` | share押下 | `slot_slug`, `group_id`, `photo_count` |
 | `collection_share_feed_card_opened` | シェアフィードのカード押下 | `item_type`, `owner_scope`, `slot_slug` |
+
+`cat_profile_share_purpose_selected` は用途選択UIの廃止に伴い送信を終了する。
+選択した節名、プロフィールの値、`今回だけ伝えること`の本文はイベントへ入れない。
 
 ### 6.6 Account and monetization intent
 

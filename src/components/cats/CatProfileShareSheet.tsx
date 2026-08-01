@@ -11,6 +11,7 @@ import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
 import { CatIcon, SendIcon } from "../ui/AppIcons";
 import { PhotoTile } from "../ui/PhotoTile";
+import { AppTextField } from "../ui/AppTextField";
 import {
   color,
   radius,
@@ -18,7 +19,12 @@ import {
   typography,
 } from "../ui/designTokens";
 
-export type CatProfileSharePurpose = "everyday" | "emergency";
+export type CatProfileShareSectionKey =
+  | "personality"
+  | "care_note"
+  | "clinic"
+  | "health"
+  | "basic";
 
 export type CatProfileShareCat = {
   localCatId?: string | null;
@@ -40,68 +46,82 @@ type ShareFeedback =
   | null;
 
 type ShareTextSection = {
+  key: CatProfileShareSectionKey;
   title: string;
   rows: Array<{ label: string; value: string }>;
 };
 
-const PURPOSES: ReadonlyArray<{
-  value: CatProfileSharePurpose;
-  label: string;
-  testId: string;
-}> = [
-  {
-    value: "everyday",
-    label: "お世話をお願いする",
-    testId: "cats-profile-share-purpose-everyday",
-  },
-  {
-    value: "emergency",
-    label: "もしものために保存",
-    testId: "cats-profile-share-purpose-emergency",
-  },
-];
+const DEFAULT_SHARE_SECTION_KEYS = new Set<CatProfileShareSectionKey>([
+  "personality",
+  "care_note",
+  "clinic",
+]);
 
 export function CatProfileShareSheet({
   cat,
   open,
   onClose,
 }: CatProfileShareSheetProps) {
-  const [purpose, setPurpose] = useState<CatProfileSharePurpose | null>(null);
+  const sections = useMemo(() => buildCatProfileShareSections(cat), [cat]);
+  const defaultSelectionSignature = useMemo(
+    () => getDefaultSelectedSectionKeys(sections).join("|"),
+    [sections],
+  );
+  const [selectedKeys, setSelectedKeys] = useState<
+    CatProfileShareSectionKey[]
+  >([]);
+  const [temporaryNote, setTemporaryNote] = useState("");
   const [isSharing, setIsSharing] = useState(false);
   const [feedback, setFeedback] = useState<ShareFeedback>(null);
   const catName = normalizeCatName(cat.name);
-  const shareTitle = purpose ? getShareTitle(catName, purpose) : "";
+  const shareTitle = `${catName}の共有メモ`;
   const shareText = useMemo(
-    () => (purpose ? buildCatProfileShareText(cat, purpose) : ""),
-    [cat, purpose],
+    () => buildCatProfileShareText(cat, selectedKeys, temporaryNote),
+    [cat, selectedKeys, temporaryNote],
   );
+  const canShare =
+    selectedKeys.length > 0 || normalizeTemporaryNote(temporaryNote) !== "";
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    setPurpose(null);
+    setSelectedKeys(
+      defaultSelectionSignature
+        ? (defaultSelectionSignature.split(
+            "|",
+          ) as CatProfileShareSectionKey[])
+        : [],
+    );
+    setTemporaryNote("");
     setIsSharing(false);
     setFeedback(null);
-  }, [open]);
+  }, [defaultSelectionSignature, open]);
 
   if (!open) {
     return null;
   }
 
-  function selectPurpose(nextPurpose: CatProfileSharePurpose) {
-    setPurpose(nextPurpose);
-    setFeedback(null);
-    trackProductEvent(
-      "cat_profile_share_purpose_selected",
-      { purpose: nextPurpose },
-      { localCatId: cat.localCatId },
+  function toggleSection(key: CatProfileShareSectionKey) {
+    setSelectedKeys((current) =>
+      current.includes(key)
+        ? current.filter((currentKey) => currentKey !== key)
+        : [...current, key],
     );
+    setFeedback(null);
+  }
+
+  function closeSheet() {
+    setSelectedKeys([]);
+    setTemporaryNote("");
+    setIsSharing(false);
+    setFeedback(null);
+    onClose();
   }
 
   async function handleShare() {
-    if (!purpose || !shareText || isSharing) {
+    if (!canShare || !shareText || isSharing) {
       return;
     }
 
@@ -117,19 +137,28 @@ export function CatProfileShareSheet({
           });
           trackProductEvent(
             "cat_profile_share_completed",
-            { method: "native_share", purpose },
+            {
+              method: "native_share",
+              selected_sections_count: selectedKeys.length,
+              has_temporary_note: normalizeTemporaryNote(temporaryNote) !== "",
+            },
             { localCatId: cat.localCatId },
           );
-          onClose();
+          closeSheet();
           return;
         } catch (error) {
           if (isShareCancellation(error)) {
             trackProductEvent(
               "cat_profile_share_cancelled",
-              { method: "native_share", purpose },
+              {
+                method: "native_share",
+                selected_sections_count: selectedKeys.length,
+                has_temporary_note:
+                  normalizeTemporaryNote(temporaryNote) !== "",
+              },
               { localCatId: cat.localCatId },
             );
-            onClose();
+            closeSheet();
             return;
           }
         }
@@ -138,7 +167,11 @@ export function CatProfileShareSheet({
       await copyText(shareText);
       trackProductEvent(
         "cat_profile_share_completed",
-        { method: "clipboard", purpose },
+        {
+          method: "clipboard",
+          selected_sections_count: selectedKeys.length,
+          has_temporary_note: normalizeTemporaryNote(temporaryNote) !== "",
+        },
         { localCatId: cat.localCatId },
       );
       setFeedback({
@@ -160,27 +193,26 @@ export function CatProfileShareSheet({
     <div data-testid="cats-profile-share-dialog" style={styles.dialogRoot}>
       <AppSheet
         open
-        title="プロフィールを共有"
-        onClose={onClose}
+        title={`${catName}の共有メモ`}
+        onClose={closeSheet}
         closeLabel="閉じる"
         size="content"
         footer={
-          purpose ? (
-            <AppButton
-              type="button"
-              variant="primary"
-              fullWidth
-              iconStart={<SendIcon size={18} />}
-              loading={isSharing}
-              loadingLabel="準備しています"
-              data-testid="cats-profile-share-submit"
-              onClick={() => {
-                void handleShare();
-              }}
-            >
-              共有する
-            </AppButton>
-          ) : undefined
+          <AppButton
+            type="button"
+            variant="primary"
+            fullWidth
+            iconStart={<SendIcon size={18} />}
+            loading={isSharing}
+            loadingLabel="準備しています"
+            disabled={!canShare}
+            data-testid="cats-profile-share-submit"
+            onClick={() => {
+              void handleShare();
+            }}
+          >
+            この内容を共有
+          </AppButton>
         }
       >
         <div style={styles.content}>
@@ -199,76 +231,85 @@ export function CatProfileShareSheet({
             </PhotoTile>
             <div style={styles.catSummaryCopy}>
               <p style={styles.catName}>{catName}</p>
-              <p style={styles.intro}>
-                必要なときに、その子のことを渡せるように。
-              </p>
+              <p style={styles.intro}>伝えたいことを選べます。</p>
             </div>
           </div>
 
-          <fieldset style={styles.purposeFieldset}>
-            <legend style={styles.purposeLegend}>用途を選ぶ</legend>
-            <div
-              role="radiogroup"
-              aria-label="プロフィールを共有する用途"
-              style={styles.purposeList}
-            >
-              {PURPOSES.map((option) => {
-                const selected = purpose === option.value;
+          <fieldset style={styles.sectionFieldset}>
+            <legend style={styles.sectionLegend}>共有する項目</legend>
+            {sections.length > 0 ? (
+              <div style={styles.sectionList}>
+                {sections.map((section) => {
+                  const checked = selectedKeys.includes(section.key);
 
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    data-testid={option.testId}
-                    data-app-pressable="card"
-                    style={{
-                      ...styles.purposeButton,
-                      ...(selected ? styles.purposeButtonSelected : null),
-                    }}
-                    onClick={() => selectPurpose(option.value)}
-                  >
-                    <span style={styles.purposeLabel}>{option.label}</span>
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        ...styles.radioMark,
-                        ...(selected ? styles.radioMarkSelected : null),
-                      }}
-                    >
-                      {selected ? <span style={styles.radioMarkInner} /> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                  return (
+                    <label key={section.key} style={styles.sectionOption}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        data-testid={`cats-profile-share-section-${section.key}`}
+                        style={styles.checkbox}
+                        onChange={() => toggleSection(section.key)}
+                      />
+                      <span style={styles.sectionOptionCopy}>
+                        <span style={styles.sectionOptionLabel}>
+                          {getShareSectionLabel(section.key)}
+                        </span>
+                        <span style={styles.sectionOptionSummary}>
+                          {summarizeSection(section)}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <p style={styles.noSavedSections}>
+                選べるプロフィール情報は、まだありません。
+              </p>
+            )}
           </fieldset>
 
-          {purpose ? (
-            <section aria-labelledby="cat-profile-share-preview-heading">
-              <div style={styles.previewHeadingRow}>
-                <h3
-                  id="cat-profile-share-preview-heading"
-                  style={styles.previewHeading}
-                >
-                  共有する内容
-                </h3>
-                <span style={styles.textOnlyLabel}>テキストのみ</span>
-              </div>
-              <AppCard variant="inset" padding="md">
-                <pre
-                  data-testid="cats-profile-share-preview"
-                  style={styles.preview}
-                >
-                  {shareText}
-                </pre>
-              </AppCard>
-              <p style={styles.privacyNote}>
-                写真やねこだよりは含まれません。
-              </p>
-            </section>
-          ) : null}
+          <AppTextField
+            id="cat-profile-share-temporary-note"
+            as="textarea"
+            label="今回だけ伝えること"
+            value={temporaryNote}
+            maxLength={180}
+            rows={3}
+            placeholder="例：ごはんは冷蔵庫にあります"
+            hint="プロフィールには保存されません。"
+            data-testid="cats-profile-share-temporary-note"
+            fieldStyle={styles.temporaryNoteField}
+            onChange={(event) => {
+              setTemporaryNote(event.target.value);
+              setFeedback(null);
+            }}
+          />
+
+          <section aria-labelledby="cat-profile-share-preview-heading">
+            <div style={styles.previewHeadingRow}>
+              <h3
+                id="cat-profile-share-preview-heading"
+                style={styles.previewHeading}
+              >
+                共有する内容
+              </h3>
+              <span style={styles.textOnlyLabel}>テキストのみ</span>
+            </div>
+            <AppCard variant="inset" padding="md">
+              <pre
+                data-testid="cats-profile-share-preview"
+                style={styles.preview}
+              >
+                {shareText}
+              </pre>
+            </AppCard>
+            <p style={styles.privacyNote}>
+              写真やねこだよりは含まれません。送信・コピー後の内容は、
+              アプリから取り消せません。
+            </p>
+          </section>
 
           <p
             role={feedback?.tone === "error" ? "alert" : "status"}
@@ -288,26 +329,38 @@ export function CatProfileShareSheet({
 
 export function buildCatProfileShareText(
   cat: CatProfileShareCat,
-  purpose: CatProfileSharePurpose,
+  selectedKeys: ReadonlyArray<CatProfileShareSectionKey>,
+  temporaryNote = "",
 ): string {
   const catName = normalizeCatName(cat.name);
+  const selectedKeySet = new Set(selectedKeys);
+  const sections = buildCatProfileShareSections(cat).filter((section) =>
+    selectedKeySet.has(section.key),
+  );
+  const note = normalizeTemporaryNote(temporaryNote);
+  const lines = [`${catName}の共有メモ`, "", `名前：${catName}`];
+
+  for (const section of sections) {
+    lines.push("", `［${section.title}］`);
+    for (const row of section.rows) {
+      lines.push(`${row.label}：${row.value}`);
+    }
+  }
+
+  if (note) {
+    lines.push("", "［今回だけ伝えること］", note);
+  }
+
+  return lines.join("\n");
+}
+
+export function buildCatProfileShareSections(
+  cat: CatProfileShareCat,
+): ShareTextSection[] {
   const basicInfo = cat.basicInfo;
-  const basicRows =
-    purpose === "everyday"
-      ? compactRows([["性別", formatGender(basicInfo?.gender)]])
-      : compactRows([
-          ["家族になった日", formatSavedDate(basicInfo?.familySinceDate)],
-          ["誕生日", formatSavedDate(basicInfo?.birthDate)],
-          ["性別", formatGender(basicInfo?.gender)],
-          ["毛柄", formatCoat(cat.appearance?.coat)],
-          ["猫種", basicInfo?.breed],
-        ]);
   const sections: ShareTextSection[] = [
     {
-      title: "基本情報",
-      rows: basicRows,
-    },
-    {
+      key: "personality",
       title: "この子らしさ",
       rows: compactRows([
         ["呼び名", basicInfo?.personality?.callName],
@@ -318,15 +371,24 @@ export function buildCatProfileShareText(
       ]),
     },
     {
-      title: "ケアのメモ",
+      key: "care_note",
+      title: "気をつけること",
+      rows: compactRows([["気をつけること", basicInfo?.care?.careNote]]),
+    },
+    {
+      key: "clinic",
+      title: "かかりつけ",
+      rows: compactRows([["かかりつけ", basicInfo?.care?.vetClinic]]),
+    },
+    {
+      key: "health",
+      title: "体重・ワクチン",
       rows: compactRows([
         ["体重", formatWeight(basicInfo?.care?.weightKg)],
         [
           "体重を測った日",
           formatSavedDate(basicInfo?.care?.weightMeasuredDate),
         ],
-        ["かかりつけ", basicInfo?.care?.vetClinic],
-        ["気をつけること", basicInfo?.care?.careNote],
         [
           "ワクチンを打った日",
           formatSavedDate(basicInfo?.care?.vaccineDate),
@@ -334,39 +396,57 @@ export function buildCatProfileShareText(
         ["ワクチンのメモ", basicInfo?.care?.vaccineNote],
       ]),
     },
+    {
+      key: "basic",
+      title: "基本情報",
+      rows: compactRows([
+        ["家族になった日", formatSavedDate(basicInfo?.familySinceDate)],
+        ["誕生日", formatSavedDate(basicInfo?.birthDate)],
+        ["性別", formatGender(basicInfo?.gender)],
+        ["毛柄", formatCoat(cat.appearance?.coat)],
+        ["猫種", basicInfo?.breed],
+      ]),
+    },
   ];
-  const lines = [getShareTextHeading(catName, purpose), "", `名前：${catName}`];
 
-  for (const section of sections) {
-    if (section.rows.length === 0) {
-      continue;
-    }
+  return sections.filter((section) => section.rows.length > 0);
+}
 
-    lines.push("", `［${section.title}］`);
-    for (const row of section.rows) {
-      lines.push(`${row.label}：${row.value}`);
-    }
+function getDefaultSelectedSectionKeys(
+  sections: ReadonlyArray<ShareTextSection>,
+): CatProfileShareSectionKey[] {
+  const preferred = sections
+    .filter((section) => DEFAULT_SHARE_SECTION_KEYS.has(section.key))
+    .map((section) => section.key);
+
+  if (preferred.length > 0) {
+    return preferred;
   }
 
-  return lines.join("\n");
+  return sections[0] ? [sections[0].key] : [];
 }
 
-function getShareTitle(
-  catName: string,
-  purpose: CatProfileSharePurpose,
-): string {
-  return purpose === "everyday"
-    ? `${catName}のお世話メモ`
-    : `${catName}のプロフィール`;
+function getShareSectionLabel(key: CatProfileShareSectionKey): string {
+  const labels: Record<CatProfileShareSectionKey, string> = {
+    personality: "この子らしさ",
+    care_note: "気をつけること",
+    clinic: "かかりつけ",
+    health: "体重・ワクチン",
+    basic: "基本情報",
+  };
+
+  return labels[key];
 }
 
-function getShareTextHeading(
-  catName: string,
-  purpose: CatProfileSharePurpose,
-): string {
-  return purpose === "everyday"
-    ? `${catName}のお世話メモ（お世話をお願いする）`
-    : `${catName}のプロフィール（もしものために保存）`;
+function summarizeSection(section: ShareTextSection): string {
+  return section.rows
+    .slice(0, 2)
+    .map((row) => row.value)
+    .join("・");
+}
+
+function normalizeTemporaryNote(value: string): string {
+  return value.replace(/\r\n?/g, "\n").trim();
 }
 
 function compactRows(
@@ -390,7 +470,7 @@ function formatSavedDate(value?: string): string {
 
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
   if (!match) {
-    return normalized;
+    return "";
   }
 
   const year = Number(match[1]);
@@ -402,7 +482,7 @@ function formatSavedDate(value?: string): string {
     date.getMonth() === month - 1 &&
     date.getDate() === day;
 
-  return isValid ? `${year}年${month}月${day}日` : normalized;
+  return isValid ? `${year}年${month}月${day}日` : "";
 }
 
 function formatGender(gender?: CatBasicInfo["gender"]): string {
@@ -414,7 +494,7 @@ function formatGender(gender?: CatBasicInfo["gender"]): string {
     return "女の子";
   }
 
-  return gender === "unknown" ? "不明" : "";
+  return gender === "unknown" ? "わからない" : "";
 }
 
 function formatCoat(coat?: string): string {
@@ -439,7 +519,12 @@ function formatCoat(coat?: string): string {
 }
 
 function formatWeight(weightKg?: number): string {
-  if (!weightKg || !Number.isFinite(weightKg)) {
+  if (
+    !weightKg ||
+    !Number.isFinite(weightKg) ||
+    weightKg < 0.5 ||
+    weightKg > 20
+  ) {
     return "";
   }
 
@@ -536,13 +621,13 @@ const styles = {
     fontSize: typography.caption.fontSize,
     lineHeight: 1.55,
   },
-  purposeFieldset: {
+  sectionFieldset: {
     minWidth: 0,
     margin: 0,
     padding: 0,
     border: 0,
   },
-  purposeLegend: {
+  sectionLegend: {
     marginBottom: spacing.sm,
     padding: 0,
     color: color.text,
@@ -551,64 +636,62 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.5,
   },
-  purposeList: {
+  sectionList: {
     display: "grid",
-    gap: spacing.sm,
+    borderTop: `1px solid ${color.border}`,
   },
-  purposeButton: {
+  sectionOption: {
     boxSizing: "border-box",
     width: "100%",
-    minHeight: 68,
-    display: "flex",
+    minHeight: 58,
+    display: "grid",
+    gridTemplateColumns: "24px minmax(0, 1fr)",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
+    gap: spacing.sm,
     margin: 0,
-    padding: `${spacing.md}px ${spacing.lg}px`,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: color.border,
-    borderRadius: radius.lg,
-    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    padding: `${spacing.sm}px 2px`,
+    borderBottom: `1px solid ${color.border}`,
     color: color.text,
     textAlign: "left",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
-    transition:
-      "transform var(--app-press-duration, var(--dur-press-out)) var(--ease-settle), background var(--dur-instant) var(--ease-gentle), border-color var(--dur-instant) var(--ease-gentle)",
   },
-  purposeButtonSelected: {
-    borderColor: "var(--control-border-selected)",
-    background: "var(--control-surface-selected)",
+  checkbox: {
+    width: 20,
+    height: 20,
+    margin: 0,
+    accentColor: "var(--seal)",
+    cursor: "pointer",
   },
-  purposeLabel: {
+  sectionOptionCopy: {
+    minWidth: 0,
+    display: "grid",
+    gap: 2,
+  },
+  sectionOptionLabel: {
     fontFamily: typography.fontUi,
     fontSize: typography.body.fontSize,
     fontWeight: 500,
-    lineHeight: 1.4,
+    lineHeight: 1.45,
   },
-  radioMark: {
-    boxSizing: "border-box",
-    width: 20,
-    minWidth: 20,
-    height: 20,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: color.border,
-    borderRadius: radius.circle,
-    color: color.text,
+  sectionOptionSummary: {
+    color: color.textMuted,
+    fontFamily: typography.fontUi,
+    fontSize: 12,
+    fontWeight: 400,
+    lineHeight: 1.5,
+    overflowWrap: "anywhere",
   },
-  radioMarkSelected: {
-    borderColor: color.textStrong,
+  noSavedSections: {
+    margin: 0,
+    color: color.textMuted,
+    fontFamily: typography.fontUi,
+    fontSize: typography.caption.fontSize,
+    lineHeight: 1.65,
   },
-  radioMarkInner: {
-    width: 10,
-    height: 10,
-    borderRadius: radius.circle,
-    background: color.textStrong,
+  temporaryNoteField: {
+    minHeight: 92,
+    resize: "vertical",
   },
   previewHeadingRow: {
     display: "flex",

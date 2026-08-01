@@ -3701,26 +3701,26 @@ function CatBasicProfilePanel({
             <p style={styles.profileSummaryDurationValue}>{familyDays}</p>
           ) : (
             <p style={styles.profileSummaryDurationMissing}>
-              家族になった日を登録できます
+              家族になった日は、まだ書かれていません
             </p>
           )}
         </div>
         <button
           type="button"
-          data-testid="cats-basic-info-edit-button"
-          style={styles.profileSummaryEditButton}
-          onClick={onEditBasic}
-          aria-label="基本情報を編集"
+          data-testid="cats-profile-share-open"
+          style={styles.profileSummaryShareButton}
+          onClick={onOpenShare}
+          aria-label={`${catName}の共有メモを作る`}
         >
-          基本情報を編集
+          共有メモ
         </button>
       </section>
       <BasicInfoTable
         profile={profile}
+        onEditBasic={onEditBasic}
         onEditPersonality={onEditPersonality}
         onEditCare={onEditCare}
         onGrowProfile={onGrowProfile}
-        onOpenShare={onOpenShare}
       />
     </div>
   );
@@ -3728,116 +3728,101 @@ function CatBasicProfilePanel({
 
 function BasicInfoTable({
   profile,
+  onEditBasic,
   onEditPersonality,
   onEditCare,
   onGrowProfile,
-  onOpenShare,
 }: {
   profile: CatProfile;
+  onEditBasic: () => void;
   onEditPersonality: () => void;
   onEditCare: () => void;
   onGrowProfile: (field: CatProfilePersonalityQuestionKey | null) => void;
-  onOpenShare: () => void;
 }) {
   const presentation = buildCatProfilePresentation(profile);
-  const lifeRows = presentation.livingItems
-    .filter((item) => item.group === "care")
+  const personalityRows = presentation.personalityItems.map((item) =>
+    createBasicInfoRow({ label: item.label, value: item.value }),
+  );
+  const livingRows = presentation.livingItems
+    .filter((item) => item.group === "living")
+    .map(createBasicInfoRowFromLivingItem);
+  const healthRows = presentation.livingItems
+    .filter((item) => item.group === "health")
     .map(createBasicInfoRowFromLivingItem);
   const basicRows = presentation.livingItems
-    .filter((item) => item.group !== "care")
+    .filter((item) => item.group === "basic")
     .map(createBasicInfoRowFromLivingItem);
-  const nextQuestion = presentation.nextQuestion;
+  const hasPersonality = personalityRows.length > 0;
+  const showEmptySections =
+    hasPersonality ||
+    livingRows.length > 0 ||
+    healthRows.length > 0 ||
+    basicRows.length > 0;
 
   return (
     <div style={styles.basicInfoBlock}>
-      <section
-        data-testid="cats-profile-personality-section"
-        style={styles.profilePortraitSection}
-      >
-        <div style={styles.basicInfoSubsectionHeading}>
-          <h2 style={styles.profilePortraitTitle}>{presentation.title}</h2>
-          {presentation.portraitLines.length > 0 ? (
-            <button
-              type="button"
-              style={styles.basicInfoSubsectionEditButton}
-              onClick={onEditPersonality}
-              aria-label={`${presentation.title}を編集`}
-            >
-              編集
-            </button>
-          ) : null}
-        </div>
-        {presentation.portraitParagraph ? (
-          <p
-            data-testid="cats-profile-portrait-copy"
-            style={styles.profilePortraitCopy}
-          >
-            {presentation.portraitParagraph}
-          </p>
-        ) : (
+      {hasPersonality ? (
+        <BasicInfoSubsection
+          title="この子らしさ"
+          rows={personalityRows}
+          layout="facts"
+          onEdit={onEditPersonality}
+          testId="cats-profile-personality-section"
+        />
+      ) : (
+        <section
+          data-testid="cats-profile-personality-section"
+          style={styles.profileEmptyPersonalitySection}
+        >
+          <div style={styles.basicInfoSubsectionHeading}>
+            <h2 style={styles.profilePortraitTitle}>この子らしさ</h2>
+          </div>
           <p style={styles.profilePortraitEmpty}>
-            いっしょに過ごすうちに見つけたことを、少しずつ残せます。
+            いっしょに過ごして気づいたことを、ひとつだけ残せます。
           </p>
-        )}
-      </section>
+          <button
+            type="button"
+            data-testid="cats-profile-empty-invitation"
+            data-profile-question="favoritePlace"
+            style={styles.profileEmptyPersonalityAction}
+            onClick={() => onGrowProfile("favoritePlace")}
+          >
+            <AddSmallIcon />
+            好きなことを書く
+          </button>
+        </section>
+      )}
 
-      <button
-        type="button"
-        data-testid="cats-profile-growth-section"
-        data-profile-question={nextQuestion.key}
-        style={styles.profileGrowthAction}
-        onClick={() =>
-          onGrowProfile(nextQuestion.kind === "question" ? nextQuestion.key : null)
-        }
-        aria-label={`プロフィールを育てる。${nextQuestion.prompt}`}
-      >
-        <span style={styles.profileGrowthText}>
-          <span style={styles.profileGrowthKicker}>プロフィールを育てる</span>
-          <span style={styles.profileGrowthPrompt}>{nextQuestion.prompt}</span>
-        </span>
-        <span style={styles.profileGrowthVerb}>
-          {nextQuestion.kind === "question" ? "答える" : "見返す"}
-        </span>
-        <ChevronRightSmallIcon />
-      </button>
-
-      <BasicInfoSubsection
-        title="暮らしのこと"
-        rows={lifeRows}
-        layout="care"
-        onEdit={onEditCare}
-        emptyActionLabel="書く"
-        emptyMessage="体調や通院など、日々の暮らしで覚えておきたいこと。"
-        testId="cats-profile-life-section"
-      />
-      {basicRows.some((row) => row.value) ? (
+      {showEmptySections || livingRows.length > 0 ? (
+        <BasicInfoSubsection
+          title="暮らし"
+          rows={livingRows}
+          layout="care"
+          onEdit={onEditCare}
+          emptyMessage="気をつけていることは、まだ書かれていません。"
+          testId="cats-profile-living-section"
+        />
+      ) : null}
+      {showEmptySections || healthRows.length > 0 ? (
+        <BasicInfoSubsection
+          title="からだ・通院"
+          rows={healthRows}
+          layout="facts"
+          onEdit={onEditCare}
+          emptyMessage="からだや通院の情報は、まだ書かれていません。"
+          testId="cats-profile-health-section"
+        />
+      ) : null}
+      {showEmptySections || basicRows.length > 0 ? (
         <BasicInfoSubsection
           title="基本情報"
           rows={basicRows}
           layout="facts"
+          onEdit={onEditBasic}
+          emptyMessage="誕生日や性別などは、まだ書かれていません。"
           testId="cats-profile-basic-section"
         />
       ) : null}
-
-      <section data-testid="cats-profile-share-entry">
-        <button
-          type="button"
-          style={styles.profileShareEntry}
-          onClick={onOpenShare}
-          aria-label="この子のことを伝える"
-        >
-          <span style={styles.profileShareEntryText}>
-            <span style={styles.profileShareEntryTitle}>
-              この子のことを伝える
-            </span>
-            <span style={styles.profileShareEntryHint}>
-              必要なことだけ選んで、端末から共有できます。
-            </span>
-          </span>
-          <span style={styles.profileShareEntryVerb}>選ぶ</span>
-          <ChevronRightSmallIcon />
-        </button>
-      </section>
     </div>
   );
 }
@@ -3909,21 +3894,10 @@ function BasicInfoSubsection({
     <section
       data-testid={testId}
       data-profile-layout={layout}
-      style={
-        layout === "care"
-          ? {
-              ...styles.basicInfoSubsection,
-              ...styles.profileInfoSurface,
-              ...styles.profileCareSurface,
-            }
-          : {
-              ...styles.basicInfoSubsection,
-              ...styles.profileInfoSurface,
-            }
-      }
+      style={styles.basicInfoSubsection}
     >
       <div style={styles.basicInfoSubsectionHeading}>
-        <p style={styles.basicInfoSubsectionTitle}>{title}</p>
+        <h2 style={styles.basicInfoSubsectionTitle}>{title}</h2>
         {onEdit ? (
           <button
             type="button"
@@ -3954,7 +3928,18 @@ function BasicInfoSubsection({
                     : styles.basicInfoRow
               }
             >
-              <span style={styles.basicInfoLabel}>{row.label}</span>
+              <span
+                style={
+                  layout === "care"
+                    ? {
+                        ...styles.basicInfoLabel,
+                        ...styles.basicInfoCareLabel,
+                      }
+                    : styles.basicInfoLabel
+                }
+              >
+                {row.label}
+              </span>
               <span
                 style={
                   layout === "care"
@@ -7486,7 +7471,7 @@ const styles = {
   sectionTabButton: {
     minWidth: 0,
     minHeight: "47px",
-    padding: "0 12px 2px",
+    padding: "0 4px 2px",
     border: "none",
     borderRadius: 0,
     borderBottom: "2px solid transparent",
@@ -7496,6 +7481,7 @@ const styles = {
     fontSize: "13px",
     fontWeight: 500,
     letterSpacing: CATS_BODY_TRACKING,
+    whiteSpace: "nowrap",
     cursor: "pointer",
   },
   sectionTabButtonActive: {
@@ -7509,6 +7495,7 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
+    whiteSpace: "nowrap",
   },
   sectionTabIndicator: {
     position: "absolute" as const,
@@ -8556,8 +8543,7 @@ const styles = {
   },
   profileSummaryCard: {
     display: "grid",
-    gridTemplateColumns: "72px minmax(0, 1fr)",
-    gridTemplateRows: "auto auto",
+    gridTemplateColumns: "72px minmax(0, 1fr) auto",
     alignItems: "center",
     columnGap: "12px",
     rowGap: "2px",
@@ -8570,7 +8556,6 @@ const styles = {
       "0 12px 28px -26px color-mix(in srgb, var(--ink) 28%, transparent)",
   },
   profileSummaryPhoto: {
-    gridRow: "1 / span 2",
     width: "72px",
     height: "72px",
     display: "flex",
@@ -8640,9 +8625,8 @@ const styles = {
     lineHeight: 1.55,
     letterSpacing: CATS_META_TRACKING,
   },
-  profileSummaryEditButton: {
-    gridColumn: 2,
-    justifySelf: "start",
+  profileSummaryShareButton: {
+    justifySelf: "end",
     minWidth: "44px",
     height: "44px",
     minHeight: "44px",
@@ -8718,39 +8702,21 @@ const styles = {
   basicInfoTable: {
     display: "grid",
     gap: 0,
-    borderTop: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
     background: "transparent",
   },
   basicInfoSubsection: {
     display: "grid",
-    gap: "10px",
+    gap: 0,
     minWidth: 0,
-  },
-  profileInfoSurface: {
-    padding: "16px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 48%, transparent)",
-    borderRadius: "20px",
-    background: "color-mix(in srgb, var(--paper-card) 38%, transparent)",
-  },
-  profileCareSurface: {
-    background: "color-mix(in srgb, var(--paper-warm) 44%, transparent)",
-  },
-  profilePortraitSection: {
-    display: "grid",
-    gap: "12px",
-    minWidth: 0,
-    padding: "18px 18px 20px",
-    borderRadius: "0 20px 20px 0",
-    borderLeft:
-      "2px solid color-mix(in srgb, var(--seal) 48%, var(--line))",
-    background: "color-mix(in srgb, var(--paper-card) 42%, transparent)",
   },
   basicInfoSubsectionHeading: {
+    minHeight: "44px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
     minWidth: 0,
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 70%, transparent)",
   },
   basicInfoSubsectionTitle: {
     margin: 0,
@@ -8765,23 +8731,10 @@ const styles = {
     margin: 0,
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
-    fontSize: "18px",
+    fontSize: "17px",
     fontWeight: 500,
     lineHeight: 1.45,
     letterSpacing: CATS_TITLE_TRACKING,
-  },
-  profilePortraitCopy: {
-    minWidth: 0,
-    margin: 0,
-    color: CATS_TEXT_STRONG,
-    fontFamily: CATS_UI,
-    fontSize: "16px",
-    fontWeight: 400,
-    lineHeight: 1.95,
-    letterSpacing: CATS_BODY_TRACKING,
-    whiteSpace: "pre-wrap" as const,
-    overflowWrap: "anywhere" as const,
-    textWrap: "pretty" as const,
   },
   profilePortraitEmpty: {
     minWidth: 0,
@@ -8793,53 +8746,32 @@ const styles = {
     lineHeight: 1.75,
     letterSpacing: CATS_BODY_TRACKING,
   },
-  profileGrowthAction: {
-    width: "100%",
-    minHeight: "78px",
+  profileEmptyPersonalitySection: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto auto",
+    gap: "14px",
+    minWidth: 0,
+    paddingBottom: "2px",
+  },
+  profileEmptyPersonalityAction: {
+    minWidth: "44px",
+    minHeight: "46px",
+    justifySelf: "start",
+    display: "inline-flex",
     alignItems: "center",
-    gap: "10px",
-    padding: "14px 14px 14px 16px",
-    border: "1px solid color-mix(in srgb, var(--seal) 32%, var(--line))",
-    borderRadius: "18px",
-    background: "color-mix(in srgb, var(--paper-card) 46%, transparent)",
-    color: CATS_TEXT,
-    textAlign: "left" as const,
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-  },
-  profileGrowthText: {
-    minWidth: 0,
-    display: "grid",
-    gap: "4px",
-  },
-  profileGrowthKicker: {
-    color: "var(--seal)",
+    justifyContent: "center",
+    gap: "7px",
+    padding: "0 16px",
+    border: "none",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    color: "var(--paper)",
     fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 500,
-    lineHeight: 1.4,
-    letterSpacing: "0.055em",
-  },
-  profileGrowthPrompt: {
-    minWidth: 0,
-    color: CATS_TEXT_STRONG,
-    fontFamily: CATS_UI,
-    fontSize: "15px",
-    fontWeight: 500,
-    lineHeight: 1.55,
-    letterSpacing: CATS_BODY_TRACKING,
-    overflowWrap: "anywhere" as const,
-  },
-  profileGrowthVerb: {
-    color: "var(--seal)",
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
+    fontSize: "14px",
     fontWeight: 500,
     lineHeight: 1,
-    letterSpacing: CATS_META_TRACKING,
-    whiteSpace: "nowrap" as const,
+    letterSpacing: CATS_BODY_TRACKING,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   basicInfoSubsectionEditButton: {
     minWidth: "44px",
@@ -8892,6 +8824,9 @@ const styles = {
     letterSpacing: "0.04em",
     overflowWrap: "break-word",
   },
+  basicInfoCareLabel: {
+    gridRow: 2,
+  },
   basicInfoValueStack: {
     display: "flex",
     alignItems: "baseline",
@@ -8902,6 +8837,7 @@ const styles = {
     textAlign: "right",
   },
   basicInfoCareValueStack: {
+    gridRow: 1,
     justifyContent: "flex-start",
     textAlign: "left" as const,
   },
@@ -8938,52 +8874,6 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.7,
     letterSpacing: CATS_META_TRACKING,
-  },
-  profileShareEntry: {
-    width: "100%",
-    minHeight: "76px",
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto auto",
-    alignItems: "center",
-    gap: "10px",
-    padding: "14px 14px 14px 16px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
-    borderRadius: "18px",
-    background: "transparent",
-    color: CATS_TEXT,
-    textAlign: "left" as const,
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-  },
-  profileShareEntryText: {
-    minWidth: 0,
-    display: "grid",
-    gap: "3px",
-  },
-  profileShareEntryTitle: {
-    color: CATS_TEXT_STRONG,
-    fontFamily: CATS_UI,
-    fontSize: "15px",
-    fontWeight: 500,
-    lineHeight: 1.5,
-    letterSpacing: CATS_BODY_TRACKING,
-  },
-  profileShareEntryHint: {
-    color: CATS_PROFILE_META,
-    fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.55,
-    letterSpacing: CATS_META_TRACKING,
-  },
-  profileShareEntryVerb: {
-    color: "var(--seal)",
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 500,
-    lineHeight: 1,
-    letterSpacing: CATS_META_TRACKING,
-    whiteSpace: "nowrap" as const,
   },
   basicInfoNoteRow: {
     display: "grid",

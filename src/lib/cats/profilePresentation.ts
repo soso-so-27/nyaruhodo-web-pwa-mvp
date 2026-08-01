@@ -5,41 +5,8 @@ import type {
 } from "../../components/home/homeInputHelpers";
 
 const PERSONALITY_VALUE_MAX_LENGTH = 60;
-const CAT_NAME_MAX_LENGTH = 40;
 const LIVING_VALUE_MAX_LENGTH = 180;
 const LIVING_NOTE_MAX_LENGTH = 100;
-
-const PERSONALITY_QUESTIONS = [
-  {
-    key: "callName",
-    label: "呼び名",
-    prompt: "いつもの呼び名は？",
-  },
-  {
-    key: "favoritePlace",
-    label: "好きな場所",
-    prompt: "好きな場所は？",
-  },
-  {
-    key: "favoritePlay",
-    label: "好きな遊び",
-    prompt: "好きな遊びは？",
-  },
-  {
-    key: "favoriteTouch",
-    label: "なでると喜ぶ場所",
-    prompt: "なでると喜ぶ場所は？",
-  },
-  {
-    key: "dislikes",
-    label: "苦手なこと",
-    prompt: "苦手なことは？",
-  },
-] as const satisfies ReadonlyArray<{
-  key: keyof CatPersonalityInfo;
-  label: string;
-  prompt: string;
-}>;
 
 const COAT_LABELS: Readonly<Record<string, string>> = {
   saba: "サバトラ",
@@ -54,24 +21,21 @@ const COAT_LABELS: Readonly<Record<string, string>> = {
   tortoiseshell: "サビ",
 };
 
-export type CatProfilePersonalityQuestionKey =
-  (typeof PERSONALITY_QUESTIONS)[number]["key"];
+export type CatProfilePersonalityQuestionKey = keyof CatPersonalityInfo;
 
-export type CatProfileNextQuestion =
-  | {
-      kind: "question";
-      key: CatProfilePersonalityQuestionKey;
-      label: string;
-      prompt: string;
-    }
-  | {
-      kind: "review";
-      key: "review";
-      label: "見返す";
-      prompt: "書いたことを、見返してみる";
-    };
+export type CatProfilePersonalityItemKey =
+  | "callName"
+  | "likes"
+  | "favoriteTouch"
+  | "dislikes";
 
-export type CatProfileLivingItemGroup = "care" | "history" | "identity";
+export type CatProfilePersonalityItem = {
+  key: CatProfilePersonalityItemKey;
+  label: string;
+  value: string;
+};
+
+export type CatProfileLivingItemGroup = "living" | "health" | "basic";
 
 export type CatProfileLivingItemKey =
   | "careNote"
@@ -94,10 +58,7 @@ export type CatProfileLivingItem = {
 };
 
 export type CatProfilePresentation = {
-  title: string;
-  portraitLines: string[];
-  portraitParagraph: string;
-  nextQuestion: CatProfileNextQuestion;
+  personalityItems: CatProfilePersonalityItem[];
   livingItems: CatProfileLivingItem[];
 };
 
@@ -108,27 +69,15 @@ export type CatProfilePresentation = {
 export function buildCatProfilePresentation(
   profile: CatProfile,
 ): CatProfilePresentation {
-  const portraitLines = buildCatProfilePortraitLines(profile);
-
   return {
-    title: buildCatProfilePortraitTitle(profile),
-    portraitLines,
-    portraitParagraph: portraitLines.join(""),
-    nextQuestion: getNextCatProfileQuestion(profile),
+    personalityItems: buildCatProfilePersonalityItems(profile),
     livingItems: buildCatProfileLivingItems(profile),
   };
 }
 
-export function buildCatProfilePortraitTitle(profile: CatProfile): string {
-  const name =
-    profile.nameState === "unset"
-      ? null
-      : normalizeDisplayText(profile.name, CAT_NAME_MAX_LENGTH);
-
-  return `${name ?? "この子"}は、こんな子`;
-}
-
-export function buildCatProfilePortraitLines(profile: CatProfile): string[] {
+export function buildCatProfilePersonalityItems(
+  profile: CatProfile,
+): CatProfilePersonalityItem[] {
   const personality = profile.basicInfo?.personality;
 
   if (!personality) {
@@ -158,40 +107,44 @@ export function buildCatProfilePortraitLines(profile: CatProfile): string[] {
     ),
   };
 
-  return [
-    values.callName ? `ふだんの呼び名は、${values.callName}。` : null,
-    values.favoritePlace ? `よくいるのは、${values.favoritePlace}。` : null,
-    values.favoritePlay ? `好きな遊びは、${values.favoritePlay}。` : null,
-    values.favoriteTouch
-      ? `なでると喜ぶのは、${values.favoriteTouch}。`
-      : null,
-    values.dislikes ? `苦手なのは、${values.dislikes}。` : null,
-  ].filter((line): line is string => line !== null);
-}
+  const items: CatProfilePersonalityItem[] = [];
 
-export function getNextCatProfileQuestion(
-  profile: CatProfile,
-): CatProfileNextQuestion {
-  const personality = profile.basicInfo?.personality;
-  const unanswered = PERSONALITY_QUESTIONS.find(
-    ({ key }) => !normalizeDisplayText(personality?.[key]),
-  );
-
-  if (unanswered) {
-    return {
-      kind: "question",
-      key: unanswered.key,
-      label: unanswered.label,
-      prompt: unanswered.prompt,
-    };
+  if (values.callName) {
+    items.push({
+      key: "callName",
+      label: "呼び名",
+      value: values.callName,
+    });
   }
 
-  return {
-    kind: "review",
-    key: "review",
-    label: "見返す",
-    prompt: "書いたことを、見返してみる",
-  };
+  const likes = [values.favoritePlace, values.favoritePlay].filter(
+    (value): value is string => Boolean(value),
+  );
+  if (likes.length > 0) {
+    items.push({
+      key: "likes",
+      label: "好き",
+      value: likes.join("\n"),
+    });
+  }
+
+  if (values.favoriteTouch) {
+    items.push({
+      key: "favoriteTouch",
+      label: "接し方",
+      value: values.favoriteTouch,
+    });
+  }
+
+  if (values.dislikes) {
+    items.push({
+      key: "dislikes",
+      label: "苦手",
+      value: values.dislikes,
+    });
+  }
+
+  return items;
 }
 
 /**
@@ -206,14 +159,25 @@ export function buildCatProfileLivingItems(
 
   pushLivingItem(items, {
     key: "careNote",
-    group: "care",
+    group: "living",
     label: "気をつけること",
     value: normalizeDisplayText(care?.careNote, LIVING_VALUE_MAX_LENGTH),
   });
 
+  const weight = formatWeight(care?.weightKg);
+
+  pushLivingItem(items, {
+    key: "weight",
+    group: "health",
+    label: "体重",
+    value: weight,
+    note: weight ? formatMeasuredDate(care?.weightMeasuredDate) : undefined,
+    valueTone: "measurement",
+  });
+
   pushLivingItem(items, {
     key: "vetClinic",
-    group: "care",
+    group: "health",
     label: "かかりつけ",
     value: normalizeDisplayText(care?.vetClinic, LIVING_VALUE_MAX_LENGTH),
   });
@@ -227,7 +191,7 @@ export function buildCatProfileLivingItems(
   if (vaccineDate || vaccineNote) {
     items.push({
       key: "vaccine",
-      group: "care",
+      group: "health",
       label: "ワクチン",
       value: vaccineDate ?? vaccineNote ?? "",
       note: vaccineDate ? vaccineNote ?? undefined : undefined,
@@ -235,20 +199,9 @@ export function buildCatProfileLivingItems(
     });
   }
 
-  const weight = formatWeight(care?.weightKg);
-
-  pushLivingItem(items, {
-    key: "weight",
-    group: "care",
-    label: "体重",
-    value: weight,
-    note: weight ? formatMeasuredDate(care?.weightMeasuredDate) : undefined,
-    valueTone: "measurement",
-  });
-
   pushLivingItem(items, {
     key: "familySinceDate",
-    group: "history",
+    group: "basic",
     label: "家族になった日",
     value: formatLocalDate(basicInfo?.familySinceDate),
     valueTone: "date",
@@ -256,7 +209,7 @@ export function buildCatProfileLivingItems(
 
   pushLivingItem(items, {
     key: "birthDate",
-    group: "history",
+    group: "basic",
     label: "誕生日",
     value: formatLocalDate(basicInfo?.birthDate),
     valueTone: "date",
@@ -264,7 +217,7 @@ export function buildCatProfileLivingItems(
 
   pushLivingItem(items, {
     key: "gender",
-    group: "identity",
+    group: "basic",
     label: "性別",
     value: formatGender(basicInfo?.gender),
   });
@@ -276,14 +229,14 @@ export function buildCatProfileLivingItems(
 
   pushLivingItem(items, {
     key: "coat",
-    group: "identity",
+    group: "basic",
     label: "毛柄",
     value: coat ? COAT_LABELS[coat] ?? coat : null,
   });
 
   pushLivingItem(items, {
     key: "breed",
-    group: "identity",
+    group: "basic",
     label: "猫種",
     value: normalizeDisplayText(basicInfo?.breed, LIVING_VALUE_MAX_LENGTH),
   });
