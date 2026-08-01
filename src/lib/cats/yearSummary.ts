@@ -1,6 +1,8 @@
 import type { CatSleepingMilestone } from "../home/sleepingPhotos";
 import type { OmoideMemory } from "../home/omoideDelivery";
 
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
 export type CatYearSummaryPhoto = {
   id: string;
   src: string;
@@ -31,11 +33,13 @@ export function createCatYearSummaries({
   const rows = new Map<number, MutableYearSummary>();
 
   for (const photo of photos) {
-    const date = toValidDate(photo.createdAt);
-    const year = date.getFullYear();
-    const row = getOrCreateRow(rows, year);
+    const date = getJstDateParts(photo.createdAt);
+    const row = getOrCreateRow(rows, date.year);
     row.photoCount += 1;
-    row.monthCounts.set(date.getMonth(), (row.monthCounts.get(date.getMonth()) ?? 0) + 1);
+    row.monthCounts.set(
+      date.monthIndex,
+      (row.monthCounts.get(date.monthIndex) ?? 0) + 1,
+    );
 
     if (!row.coverSrc || photo.createdAt > row.coverTimestamp) {
       row.coverSrc = photo.src;
@@ -54,7 +58,7 @@ export function createCatYearSummaries({
       continue;
     }
 
-    const year = toValidDate(milestone.reachedAt).getFullYear();
+    const year = getJstDateParts(milestone.reachedAt).year;
     const row = getOrCreateRow(rows, year);
     row.milestoneCount += 1;
     row.highlights.push(getYearMilestoneLabel(milestone.target));
@@ -66,7 +70,7 @@ export function createCatYearSummaries({
   }
 
   if (rows.size === 0) {
-    getOrCreateRow(rows, toValidDate(now).getFullYear());
+    getOrCreateRow(rows, getJstDateParts(now).year);
   }
 
   return [...rows.values()]
@@ -131,14 +135,21 @@ function getYearMilestoneLabel(target: CatSleepingMilestone["target"]) {
   return `${target}枚目`;
 }
 
-function toValidDate(timestamp: number) {
-  const date = new Date(timestamp || Date.now());
-  return Number.isNaN(date.getTime()) ? new Date() : date;
+function getJstDateParts(timestamp: number) {
+  const date = new Date((timestamp || Date.now()) + JST_OFFSET_MS);
+  const validDate = Number.isNaN(date.getTime())
+    ? new Date(Date.now() + JST_OFFSET_MS)
+    : date;
+
+  return {
+    year: validDate.getUTCFullYear(),
+    monthIndex: validDate.getUTCMonth(),
+  };
 }
 
 function getYearFromDateKey(dateKey: string) {
   const year = Number(dateKey.slice(0, 4));
-  return year || new Date().getFullYear();
+  return year || getJstDateParts(Date.now()).year;
 }
 
 function unique(values: string[]) {

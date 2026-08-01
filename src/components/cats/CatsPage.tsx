@@ -1983,7 +1983,7 @@ export function CatsPage() {
                           onChange={(event) =>
                             setEditFamilySinceDate(event.target.value)
                           }
-                          max={new Date().toISOString().split("T")[0]}
+                          max={getTodayDateInputValue()}
                         />
 
                         <AppTextField
@@ -1993,7 +1993,7 @@ export function CatsPage() {
                           onChange={(event) =>
                             setEditBirthDate(event.target.value)
                           }
-                          max={new Date().toISOString().split("T")[0]}
+                          max={getTodayDateInputValue()}
                         />
 
                         <AppSegmented<EditableGender>
@@ -2477,7 +2477,7 @@ export function CatsPage() {
                           onChange={(event) =>
                             setEditFamilySinceDate(event.target.value)
                           }
-                          max={new Date().toISOString().split("T")[0]}
+                          max={getTodayDateInputValue()}
                         />
                         <AppTextField
                           type="date"
@@ -2487,7 +2487,7 @@ export function CatsPage() {
                           onChange={(event) =>
                             setEditBirthDate(event.target.value)
                           }
-                          max={new Date().toISOString().split("T")[0]}
+                          max={getTodayDateInputValue()}
                         />
                       </div>
                     </section>
@@ -2599,7 +2599,7 @@ export function CatsPage() {
                         onChange={(event) =>
                           setEditWeightMeasuredDate(event.target.value)
                         }
-                        max={new Date().toISOString().split("T")[0]}
+                        max={getTodayDateInputValue()}
                       />
                     </div>
                     <AppTextField
@@ -2618,7 +2618,7 @@ export function CatsPage() {
                       onChange={(event) =>
                         setEditVaccineDate(event.target.value)
                       }
-                      max={new Date().toISOString().split("T")[0]}
+                      max={getTodayDateInputValue()}
                     />
                     <AppTextField
                       type="text"
@@ -5351,30 +5351,18 @@ function getFootprintMilestoneTitle(target: CatSleepingMilestone["target"]) {
 }
 
 function formatFootprintDate(timestamp: number) {
-  if (!timestamp) {
+  const parts = getJstDateParts(timestamp);
+  if (!parts) {
     return "";
   }
 
-  const date = new Date(timestamp);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(
-    2,
-    "0",
-  )}/${String(date.getDate()).padStart(2, "0")}`;
+  return `${parts.year}/${String(parts.month).padStart(2, "0")}/${String(
+    parts.day,
+  ).padStart(2, "0")}`;
 }
 
 function isTimestampInYear(timestamp: number, year: number) {
-  if (!timestamp) {
-    return false;
-  }
-
-  const date = new Date(timestamp);
-
-  return !Number.isNaN(date.getTime()) && date.getFullYear() === year;
+  return getJstDateParts(timestamp)?.year === year;
 }
 
 function isDateKeyInYear(dateKey: string, year: number) {
@@ -5489,13 +5477,8 @@ function trimToMax(value: string, maxLength: number) {
   return trimmed ? trimmed.slice(0, maxLength) : undefined;
 }
 
-function getTodayDateInputValue() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+function getTodayDateInputValue(now = Date.now()) {
+  return getJstDateKey(now);
 }
 
 function countKnownCatInfo({
@@ -6333,12 +6316,12 @@ function countStoredSleepingPhotosForCat(catId: string) {
 }
 
 function formatRecordMonth(timestamp: number) {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
+  const parts = getJstDateParts(timestamp);
+  if (!parts) {
     return "";
   }
 
-  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+  return `${parts.year}年${parts.month}月`;
 }
 
 function getClientNow() {
@@ -6366,12 +6349,12 @@ function getMsUntilNextJstCalendarDay(now: number) {
 }
 
 function formatRecordShortDate(timestamp: number) {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
+  const parts = getJstDateParts(timestamp);
+  if (!parts) {
     return "";
   }
 
-  return `${date.getMonth() + 1}/${date.getDate()}`;
+  return `${parts.month}/${parts.day}`;
 }
 
 function hasSeenUnopenedOmoideDotHint() {

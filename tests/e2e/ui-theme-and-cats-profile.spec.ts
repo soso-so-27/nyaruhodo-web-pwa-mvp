@@ -1526,6 +1526,46 @@ test("edits weight and mixed coat without showing the old breed field", async ({
     });
 });
 
+test("uses the JST date as the profile input limit at the start of a month", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-08-01T00:30:00+09:00"));
+  await seedCatsBasicProfile(page, {
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+      birthDate: "2022-07-10",
+    },
+    appearance: {},
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await expect(page.getByTestId("cats-section-tab-basic")).toBeVisible();
+  await page.getByTestId("cats-section-tab-basic").click();
+
+  await page.getByRole("button", { name: "基本情報を編集" }).click();
+  const basicDialog = page.getByRole("dialog", { name: "むぎの基本情報" });
+  await expect(basicDialog.getByLabel("家族になった日")).toHaveAttribute(
+    "max",
+    "2026-08-01",
+  );
+  await expect(basicDialog.getByLabel("誕生日")).toHaveAttribute(
+    "max",
+    "2026-08-01",
+  );
+  await basicDialog.getByRole("button", { name: "キャンセル" }).click();
+
+  await page.getByRole("button", { name: "ケアのメモを編集" }).click();
+  const careDialog = page.getByRole("dialog", { name: "むぎのケアのメモ" });
+  await expect(careDialog.getByLabel("はかった日")).toHaveAttribute(
+    "max",
+    "2026-08-01",
+  );
+  await expect(careDialog.getByLabel("ワクチンを打った日")).toHaveAttribute(
+    "max",
+    "2026-08-01",
+  );
+});
+
 test("closes the basic profile editor instead of returning to cat management", async ({
   page,
 }) => {
@@ -1889,6 +1929,50 @@ test("opens a year summary dashboard from the yearly archive", async ({
   await expect(dialog).toContainText("記念");
   await expect(dialog).toContainText("6月によく とりました");
   await expect(dialog).toContainText("10枚目");
+});
+
+test.describe("JST record boundaries outside Japan", () => {
+  test.use({ timezoneId: "UTC" });
+
+  test("keeps an August 1 photo in August", async ({ page }) => {
+    const now = Date.parse("2026-08-01T00:30:00+09:00");
+    await seedCatsProfile(page, now, 1);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/cats");
+    await expect(page.getByTestId("cats-section-tab-record")).toBeVisible();
+    await page.getByTestId("cats-section-tab-record").click();
+
+    await expect(page.getByText("2026年8月", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: /2026年/ }).click();
+
+    const dialog = page.getByRole("dialog", { name: "2026年" });
+    await expect(dialog).toContainText("8月によく とりました");
+  });
+
+  test("keeps a January 1 photo and its details in the new year", async ({
+    page,
+  }) => {
+    const now = Date.parse("2027-01-01T00:30:00+09:00");
+    await seedCatsProfile(page, now, 1);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/cats");
+    await expect(page.getByTestId("cats-section-tab-record")).toBeVisible();
+    await page.getByTestId("cats-section-tab-record").click();
+
+    await expect(page.getByText("2027年1月", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /2026年/ })).toHaveCount(0);
+    await page.getByRole("button", { name: /2027年/ }).click();
+
+    const dialog = page.getByRole("dialog", { name: "2027年" });
+    const photoDetailButton = dialog.getByRole("button", { name: /写真/ });
+    await expect(photoDetailButton).toBeEnabled();
+    await photoDetailButton.click();
+    await expect(
+      dialog.getByRole("button", {
+        name: "2027/01/01の写真をひらく",
+      }).first(),
+    ).toBeVisible();
+  });
 });
 
 async function seedCatsPhotoTabState(

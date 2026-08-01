@@ -74,6 +74,27 @@ test.describe("20時 and day-reset boundaries", () => {
     );
   });
 
+  test("rolls client and server date keys across month and year boundaries", () => {
+    const monthEnd = Date.parse("2026-07-31T23:59:59+09:00");
+    const nextMonth = Date.parse("2026-08-01T00:00:00+09:00");
+    const yearEnd = Date.parse("2026-12-31T23:59:59+09:00");
+    const nextYear = Date.parse("2027-01-01T00:00:00+09:00");
+
+    expect(getJstDateKey(monthEnd)).toBe("2026-07-31");
+    expect(getJstDateKey(nextMonth)).toBe("2026-08-01");
+    expect(getServerJstDateKey(monthEnd)).toBe("2026-07-31");
+    expect(getServerJstDateKey(nextMonth)).toBe("2026-08-01");
+    expect(getJstDateKey(yearEnd)).toBe("2026-12-31");
+    expect(getJstDateKey(nextYear)).toBe("2027-01-01");
+    expect(getServerJstDateKey(yearEnd)).toBe("2026-12-31");
+    expect(getServerJstDateKey(nextYear)).toBe("2027-01-01");
+    expect(
+      getEveningDeliveryTargetDateKey(
+        Date.parse("2026-07-31T20:00:00+09:00"),
+      ),
+    ).toBe("2026-08-01");
+  });
+
   test("keeps JST date math stable around the 5時 home reset boundary", () => {
     expect(getJstDateKey(Date.parse("2026-07-10T04:59:59+09:00"))).toBe(
       "2026-07-10",

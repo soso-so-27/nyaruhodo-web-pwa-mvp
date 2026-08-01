@@ -38,17 +38,38 @@ test.describe("cat year summaries", () => {
     });
   });
 
+  test("uses JST for the photo month and milestone year at UTC-side rollovers", () => {
+    const summaries = createCatYearSummaries({
+      photos: [photo("august-photo", "2026-07-31T15:30:00.000Z")],
+      memories: [],
+      milestones: [milestone(10, "2026-12-31T15:30:00.000Z")],
+    });
+
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0]).toMatchObject({
+      year: 2027,
+      photoCount: 0,
+      milestoneCount: 1,
+    });
+    expect(summaries[1]).toMatchObject({
+      year: 2026,
+      photoCount: 1,
+      milestoneCount: 0,
+      activeMonthLabel: "8月によく とりました",
+    });
+  });
+
   test("uses the current year as a quiet empty state", () => {
     const summaries = createCatYearSummaries({
       photos: [],
       memories: [],
       milestones: [],
-      now: Date.parse("2026-06-10T12:00:00+09:00"),
+      now: Date.parse("2026-12-31T15:30:00.000Z"),
     });
 
     expect(summaries).toEqual([
       {
-        year: 2026,
+        year: 2027,
         photoCount: 0,
         pickupCount: 0,
         milestoneCount: 0,
