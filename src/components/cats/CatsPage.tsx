@@ -182,7 +182,6 @@ const CATS_PROFILE_META =
 const CATS_PAPER = "var(--paper)";
 const CATS_UI = "var(--font-ui)";
 const CATS_SERIF = CATS_UI;
-const CATS_BASIC_VALUE_SERIF = CATS_UI;
 const CATS_TITLE_SIZE = "20px";
 const CATS_DISPLAY_SIZE = "25px";
 const CATS_BODY_SIZE = "13px";
@@ -2233,7 +2232,6 @@ export function CatsPage() {
                   style={styles.profileSettings}
                   aria-label="猫の管理"
                 >
-                  <p style={styles.profileSettingsHeading}>管理</p>
                   <button
                     type="button"
                     style={styles.profileSettingsRow}
@@ -3704,16 +3702,17 @@ function CatBasicProfilePanel({
               家族になった日は、まだ書かれていません
             </p>
           )}
+          <button
+            type="button"
+            data-testid="cats-profile-share-open"
+            style={styles.profileSummaryShareButton}
+            onClick={onOpenShare}
+            aria-label={`${catName}の共有メモを作る`}
+          >
+            <AppIcon name="send" size={16} />
+            <span>共有メモ</span>
+          </button>
         </div>
-        <button
-          type="button"
-          data-testid="cats-profile-share-open"
-          style={styles.profileSummaryShareButton}
-          onClick={onOpenShare}
-          aria-label={`${catName}の共有メモを作る`}
-        >
-          共有メモ
-        </button>
       </section>
       <BasicInfoTable
         profile={profile}
@@ -3753,11 +3752,12 @@ function BasicInfoTable({
     .filter((item) => item.group === "basic")
     .map(createBasicInfoRowFromLivingItem);
   const hasPersonality = personalityRows.length > 0;
-  const showEmptySections =
-    hasPersonality ||
-    livingRows.length > 0 ||
-    healthRows.length > 0 ||
-    basicRows.length > 0;
+  const hasCareInformation = livingRows.length > 0 || healthRows.length > 0;
+  const hasAnyProfileInformation =
+    hasPersonality || hasCareInformation || basicRows.length > 0;
+  const showAddMore =
+    hasAnyProfileInformation &&
+    (!hasCareInformation || basicRows.length === 0);
 
   return (
     <div style={styles.basicInfoBlock}>
@@ -3765,7 +3765,7 @@ function BasicInfoTable({
         <BasicInfoSubsection
           title="この子らしさ"
           rows={personalityRows}
-          layout="facts"
+          layout="story"
           onEdit={onEditPersonality}
           testId="cats-profile-personality-section"
         />
@@ -3793,17 +3793,17 @@ function BasicInfoTable({
         </section>
       )}
 
-      {showEmptySections || livingRows.length > 0 ? (
+      {livingRows.length > 0 ? (
         <BasicInfoSubsection
           title="暮らし"
           rows={livingRows}
-          layout="care"
+          layout="note"
           onEdit={onEditCare}
           emptyMessage="気をつけていることは、まだ書かれていません。"
           testId="cats-profile-living-section"
         />
       ) : null}
-      {showEmptySections || healthRows.length > 0 ? (
+      {healthRows.length > 0 ? (
         <BasicInfoSubsection
           title="からだ・通院"
           rows={healthRows}
@@ -3813,7 +3813,7 @@ function BasicInfoTable({
           testId="cats-profile-health-section"
         />
       ) : null}
-      {showEmptySections || basicRows.length > 0 ? (
+      {basicRows.length > 0 ? (
         <BasicInfoSubsection
           title="基本情報"
           rows={basicRows}
@@ -3822,6 +3822,39 @@ function BasicInfoTable({
           emptyMessage="誕生日や性別などは、まだ書かれていません。"
           testId="cats-profile-basic-section"
         />
+      ) : null}
+      {showAddMore ? (
+        <section
+          data-testid="cats-profile-add-more"
+          style={styles.profileAddMore}
+          aria-label="プロフィールに書き足す"
+        >
+          <p style={styles.profileAddMoreTitle}>書き足す</p>
+          <div style={styles.profileAddMoreActions}>
+            {!hasCareInformation ? (
+              <button
+                type="button"
+                style={styles.profileAddMoreButton}
+                onClick={onEditCare}
+                aria-label="暮らし・からだを書く"
+              >
+                <AddSmallIcon />
+                暮らし・からだ
+              </button>
+            ) : null}
+            {basicRows.length === 0 ? (
+              <button
+                type="button"
+                style={styles.profileAddMoreButton}
+                onClick={onEditBasic}
+                aria-label="基本情報を書く"
+              >
+                <AddSmallIcon />
+                基本情報
+              </button>
+            ) : null}
+          </div>
+        </section>
       ) : null}
     </div>
   );
@@ -3867,6 +3900,35 @@ function createBasicInfoRow({
   };
 }
 
+function ProfileValueText({
+  value,
+  preventOrphan,
+}: {
+  value: string;
+  preventOrphan: boolean;
+}) {
+  const characters = Array.from(value);
+
+  if (!preventOrphan || characters.length < 8) {
+    return <>{value}</>;
+  }
+
+  const tail = characters.slice(-4).join("");
+  const leading = characters.slice(0, -4).join("");
+
+  return (
+    <>
+      {leading}
+      <span
+        data-testid="cats-profile-value-tail"
+        style={styles.basicInfoValueTail}
+      >
+        {tail}
+      </span>
+    </>
+  );
+}
+
 function BasicInfoSubsection({
   title,
   rows,
@@ -3878,7 +3940,7 @@ function BasicInfoSubsection({
 }: {
   title: string;
   rows: BasicInfoDisplayRow[];
-  layout?: "facts" | "care";
+  layout?: "story" | "note" | "facts";
   onEdit?: () => void;
   emptyActionLabel?: string;
   emptyMessage?: string;
@@ -3910,64 +3972,70 @@ function BasicInfoSubsection({
         ) : null}
       </div>
       {visibleRows.length > 0 ? (
-        <div style={styles.basicInfoTable}>
-          {visibleRows.map((row, index) => (
-            <div
-              key={row.label}
-              data-testid={`cats-profile-${layout}-row`}
-              style={
-                layout === "care"
-                  ? index === 0
-                    ? {
-                        ...styles.basicInfoCareRow,
-                        ...styles.basicInfoRowFirst,
-                      }
-                    : styles.basicInfoCareRow
-                  : index === 0
-                    ? { ...styles.basicInfoRow, ...styles.basicInfoRowFirst }
-                    : styles.basicInfoRow
-              }
-            >
-              <span
-                style={
-                  layout === "care"
-                    ? {
-                        ...styles.basicInfoLabel,
-                        ...styles.basicInfoCareLabel,
-                      }
-                    : styles.basicInfoLabel
-                }
-              >
-                {row.label}
-              </span>
-              <span
-                style={
-                  layout === "care"
-                    ? {
-                        ...styles.basicInfoValueStack,
-                        ...styles.basicInfoCareValueStack,
-                      }
-                    : styles.basicInfoValueStack
-                }
-              >
-                <span
-                  style={
-                    row.valueTone === "numeric"
-                      ? {
-                          ...styles.basicInfoValue,
-                          ...styles.basicInfoValueNumeric,
-                        }
-                      : styles.basicInfoValue
+        <div
+          style={
+            layout === "story"
+              ? { ...styles.basicInfoTable, ...styles.basicInfoStoryList }
+              : layout === "note"
+                ? { ...styles.basicInfoTable, ...styles.basicInfoNoteList }
+                : styles.basicInfoTable
+          }
+        >
+          {visibleRows.map((row) => {
+            const rowStyle =
+              layout === "story"
+                ? styles.basicInfoStoryRow
+                : layout === "note"
+                  ? styles.basicInfoNoteRow
+                  : styles.basicInfoRow;
+            const labelStyle =
+              layout === "story"
+                ? { ...styles.basicInfoLabel, ...styles.basicInfoStoryLabel }
+                : layout === "note"
+                  ? { ...styles.basicInfoLabel, ...styles.basicInfoNoteLabel }
+                  : styles.basicInfoLabel;
+            const valueStackStyle =
+              layout === "story"
+                ? {
+                    ...styles.basicInfoValueStack,
+                    ...styles.basicInfoStoryValueStack,
                   }
-                >
-                  {row.value}
+                : layout === "note"
+                  ? {
+                      ...styles.basicInfoValueStack,
+                      ...styles.basicInfoNoteValueStack,
+                    }
+                  : styles.basicInfoValueStack;
+            const valueStyle = {
+              ...styles.basicInfoValue,
+              ...(layout === "story" ? styles.basicInfoStoryValue : {}),
+              ...(layout === "note" ? styles.basicInfoNoteValue : {}),
+              ...(row.valueTone === "numeric"
+                ? styles.basicInfoValueNumeric
+                : {}),
+            };
+
+            return (
+              <div
+                key={row.label}
+                data-testid={`cats-profile-${layout}-row`}
+                style={rowStyle}
+              >
+                <span style={labelStyle}>{row.label}</span>
+                <span style={valueStackStyle}>
+                  <span style={valueStyle}>
+                    <ProfileValueText
+                      value={row.value}
+                      preventOrphan={layout !== "facts"}
+                    />
+                  </span>
+                  {row.note ? (
+                    <span style={styles.basicInfoValueNote}>{row.note}</span>
+                  ) : null}
                 </span>
-                {row.note ? (
-                  <span style={styles.basicInfoValueNote}>{row.note}</span>
-                ) : null}
-              </span>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       ) : emptyMessage ? (
         <p style={styles.profileInfoEmpty}>{emptyMessage}</p>
@@ -7223,10 +7291,10 @@ const styles = {
     bottom: 0,
     zIndex: 19,
     height:
-      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 40px)",
+      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 18px)",
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(to bottom, transparent 0%, color-mix(in srgb, var(--paper-warm) 74%, transparent) 42%, color-mix(in srgb, var(--paper) 94%, transparent) 100%)",
+      "linear-gradient(to bottom, transparent 0%, color-mix(in srgb, var(--paper-warm) 46%, transparent) 34%, color-mix(in srgb, var(--paper) 90%, transparent) 100%)",
   },
   container: {
     position: "relative",
@@ -7451,6 +7519,8 @@ const styles = {
     paddingTop: "2px",
     paddingBottom:
       "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 24px + env(safe-area-inset-bottom))",
+    scrollPaddingBottom:
+      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 24px + env(safe-area-inset-bottom))",
   },
   sectionTabs: {
     flex: "0 0 auto",
@@ -7485,8 +7555,9 @@ const styles = {
     cursor: "pointer",
   },
   sectionTabButtonActive: {
-    color: "var(--seal)",
-    borderBottom: "2px solid var(--seal)",
+    color: "color-mix(in srgb, var(--seal) 32%, var(--ink) 68%)",
+    borderBottom:
+      "2px solid color-mix(in srgb, var(--seal) 32%, var(--ink) 68%)",
     background: "transparent",
     boxShadow: "none",
   },
@@ -8529,11 +8600,11 @@ const styles = {
   },
   basicInfoBlock: {
     display: "grid",
-    gap: "24px",
+    gap: "32px",
   },
   basicProfilePanel: {
     display: "grid",
-    gap: "24px",
+    gap: "34px",
   },
   basicInfoPanel: {
     marginBottom: 0,
@@ -8543,28 +8614,25 @@ const styles = {
   },
   profileSummaryCard: {
     display: "grid",
-    gridTemplateColumns: "72px minmax(0, 1fr) auto",
+    gridTemplateColumns: "96px minmax(0, 1fr)",
     alignItems: "center",
-    columnGap: "12px",
-    rowGap: "2px",
+    columnGap: "18px",
     minWidth: 0,
-    padding: "14px",
-    borderRadius: "22px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 56%, transparent)",
-    boxShadow:
-      "0 12px 28px -26px color-mix(in srgb, var(--ink) 28%, transparent)",
+    padding: "2px 2px 0",
+    border: "none",
+    background: "transparent",
+    boxShadow: "none",
   },
   profileSummaryPhoto: {
-    width: "72px",
-    height: "72px",
+    width: "96px",
+    height: "96px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    borderRadius: "18px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 54%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 56%, transparent)",
+    borderRadius: "24px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 46%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 44%, transparent)",
     color: CATS_MUTED,
   },
   profileSummaryPhotoTile: {
@@ -8592,7 +8660,8 @@ const styles = {
     minWidth: 0,
     display: "grid",
     alignContent: "center",
-    gap: "2px",
+    justifyItems: "start",
+    gap: "3px",
   },
   profileSummaryKicker: {
     minWidth: 0,
@@ -8609,7 +8678,7 @@ const styles = {
     margin: 0,
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
-    fontSize: "20px",
+    fontSize: "23px",
     fontWeight: 500,
     lineHeight: 1.35,
     letterSpacing: CATS_TITLE_TRACKING,
@@ -8626,17 +8695,21 @@ const styles = {
     letterSpacing: CATS_META_TRACKING,
   },
   profileSummaryShareButton: {
-    justifySelf: "end",
+    justifySelf: "start",
     minWidth: "44px",
     height: "44px",
     minHeight: "44px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "0 2px",
-    border: "none",
-    background: "transparent",
-    color: "var(--seal)",
+    gap: "7px",
+    marginTop: "6px",
+    padding: "0 14px",
+    border:
+      "1px solid color-mix(in srgb, var(--seal) 34%, var(--line-strong) 66%)",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--paper) 24%, transparent)",
+    color: "color-mix(in srgb, var(--seal) 32%, var(--ink) 68%)",
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 500,
@@ -8647,29 +8720,20 @@ const styles = {
   },
   profileSettings: {
     display: "grid",
-    gap: "8px",
-    margin: "24px 16px 22px",
-  },
-  profileSettingsHeading: {
-    margin: "0 4px",
-    color: CATS_PROFILE_META,
-    fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 500,
-    lineHeight: 1.45,
-    letterSpacing: "0.06em",
+    margin: "34px 16px 26px",
   },
   profileSettingsRow: {
     width: "100%",
-    minHeight: "64px",
+    minHeight: "56px",
     display: "grid",
-    gridTemplateColumns: "40px minmax(0, 1fr) auto",
+    gridTemplateColumns: "24px minmax(0, 1fr) auto",
     alignItems: "center",
-    gap: "12px",
-    padding: "11px 12px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
-    borderRadius: "18px",
-    background: "color-mix(in srgb, var(--paper-card) 42%, transparent)",
+    gap: "10px",
+    padding: "10px 2px",
+    border: "none",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
+    borderRadius: 0,
+    background: "transparent",
     color: CATS_MUTED,
     textAlign: "left" as const,
     cursor: "pointer",
@@ -8689,14 +8753,14 @@ const styles = {
     letterSpacing: CATS_BODY_TRACKING,
   },
   profileSettingsIcon: {
-    width: "40px",
-    height: "40px",
+    width: "24px",
+    height: "24px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--line) 55%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 36%, transparent)",
+    borderRadius: 0,
+    border: "none",
+    background: "transparent",
     color: CATS_MUTED,
   },
   basicInfoTable: {
@@ -8706,7 +8770,7 @@ const styles = {
   },
   basicInfoSubsection: {
     display: "grid",
-    gap: 0,
+    gap: "12px",
     minWidth: 0,
   },
   basicInfoSubsectionHeading: {
@@ -8716,13 +8780,13 @@ const styles = {
     justifyContent: "space-between",
     gap: "12px",
     minWidth: 0,
-    borderBottom: "1px solid color-mix(in srgb, var(--line) 70%, transparent)",
+    borderBottom: "none",
   },
   basicInfoSubsectionTitle: {
     margin: 0,
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
-    fontSize: "16px",
+    fontSize: "17px",
     fontWeight: 500,
     lineHeight: 1.45,
     letterSpacing: CATS_BODY_TRACKING,
@@ -8783,7 +8847,7 @@ const styles = {
     padding: "0 2px",
     border: "none",
     background: "transparent",
-    color: "var(--seal)",
+    color: CATS_MUTED,
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 500,
@@ -8794,23 +8858,39 @@ const styles = {
   },
   basicInfoRow: {
     display: "grid",
-    gridTemplateColumns: "minmax(92px, 40%) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(78px, 34%) minmax(0, 1fr)",
     alignItems: "baseline",
     columnGap: "12px",
     rowGap: "5px",
     minHeight: "auto",
-    padding: "13px 2px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
+    padding: "9px 2px",
+    borderBottom: "none",
   },
-  basicInfoCareRow: {
+  basicInfoStoryList: {
     display: "grid",
-    gap: "5px",
+    gap: "18px",
     minWidth: 0,
-    padding: "13px 2px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line) 44%, transparent)",
   },
-  basicInfoRowFirst: {
-    borderTop: "none",
+  basicInfoStoryRow: {
+    display: "grid",
+    gap: "4px",
+    minWidth: 0,
+    padding: "0 2px",
+  },
+  basicInfoNoteList: {
+    display: "grid",
+    gap: "16px",
+    minWidth: 0,
+    padding: "15px 16px 16px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 42%, transparent)",
+    borderRadius: "18px",
+    background: "color-mix(in srgb, var(--paper-card) 42%, transparent)",
+  },
+  basicInfoNoteRow: {
+    display: "grid",
+    gap: "6px",
+    minWidth: 0,
+    padding: 0,
   },
   basicInfoLabel: {
     display: "inline-flex",
@@ -8822,10 +8902,22 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.55,
     letterSpacing: "0.04em",
-    overflowWrap: "break-word",
+    wordBreak: "normal" as const,
+    lineBreak: "strict" as const,
   },
-  basicInfoCareLabel: {
-    gridRow: 2,
+  basicInfoStoryLabel: {
+    color: CATS_PROFILE_META,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.06em",
+  },
+  basicInfoNoteLabel: {
+    color: CATS_PROFILE_META,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.06em",
   },
   basicInfoValueStack: {
     display: "flex",
@@ -8836,11 +8928,6 @@ const styles = {
     minWidth: 0,
     textAlign: "right",
   },
-  basicInfoCareValueStack: {
-    gridRow: 1,
-    justifyContent: "flex-start",
-    textAlign: "left" as const,
-  },
   basicInfoValue: {
     minWidth: 0,
     color: CATS_TEXT,
@@ -8850,7 +8937,30 @@ const styles = {
     lineHeight: 1.7,
     letterSpacing: CATS_BODY_TRACKING,
     whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
+    overflowWrap: "break-word",
+    wordBreak: "normal" as const,
+    lineBreak: "strict" as const,
+  },
+  basicInfoStoryValueStack: {
+    justifyContent: "flex-start",
+    textAlign: "left" as const,
+  },
+  basicInfoStoryValue: {
+    fontSize: "16px",
+    lineHeight: 1.72,
+    textWrap: "pretty" as const,
+  },
+  basicInfoNoteValueStack: {
+    justifyContent: "flex-start",
+    textAlign: "left" as const,
+  },
+  basicInfoNoteValue: {
+    fontSize: "15px",
+    lineHeight: 1.72,
+    textWrap: "pretty" as const,
+  },
+  basicInfoValueTail: {
+    whiteSpace: "nowrap" as const,
   },
   basicInfoValueNumeric: {
     fontFamily: CATS_UI,
@@ -8875,30 +8985,45 @@ const styles = {
     lineHeight: 1.7,
     letterSpacing: CATS_META_TRACKING,
   },
-  basicInfoNoteRow: {
+  profileAddMore: {
     display: "grid",
-    gap: "5px",
-    minHeight: "auto",
-    padding: "12px",
-    borderBottom:
-      "1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)",
+    gap: "8px",
+    minWidth: 0,
+    paddingTop: "2px",
   },
-  basicInfoNoteLabel: {
-    color: CATS_FAINT,
+  profileAddMoreTitle: {
+    margin: 0,
+    color: CATS_PROFILE_META,
     fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.35,
-    letterSpacing: "0.08em",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.06em",
   },
-  basicInfoNoteValue: {
-    color: CATS_TEXT,
-    fontFamily: CATS_BASIC_VALUE_SERIF,
-    fontSize: "15px",
-    fontWeight: 400,
-    lineHeight: 1.9,
-    letterSpacing: CATS_BODY_TRACKING,
-    whiteSpace: "pre-wrap",
+  profileAddMoreActions: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "8px",
+  },
+  profileAddMoreButton: {
+    minWidth: "44px",
+    minHeight: "44px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    padding: "0 13px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 56%, transparent)",
+    borderRadius: "999px",
+    background: "transparent",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: CATS_META_TRACKING,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   basicInfoMissing: {
     color: CATS_FAINT,

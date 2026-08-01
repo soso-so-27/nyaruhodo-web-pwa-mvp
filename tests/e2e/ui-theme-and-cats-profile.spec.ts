@@ -1252,7 +1252,7 @@ test("keeps stored representative photo data without showing an unused setting",
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
-  await page.waitForLoadState("networkidle");
+  await expect(page.getByTestId("cats-page")).toBeVisible();
   await page.getByTestId("cats-section-tab-basic").click();
 
   await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
@@ -1281,7 +1281,7 @@ test("keeps stored representative photo data without showing an unused setting",
   await expect(page.getByTestId("cats-cover-photo-button")).toHaveCount(0);
 });
 
-test("shows a populated profile as structured sections with one summary surface", async ({
+test("shows a populated profile as a readable handbook", async ({
   page,
 }) => {
   await page.clock.setFixedTime(new Date("2026-07-25T12:00:00+09:00"));
@@ -1345,18 +1345,74 @@ test("shows a populated profile as structured sections with one summary surface"
       .getByTestId("cats-profile-personality-section")
       .getByText("この子らしさ", { exact: true }),
   ).toBeVisible();
-  for (const label of ["呼び名", "好き", "接し方", "苦手"]) {
+  for (const label of [
+    "呼び名",
+    "好きな場所",
+    "好きな遊び",
+    "好きななで方",
+    "苦手",
+  ]) {
     await expect(
       page
         .getByTestId("cats-profile-personality-section")
         .getByText(label, { exact: true }),
     ).toBeVisible();
   }
+  const personalitySection = page.getByTestId(
+    "cats-profile-personality-section",
+  );
+  await expect(personalitySection).toHaveAttribute(
+    "data-profile-layout",
+    "story",
+  );
+  await expect(
+    personalitySection.getByTestId("cats-profile-story-row"),
+  ).toHaveCount(5);
+  const storyLayout = await personalitySection
+    .getByTestId("cats-profile-story-row")
+    .first()
+    .evaluate((row) => {
+      const value = row.lastElementChild?.firstElementChild as HTMLElement | null;
+      return {
+        columns: getComputedStyle(row).gridTemplateColumns,
+        textAlign: value ? getComputedStyle(value).textAlign : "",
+        overflowWrap: value ? getComputedStyle(value).overflowWrap : "",
+        lineBreak: value ? getComputedStyle(value).lineBreak : "",
+      };
+    });
+  expect(storyLayout.columns.trim().split(/\s+/)).toHaveLength(1);
+  expect(storyLayout.textAlign).toBe("left");
+  expect(storyLayout.overflowWrap).not.toBe("anywhere");
+  expect(storyLayout.lineBreak).toBe("strict");
+  const protectedTouchTail = personalitySection
+    .getByTestId("cats-profile-value-tail")
+    .filter({ hasText: "まなく" });
+  await expect(protectedTouchTail).toHaveCount(1);
+  await expect
+    .poll(() =>
+      protectedTouchTail.evaluate(
+        (element) => getComputedStyle(element).whiteSpace,
+      ),
+    )
+    .toBe("nowrap");
   await expect(
     page
       .getByTestId("cats-profile-living-section")
       .getByText("暮らし", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByTestId("cats-profile-living-section")).toHaveAttribute(
+    "data-profile-layout",
+    "note",
+  );
+  const livingRowTextOrder = await page
+    .getByTestId("cats-profile-note-row")
+    .first()
+    .locator(":scope > span")
+    .allTextContents();
+  expect(livingRowTextOrder).toEqual([
+    "気をつけること",
+    "爪切りはふたりで",
+  ]);
   await expect(
     page
       .getByTestId("cats-profile-health-section")
@@ -1572,6 +1628,7 @@ test("keeps populated profile stories and actions readable at mobile widths", as
 test("keeps profile actions clear of horizontal overflow and the safe-area navigation", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2026-07-25T21:30:00+09:00"));
   await seedCatsBasicProfile(page, {
     basicInfo: {
       familySinceDate: "2022-09-22",
@@ -1611,6 +1668,13 @@ test("keeps profile actions clear of horizontal overflow and the safe-area navig
   const shareEntry = page.getByTestId("cats-profile-share-open");
   const manage = page.getByRole("button", { name: "猫を追加・管理" });
   const nav = page.locator("[data-app-bottom-nav]");
+  await expect
+    .poll(() =>
+      scroller.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).scrollPaddingBottom),
+      ),
+    )
+    .toBeGreaterThanOrEqual(80);
 
   for (const viewport of [
     { width: 320, height: 568 },
@@ -1699,6 +1763,8 @@ test("keeps a name-only profile quiet with one invitation to add information", a
   await expect(page.getByTestId("cats-profile-living-section")).toHaveCount(0);
   await expect(page.getByTestId("cats-profile-health-section")).toHaveCount(0);
   await expect(page.getByTestId("cats-profile-basic-section")).toHaveCount(0);
+  const addMore = page.getByTestId("cats-profile-add-more");
+  await expect(addMore).toHaveCount(0);
   await expect(page.getByTestId("cats-profile-growth-section")).toHaveCount(0);
   const invitation = page.getByTestId("cats-profile-empty-invitation");
   await expect(invitation).toHaveCount(1);
@@ -1730,9 +1796,32 @@ test("keeps a name-only profile quiet with one invitation to add information", a
   await expect(quickDialog).toBeHidden();
   await expect(profile).toContainText("窓辺");
   await expect(page.getByTestId("cats-profile-empty-invitation")).toHaveCount(0);
-  await expect(page.getByTestId("cats-profile-living-section")).toBeVisible();
-  await expect(page.getByTestId("cats-profile-health-section")).toBeVisible();
-  await expect(page.getByTestId("cats-profile-basic-section")).toBeVisible();
+  await expect(page.getByTestId("cats-profile-living-section")).toHaveCount(0);
+  await expect(page.getByTestId("cats-profile-health-section")).toHaveCount(0);
+  await expect(page.getByTestId("cats-profile-basic-section")).toHaveCount(0);
+  await expect(addMore).toBeVisible();
+  await expect(
+    addMore.getByRole("button", { name: "暮らし・からだを書く" }),
+  ).toBeVisible();
+  await expect(
+    addMore.getByRole("button", { name: "基本情報を書く" }),
+  ).toBeVisible();
+  await addMore.scrollIntoViewIfNeeded();
+  const [addMoreBox, bottomNavBox] = await Promise.all([
+    addMore.boundingBox(),
+    page.locator("[data-app-bottom-nav]").boundingBox(),
+  ]);
+  expect(addMoreBox).not.toBeNull();
+  expect(bottomNavBox).not.toBeNull();
+  expect((addMoreBox?.y ?? 0) + (addMoreBox?.height ?? 0)).toBeLessThanOrEqual(
+    bottomNavBox?.y ?? 0,
+  );
+  await page.screenshot({
+    path: "artifacts/cats-profile-redesign/iphone-320x568-partial.png",
+    animations: "disabled",
+    caret: "hide",
+    style: "nextjs-portal { display: none !important; }",
+  });
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -2084,7 +2173,7 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await basicDialog.getByRole("button", { name: "保存する" }).click();
   await expect(basicDialog).toBeHidden();
 
-  await page.getByRole("button", { name: "からだ・通院を編集" }).click();
+  await page.getByRole("button", { name: "暮らし・からだを書く" }).click();
   const careDialog = page.getByRole("dialog", { name: "むぎのケアのメモ" });
   await expect(careDialog.getByLabel("毛柄")).toHaveCount(0);
   await careDialog.getByLabel("体重（kg）").fill("21");
@@ -2166,7 +2255,7 @@ test("uses the JST date as the profile input limit at the start of a month", asy
   );
   await basicDialog.getByRole("button", { name: "キャンセル" }).click();
 
-  await page.getByRole("button", { name: "からだ・通院を編集" }).click();
+  await page.getByRole("button", { name: "暮らし・からだを書く" }).click();
   const careDialog = page.getByRole("dialog", { name: "むぎのケアのメモ" });
   await expect(careDialog.getByLabel("はかった日")).toHaveAttribute(
     "max",

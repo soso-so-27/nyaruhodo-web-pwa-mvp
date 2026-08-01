@@ -25,7 +25,8 @@ export type CatProfilePersonalityQuestionKey = keyof CatPersonalityInfo;
 
 export type CatProfilePersonalityItemKey =
   | "callName"
-  | "likes"
+  | "favoritePlace"
+  | "favoritePlay"
   | "favoriteTouch"
   | "dislikes";
 
@@ -117,21 +118,26 @@ export function buildCatProfilePersonalityItems(
     });
   }
 
-  const likes = [values.favoritePlace, values.favoritePlay].filter(
-    (value): value is string => Boolean(value),
-  );
-  if (likes.length > 0) {
+  if (values.favoritePlace) {
     items.push({
-      key: "likes",
-      label: "好き",
-      value: likes.join("\n"),
+      key: "favoritePlace",
+      label: "好きな場所",
+      value: values.favoritePlace,
+    });
+  }
+
+  if (values.favoritePlay) {
+    items.push({
+      key: "favoritePlay",
+      label: "好きな遊び",
+      value: values.favoritePlay,
     });
   }
 
   if (values.favoriteTouch) {
     items.push({
       key: "favoriteTouch",
-      label: "接し方",
+      label: "好きななで方",
       value: values.favoriteTouch,
     });
   }
