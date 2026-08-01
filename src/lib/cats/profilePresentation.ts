@@ -13,7 +13,7 @@ const PERSONALITY_QUESTIONS = [
   {
     key: "callName",
     label: "呼び名",
-    prompt: "いつも、なんと呼んでいますか？",
+    prompt: "いつもの呼び名は？",
   },
   {
     key: "favoritePlace",
@@ -68,7 +68,7 @@ export type CatProfileNextQuestion =
       kind: "review";
       key: "review";
       label: "見返す";
-      prompt: "書いたことを、見返してみますか？";
+      prompt: "書いたことを、見返してみる";
     };
 
 export type CatProfileLivingItemGroup = "care" | "history" | "identity";
@@ -159,7 +159,7 @@ export function buildCatProfilePortraitLines(profile: CatProfile): string[] {
   };
 
   return [
-    values.callName ? `いつもは、${values.callName}と呼んでいます。` : null,
+    values.callName ? `ふだんの呼び名は、${values.callName}。` : null,
     values.favoritePlace ? `よくいるのは、${values.favoritePlace}。` : null,
     values.favoritePlay ? `好きな遊びは、${values.favoritePlay}。` : null,
     values.favoriteTouch
@@ -190,7 +190,7 @@ export function getNextCatProfileQuestion(
     kind: "review",
     key: "review",
     label: "見返す",
-    prompt: "書いたことを、見返してみますか？",
+    prompt: "書いたことを、見返してみる",
   };
 }
 

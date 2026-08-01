@@ -1288,7 +1288,7 @@ test("shows the new populated profile hierarchy without repeating legacy rows", 
         callName: "むー",
         favoritePlace: "窓辺のクッション",
         favoritePlay: "羽のおもちゃ",
-        favoriteTouch: "あごの下",
+        favoriteTouch: "全身をウラオモテくまなく",
         dislikes: "掃除機の音",
       },
       care: {
@@ -1333,6 +1333,17 @@ test("shows the new populated profile hierarchy without repeating legacy rows", 
   await expect(
     profile.getByText("むぎは、こんな子", { exact: true }),
   ).toBeVisible();
+  const portrait = page.getByTestId("cats-profile-portrait-copy");
+  for (const sentence of [
+    "ふだんの呼び名は、むー。",
+    "よくいるのは、窓辺のクッション。",
+    "好きな遊びは、羽のおもちゃ。",
+    "なでると喜ぶのは、全身をウラオモテくまなく。",
+    "苦手なのは、掃除機の音。",
+  ]) {
+    await expect(portrait).toContainText(sentence);
+  }
+  await expect(portrait).not.toContainText(/です|ます/);
   await expect(
     page
       .getByTestId("cats-profile-life-section")
@@ -1358,7 +1369,7 @@ test("shows the new populated profile hierarchy without repeating legacy rows", 
     "むー",
     "窓辺のクッション",
     "羽のおもちゃ",
-    "あごの下",
+    "全身をウラオモテくまなく",
     "掃除機の音",
     "ねこの病院",
     "爪切りはふたりで",
@@ -1441,7 +1452,7 @@ test("shows the new populated profile hierarchy without repeating legacy rows", 
     )
     .toEqual({
       birthDate: "2022-07-11",
-      favoriteTouch: "あごの下",
+      favoriteTouch: "全身をウラオモテくまなく",
       careNote: "爪切りはふたりで",
       weightKg: 4.8,
       coat: "orange_tabby",
@@ -1683,7 +1694,7 @@ test("starts an empty personality with one focused growth question", async ({
   const question = growth;
   await expect(question).toHaveCount(1);
   await expect(question).toHaveAttribute("data-profile-question", "callName");
-  await expect(question).toContainText("いつも、なんと呼んでいますか？");
+  await expect(question).toContainText("いつもの呼び名は？");
   for (const laterQuestion of [
     "好きな場所は？",
     "好きな遊びは？",
